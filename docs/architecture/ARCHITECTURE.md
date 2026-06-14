@@ -61,6 +61,14 @@ into reusable packages and crates.
   opacity, transparency, motion → DOM attributes/CSS vars); the launcher applies
   the saved appearance on show, the Settings window applies live. Accelerator
   parsing/formatting is the pure `@orbit/shortcuts`.
+- **Extension host** (`extension_host.rs`) runs each extension as an isolated
+  `node` child process (spawn-per-invocation), driving a versioned one-shot RPC
+  (`orbit-extensions::protocol`). All decisions — manifest validation, the
+  permission broker, crash-loop protection, discovery — are pure in
+  `orbit-extensions`; per-extension storage is namespaced in `orbit-core::extstore`.
+  Extensions reach the system only through brokered effects, never the renderer.
+  See [FILE_SEARCH.md](FILE_SEARCH.md) and
+  [EXTENSION_RUNTIME.md](EXTENSION_RUNTIME.md).
 
 ## Search pipeline
 

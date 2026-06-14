@@ -9,6 +9,7 @@ import {
   createAppProvider,
   createCalculatorProvider,
   createFileProvider,
+  createExtensionProvider,
   createNoteProvider,
   createQuicklinkProvider,
   createSnippetProvider,
@@ -23,8 +24,9 @@ import { ClipboardView } from './components/ClipboardView.js';
 import { SnippetsView } from './components/SnippetsView.js';
 import { QuicklinksView } from './components/QuicklinksView.js';
 import { NotesView } from './components/NotesView.js';
+import { ExtensionListView } from './components/ExtensionListView.js';
 
-type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes';
+type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes' | 'extension-list';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -46,6 +48,7 @@ export function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   const appsRef = useRef<native.NativeApp[]>([]);
+  const extCommandsRef = useRef<native.ExtCommandInfo[]>([]);
   const signalsRef = useRef<RankingSignals>(buildSignals([]));
   const searchAbort = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +64,7 @@ export function App(): JSX.Element {
       createNoteProvider(),
       createFileProvider(),
       createToolsProvider(),
+      createExtensionProvider(() => extCommandsRef.current),
       createCalculatorProvider(),
     ],
     [registry],
@@ -71,11 +75,13 @@ export function App(): JSX.Element {
     if (!native.isTauri()) return;
     void (async () => {
       try {
-        const [apps, snapshot] = await Promise.all([
+        const [apps, snapshot, extCommands] = await Promise.all([
           native.listApplications(),
           native.usageSnapshot(),
+          native.extensionCommands().catch(() => []),
         ]);
         appsRef.current = apps;
+        extCommandsRef.current = extCommands;
         signalsRef.current = buildSignals(snapshot);
         void doSearch(query);
       } catch (e) {
@@ -146,7 +152,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'clipboard' ||
           outcome.pushView === 'snippets' ||
           outcome.pushView === 'quicklinks' ||
-          outcome.pushView === 'notes'
+          outcome.pushView === 'notes' ||
+          outcome.pushView === 'extension-list'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -208,6 +215,16 @@ export function App(): JSX.Element {
 
   if (view === 'notes') {
     return <NotesView initialNoteId={viewArg} onPop={() => setView('root')} />;
+  }
+
+  if (view === 'extension-list') {
+    return (
+      <ExtensionListView
+        target={viewArg ?? ''}
+        onPop={() => setView('root')}
+        onDone={closeToRoot}
+      />
+    );
   }
 
   return (

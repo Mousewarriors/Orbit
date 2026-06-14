@@ -4,6 +4,7 @@
 
 pub mod clipboard;
 pub mod db;
+pub mod extstore;
 pub mod files;
 pub mod migrations;
 pub mod notes;

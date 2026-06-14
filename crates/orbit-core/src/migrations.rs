@@ -142,6 +142,24 @@ pub const MIGRATIONS: &[&str] = &[
         title, body, content='notes', content_rowid='rowid'
     );
     "#,
+    // 0006 — per-extension namespaced key/value storage. The (ext_id, key) pair
+    // is the natural key; values are opaque strings owned by the extension. The
+    // native broker is the only writer, so an extension can never read or write
+    // another extension's namespace.
+    r#"
+    CREATE TABLE extension_storage (
+        ext_id     TEXT NOT NULL,
+        key        TEXT NOT NULL,
+        value      TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (ext_id, key)
+    );
+
+    CREATE TABLE extension_state (
+        ext_id     TEXT PRIMARY KEY NOT NULL,
+        enabled    INTEGER NOT NULL DEFAULT 1
+    );
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -211,6 +229,7 @@ mod tests {
             "quicklinks",
             "files",
             "notes",
+            "extension_storage",
         ] {
             let count: i64 = conn
                 .query_row(

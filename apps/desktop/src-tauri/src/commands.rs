@@ -35,6 +35,8 @@ pub struct AppState {
     pub active_shortcut: Mutex<Option<Shortcut>>,
     /// Background file-index progress/state.
     pub index: crate::file_index::IndexState,
+    /// Extension host (discovery, isolated child processes, brokering).
+    pub ext_host: crate::extension_host::ExtensionHost,
 }
 
 fn now_ms() -> i64 {
@@ -630,6 +632,88 @@ pub fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
             .open_path(parent, None::<&str>)
             .map_err(|e| e.to_string())
     }
+}
+
+// ---------------------------------------------------------------------------
+// Extensions
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn extension_list(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::extension_host::ExtensionInfo>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    Ok(state.ext_host.list(&conn))
+}
+
+#[tauri::command]
+pub fn extension_commands(
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::extension_host::ExtCommandInfo>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    Ok(state.ext_host.commands(&conn))
+}
+
+#[tauri::command]
+pub fn extension_run(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    ext_id: String,
+    command: String,
+    query: String,
+) -> Result<crate::extension_host::RunResult, String> {
+    state.ext_host.run(&app, state.inner(), &ext_id, &command, &query)
+}
+
+#[tauri::command]
+pub fn extension_set_enabled(
+    state: State<'_, AppState>,
+    ext_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    state.ext_host.set_enabled(&conn, &ext_id, enabled)
+}
+
+#[tauri::command]
+pub fn extension_reload(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::extension_host::ExtensionInfo>, String> {
+    let roots = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        crate::extension_host::roots(&app, &conn)
+    };
+    state.ext_host.reload(&roots);
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    Ok(state.ext_host.list(&conn))
+}
+
+/// Folders that failed to load as extensions, with the reason (diagnostics).
+#[tauri::command]
+pub fn extension_errors(state: State<'_, AppState>) -> Vec<(String, String)> {
+    state.ext_host.errors()
+}
+
+#[tauri::command]
+pub fn extension_get_dev_paths(state: State<'_, AppState>) -> Result<String, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    Ok(orbit_core::get_setting(&conn, "extensions.dev_paths")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_default())
+}
+
+#[tauri::command]
+pub fn extension_set_dev_paths(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    paths: String,
+) -> Result<Vec<crate::extension_host::ExtensionInfo>, String> {
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        orbit_core::set_setting(&conn, "extensions.dev_paths", &paths).map_err(|e| e.to_string())?;
+    }
+    extension_reload(app, state)
 }
 
 // ---------------------------------------------------------------------------

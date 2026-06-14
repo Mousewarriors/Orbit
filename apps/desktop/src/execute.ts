@@ -72,6 +72,10 @@ export async function executeAction(
         ? { hide: false, pushView: run.viewId, pushViewArg: id }
         : { hide: false, pushView: run.viewId };
     }
+    case 'run-extension':
+      // No-view extension command: effects are brokered & performed natively.
+      if (native.isTauri()) await native.extensionRun(run.extId, run.command, ctx.query);
+      return { hide: true };
     case 'builtin':
       if (run.handler === 'run-command') {
         const id = run.args?.['commandId'];

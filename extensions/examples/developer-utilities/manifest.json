@@ -1,0 +1,27 @@
+{
+  "$schema": 1,
+  "name": "developer-utilities",
+  "title": "Developer Utilities",
+  "description": "Generate UUIDs and recall recently generated ones.",
+  "author": "orbit",
+  "version": "0.1.0",
+  "platforms": ["windows", "macos", "linux"],
+  "permissions": ["clipboard.write"],
+  "main": "index.mjs",
+  "commands": [
+    {
+      "name": "random-uuid",
+      "title": "Generate UUID",
+      "description": "Generate a UUID v4 and copy it to the clipboard",
+      "mode": "no-view",
+      "keywords": ["uuid", "guid", "id"]
+    },
+    {
+      "name": "uuid-history",
+      "title": "UUID History",
+      "description": "Recently generated UUIDs (select to copy)",
+      "mode": "list",
+      "keywords": ["uuid", "history", "recent"]
+    }
+  ]
+}

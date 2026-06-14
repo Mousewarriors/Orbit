@@ -57,6 +57,11 @@ What works and is tested today:
   surfaced in Root Search and opened straight into the editor.
 - **Built-in tools**: type `uuid`, `password 24`, a colour like `#ff8800`, or
   `json {…}` to get instant results you can copy.
+- **Extensions (foundation)**: third-party commands run in isolated child
+  processes and reach the system only through a permission-brokered RPC. Two
+  sample extensions ship in `extensions/examples`; load them via Settings →
+  Extensions → Developer folders. See
+  [`docs/architecture/EXTENSION_RUNTIME.md`](docs/architecture/EXTENSION_RUNTIME.md).
 - **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
   placeholder engine, the appearance + shortcut-accelerator models, command
@@ -82,10 +87,15 @@ packages/
   placeholders/       Snippet & Quicklink dynamic-placeholder engine
   appearance/         Pure theme/opacity/transparency/motion model
   shortcuts/          Pure global-shortcut accelerator parse/format
+  tools/              Pure built-in tools (colour, JSON, password, UUID)
+  extension-sdk/      JS SDK for authoring extensions (one-shot stdin/stdout)
 crates/
   orbit-core/         SQLite open + migrations + data access (Rust)
+  orbit-extensions/   Manifest, RPC protocol, permission broker, crash tracking
+  orbit-files/        Filesystem walker + indexing rules (Rust)
   orbit-input/        Text injection (SendInput) + keyword trigger + lifecycle
   orbit-search/       Native fuzzy matcher mirroring the TS engine (Rust)
+extensions/examples/  Sample extensions (developer-utilities, agentos-status)
 docs/                 Architecture, security, data model, etc.
 scripts/              Tooling (e.g. original app-icon generator)
 ```

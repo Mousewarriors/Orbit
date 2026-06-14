@@ -327,6 +327,81 @@ export async function openDataDir(): Promise<void> {
   return invoke('open_data_dir');
 }
 
+// --- Extensions ---
+
+export interface ExtensionInfo {
+  id: string;
+  title: string;
+  version: string;
+  enabled: boolean;
+  crashed: boolean;
+  command_count: number;
+  permissions: string[];
+}
+
+export interface ExtCommandInfo {
+  ext_id: string;
+  ext_title: string;
+  command: string;
+  title: string;
+  mode: string;
+  description: string | null;
+  keywords: string[];
+}
+
+export interface ExtRunAction {
+  kind: string;
+  value: string;
+}
+
+export interface ExtRunItem {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  action: ExtRunAction | null;
+}
+
+export interface ExtRunResult {
+  items: ExtRunItem[];
+  toast: string | null;
+}
+
+export async function extensionList(): Promise<ExtensionInfo[]> {
+  return invoke<ExtensionInfo[]>('extension_list');
+}
+
+export async function extensionCommands(): Promise<ExtCommandInfo[]> {
+  return invoke<ExtCommandInfo[]>('extension_commands');
+}
+
+export async function extensionRun(
+  extId: string,
+  command: string,
+  query: string,
+): Promise<ExtRunResult> {
+  return invoke<ExtRunResult>('extension_run', { extId, command, query });
+}
+
+export async function extensionSetEnabled(extId: string, enabled: boolean): Promise<void> {
+  return invoke('extension_set_enabled', { extId, enabled });
+}
+
+export async function extensionReload(): Promise<ExtensionInfo[]> {
+  return invoke<ExtensionInfo[]>('extension_reload');
+}
+
+export async function extensionErrors(): Promise<Array<[string, string]>> {
+  return invoke<Array<[string, string]>>('extension_errors');
+}
+
+export async function extensionGetDevPaths(): Promise<string> {
+  return invoke<string>('extension_get_dev_paths');
+}
+
+export async function extensionSetDevPaths(paths: string): Promise<ExtensionInfo[]> {
+  return invoke<ExtensionInfo[]>('extension_set_dev_paths', { paths });
+}
+
 export async function quitApp(): Promise<void> {
   return invoke('quit_app');
 }

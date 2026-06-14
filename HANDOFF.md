@@ -50,7 +50,16 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > provider (opens a note via a push-view action carrying its id).
 > (7) **Built-in tools** — pure `@orbit/tools` (colour conversion, JSON format/
 > minify, crypto-secure password, UUID; 11 tests) surfaced as instant Root Search
-> results. Counts: **127 JS tests, 76 Rust tests**; full gate green.
+> results.
+> (8) **Extension Host foundation** — isolated child-process extension runtime:
+> `orbit-extensions` (manifest/protocol/permission/crash/discovery, 21 tests),
+> `orbit-core::extstore` namespaced storage (migration 0006), `extension_host.rs`
+> (spawn `node` per call, timed RPC, effect brokering, crash-loop breaker),
+> `@orbit/extension-sdk`, two sample extensions, a Root Search command provider +
+> list view, Settings → Extensions. RPC verified end-to-end via real Node;
+> permission/crash/manifest logic unit-tested. Counts: **127 JS tests, 100 Rust
+> tests**; full gate green. Not GUI-run here; child not yet OS-sandboxed (uses
+> `node` from PATH) — see EXTENSION_RUNTIME.md.
 
 ## How to verify the build yourself (do this first)
 
@@ -169,9 +178,17 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
    in `@orbit/appearance` + `@orbit/shortcuts`. Remaining Settings polish (not
    blocking): a Files section (will land with the File Search slice), launch-at-
    login (needs the autostart plugin), and excluded-apps for snippets/clipboard.
-5. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
-   a Node sidecar child process, a restricted RPC bridge, permission broker in
-   Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
+5. ~~**Extension host**~~ — **FOUNDATION DONE (session 3)**. `orbit-extensions`
+   crate (manifest/protocol/permission/crash/discovery, 21 tests),
+   `orbit-core::extstore` namespaced storage (migration 0006, 3 tests), a Rust
+   host that spawns `node` per invocation with timed one-shot RPC + effect
+   brokering + crash-loop breaker (`extension_host.rs`), `@orbit/extension-sdk`,
+   two sample extensions (developer-utilities, agentos-status), a Root Search
+   command provider + list view, and Settings → Extensions. See
+   docs/architecture/EXTENSION_RUNTIME.md. **Next:** OS sandboxing of the child
+   (AppContainer/job objects), a bundled JS runtime (currently `node` from PATH),
+   secrets API, more command modes (view/detail/form), hot dev-reload, a typed
+   SDK npm package + CLI. Do NOT start the extension store yet.
 6. ~~**Notes**~~ — **DONE (session 3)**. `orbit-core::notes` (CRUD + FTS5,
    pin/archive), a Notes view with an autosaving editor + searchable list, and a
    root-search note provider. Next: rendered Markdown preview, version snapshots,
@@ -208,6 +225,11 @@ Compile + unit tests are green; these GUI paths still want a human eye:
 - Notes: run "Notes" → type a title/body; confirm "saved" appears (autosave) and
   the note persists after closing/reopening; search finds it by title and body;
   from Root Search a matching note opens straight into the editor; ⌘N/⌘⌫ work.
+- Extensions: Settings → Extensions → add the repo's `extensions/examples` path →
+  Save & reload; "Developer Utilities" and "AgentOS Status" appear. From Root
+  Search run "Generate UUID" (no-view → copies + toast); open "UUID History"
+  (list, shows prior UUIDs); open "AgentOS Status" (list, filter by typing).
+  Disable one and confirm its commands vanish from Root Search.
 
 For any of these, follow CLAUDE.md architecture rules and end on the full
 verification gate + a FEATURE_MATRIX update.

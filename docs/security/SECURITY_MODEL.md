@@ -39,6 +39,11 @@ cross-extension data access; AI tool misuse.
 | Settings is a second webview of the **same** bundle/origin under the same CSP; it reaches native only through the typed IPC surface (no extra origin trust) | `open_settings` + `main.tsx` hash route |
 | Snippet keyboard hook never logs/persists raw keystrokes; the buffer holds only the trailing chars needed to match a keyword and resets on focus/navigation breaks; self-injected events are tagged and ignored | `snippet_watcher.rs` + `orbit_input::trigger` |
 | Clipboard capture is user-disableable and honoured live; nothing leaves the device | `clipboard_monitor.rs` (`privacy.clipboard.enabled`) |
+| Extensions run as isolated child processes (never in the renderer/host); they affect Orbit only via a versioned, schema-validated RPC | `extension_host.rs` + `orbit-extensions::protocol` |
+| Extension effects + item actions are permission-brokered against the manifest (undeclared ⇒ dropped, never performed) | `orbit-extensions::permission` (tested) |
+| Extension storage is namespaced per extension; no cross-extension reads/writes | `orbit-core::extstore` (tested) |
+| Crash-loop protection auto-disables a repeatedly failing/hanging extension; invocations time out and the child is killed | `orbit-extensions::crash` + `extension_host` |
+| Extension manifests are validated host-side (bounded fields, safe ids, no traversal in `main`, known permissions/modes) | `orbit-extensions::manifest` (tested) |
 
 Defence-in-depth: validation exists in TS **and** the native layer re-checks
 (e.g. `open_url` independently rejects non-http(s)/mailto schemes).
@@ -47,7 +52,13 @@ Defence-in-depth: validation exists in TS **and** the native layer re-checks
 surface — it is **opt-in / off by default**, has a controllable lifecycle, and
 cannot inject into higher-integrity (elevated) windows from a non-elevated Orbit
 (a Windows boundary we deliberately do not bypass). The local SQLite store
-(clipboard/snippets) is **not yet encrypted at rest**.
+(clipboard/snippets/notes/extension storage) is **not yet encrypted at rest**.
+**Extensions are process-isolated but not yet OS-sandboxed**: the child has the
+privileges of `node` (run from PATH), so the broker governs what *Orbit* does on
+the extension's behalf, not what the child process can do directly (fs/network).
+OS sandboxing (AppContainer / job objects), a bundled runtime, and an extension
+secrets API are tracked as future work (see
+[../architecture/EXTENSION_RUNTIME.md](../architecture/EXTENSION_RUNTIME.md)).
 
 ## Planned controls
 

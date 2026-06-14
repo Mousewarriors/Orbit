@@ -261,6 +261,48 @@ export function createFileProvider(): SearchProvider {
   };
 }
 
+/**
+ * Extension command provider. Surfaces commands from installed, enabled,
+ * non-crashed extensions in Root Search (matched/ranked by title + keywords).
+ * A `no-view` command runs in its child process (effects brokered natively); a
+ * `list` command opens a dedicated view that streams its items.
+ */
+export function createExtensionProvider(
+  getCommands: () => ReadonlyArray<native.ExtCommandInfo>,
+): SearchProvider {
+  return {
+    id: 'extensions',
+    source: 'extension',
+    canHandle: () => native.isTauri(),
+    async search(): Promise<SearchItem[]> {
+      return getCommands().map((c) => {
+        const isList = c.mode === 'list';
+        return {
+          id: `ext.${c.ext_id}.${c.command}`,
+          title: c.title,
+          subtitle: c.description ? `${c.ext_title} · ${c.description}` : c.ext_title,
+          keywords: c.keywords,
+          category: c.ext_title,
+          source: 'extension' as const,
+          icon: { kind: 'builtin' as const, name: 'puzzle' },
+          confidence: 0.55,
+          primaryAction: {
+            id: `ext.${c.ext_id}.${c.command}.run`,
+            title: isList ? 'Open' : 'Run',
+            run: isList
+              ? {
+                  kind: 'push-view' as const,
+                  viewId: 'extension-list',
+                  args: { id: `${c.ext_id}::${c.command}` },
+                }
+              : { kind: 'run-extension' as const, extId: c.ext_id, command: c.command },
+          },
+        };
+      });
+    },
+  };
+}
+
 /** Cryptographically secure float in [0, 1) for password generation. */
 function secureRandom(): number {
   const a = new Uint32Array(1);

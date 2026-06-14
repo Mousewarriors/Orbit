@@ -10,6 +10,7 @@
 mod apps;
 mod clipboard_monitor;
 mod commands;
+mod extension_host;
 mod file_index;
 mod snippet_watcher;
 mod window_mgmt;
@@ -154,6 +155,7 @@ pub fn run() {
                 last_foreground: Mutex::new(0),
                 active_shortcut: Mutex::new(shortcut),
                 index: file_index::IndexState::default(),
+                ext_host: extension_host::ExtensionHost::default(),
             });
 
             // Register the global activation shortcut.
@@ -184,10 +186,14 @@ pub fn run() {
                     }
                     // Refresh the file index in the background if the user has
                     // enabled it (no-op / no disk scan otherwise).
-                    if file_index::is_enabled(&conn) {
-                        drop(conn);
+                    let file_indexing = file_index::is_enabled(&conn);
+                    // Discover installed extensions.
+                    let ext_roots = extension_host::roots(&handle, &conn);
+                    drop(conn);
+                    if file_indexing {
                         file_index::rebuild(handle.clone());
                     }
+                    state.ext_host.reload(&ext_roots);
                 }
             }
 
@@ -236,6 +242,14 @@ pub fn run() {
             commands::note_update,
             commands::note_delete,
             commands::note_set_pinned,
+            commands::extension_list,
+            commands::extension_commands,
+            commands::extension_run,
+            commands::extension_set_enabled,
+            commands::extension_reload,
+            commands::extension_errors,
+            commands::extension_get_dev_paths,
+            commands::extension_set_dev_paths,
             commands::quicklink_list,
             commands::quicklink_create,
             commands::quicklink_update,

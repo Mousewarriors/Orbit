@@ -54,4 +54,5 @@ export type ActionToken =
       /** When set, the snippet whose usage should be recorded after pasting. */
       readonly snippetId?: string;
     }
-  | { readonly kind: 'push-view'; readonly viewId: string; readonly args?: Readonly<Record<string, unknown>> };
+  | { readonly kind: 'push-view'; readonly viewId: string; readonly args?: Readonly<Record<string, unknown>> }
+  | { readonly kind: 'run-extension'; readonly extId: string; readonly command: string };

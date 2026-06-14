@@ -15,7 +15,7 @@ permissions + error handling + keyboard + tests are all present.
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
 | Vitest unit tests | ✅ | 127 passing |
-| Rust unit/integration tests | ✅ | 76 passing (orbit-core 35, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
+| Rust unit/integration tests | ✅ | 100 passing (orbit-core 38, orbit-extensions 21, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -52,6 +52,7 @@ permissions + error handling + keyboard + tests are all present.
 | Snippet provider (root search) | ✅ | placeholder-resolved, gated to ≥2 chars; paste-injects on Enter |
 | File provider (root search) | ✅ | queries the local file index, gated to ≥3 chars, runs concurrently under the per-provider timeout; actions: open / reveal / copy path |
 | Note provider (root search) | ✅ | title+body FTS, gated ≥2 chars; opens the note in the Notes editor via a push-view action carrying its id |
+| Extension command provider (root search) | ✅ | lists commands from enabled, non-crashed extensions; no-view runs in the child, list opens a streaming view |
 | Clipboard / calendar providers | ⬜ | clipboard has its own view; calendar not started |
 | Action Panel (keyboard, secondary actions) | 🟡 | compact menu implemented |
 | Diagnostics ("why this ranked") | 🧪 | data produced; no UI |
@@ -77,8 +78,10 @@ permissions + error handling + keyboard + tests are all present.
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Extension manifest schema + validation | ✅ | `@orbit/validation`, tested |
-| Extension runtime / SDK / CLI / store | ⬜ | designed in docs only |
+| Extension manifest schema + validation | ✅ | `@orbit/validation` (renderer) + `orbit-extensions::manifest` (host), both tested |
+| Extension runtime (host, RPC, broker, storage, crash isolation) | 🟡 | **Foundation built.** Isolated child-process host (spawn-per-invocation), versioned schema-validated RPC, permission-brokered effects, namespaced storage (`orbit-core::extstore`), crash-loop breaker, Root Search command provider + list view, Settings → Extensions, two sample extensions. Verified by unit tests (orbit-extensions 21) + real Node RPC round-trips. **Not** OS-sandboxed beyond process isolation; uses `node` from PATH; not GUI-run here. See [docs/architecture/EXTENSION_RUNTIME.md](docs/architecture/EXTENSION_RUNTIME.md) |
+| Extension SDK | 🟡 | `@orbit/extension-sdk` (one-shot stdin/stdout helper) + two working samples; no typed npm package/CLI yet |
+| Extension store | ⬜ | not started (intentionally deferred) |
 | AI (Quick AI, Chat, commands, agents) | ⬜ | — |
 | MCP client | ⬜ | — |
 | Cloud sync / account / teams | ⬜ | — |
@@ -93,4 +96,5 @@ permissions + error handling + keyboard + tests are all present.
 | Shell-argument & external-URL safety | ✅ | tested |
 | No `eval` in calculator | ✅ | recursive-descent parser |
 | Manifest hardening (lengths, identifiers, no traversal) | ✅ | tested |
-| Secret vault, process isolation, permission broker | ⬜ | designed in SECURITY_MODEL |
+| Extension process isolation + permission broker | 🟡 | extensions run as isolated child processes; effects/item-actions brokered against declared permissions; namespaced storage; crash-loop breaker (`orbit-extensions`, tested). **Not** OS-sandboxed yet (child has Node privileges) — see EXTENSION_RUNTIME.md |
+| Secret vault, OS sandboxing of extensions | ⬜ | designed in SECURITY_MODEL |

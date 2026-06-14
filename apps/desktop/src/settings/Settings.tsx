@@ -7,13 +7,21 @@ import { initAppearance, saveAppearance } from '../appearance.js';
 import { Toggle, Field, Section, Row } from './controls.js';
 import { ShortcutRecorder } from './ShortcutRecorder.js';
 
-type SectionId = 'general' | 'appearance' | 'snippets' | 'files' | 'privacy' | 'developer';
+type SectionId =
+  | 'general'
+  | 'appearance'
+  | 'snippets'
+  | 'files'
+  | 'extensions'
+  | 'privacy'
+  | 'developer';
 
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; icon: string }> = [
   { id: 'general', label: 'General', icon: '⚙' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
   { id: 'snippets', label: 'Snippets', icon: '⌨' },
   { id: 'files', label: 'Files', icon: '📁' },
+  { id: 'extensions', label: 'Extensions', icon: '🧩' },
   { id: 'privacy', label: 'Privacy', icon: '🔒' },
   { id: 'developer', label: 'Developer', icon: '🛠' },
 ];
@@ -49,6 +57,7 @@ export function Settings(): JSX.Element {
         {active === 'appearance' && <AppearanceSection />}
         {active === 'snippets' && <SnippetsSection />}
         {active === 'files' && <FilesSection />}
+        {active === 'extensions' && <ExtensionsSection />}
         {active === 'privacy' && <PrivacySection />}
         {active === 'developer' && <DeveloperSection />}
       </main>
@@ -388,6 +397,136 @@ function FilesSection(): JSX.Element {
           Rebuild index now
         </button>
       </Field>
+      {error && <p className="settings-err">⚠ {error}</p>}
+    </Section>
+  );
+}
+
+function ExtensionsSection(): JSX.Element {
+  const [exts, setExts] = useState<native.ExtensionInfo[]>([]);
+  const [errors, setErrors] = useState<Array<[string, string]>>([]);
+  const [devPaths, setDevPaths] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [list, errs, paths] = await Promise.all([
+        native.extensionList(),
+        native.extensionErrors(),
+        native.extensionGetDevPaths(),
+      ]);
+      setExts(list);
+      setErrors(errs);
+      setDevPaths(paths);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const reload = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setExts(await native.extensionReload());
+      setErrors(await native.extensionErrors());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const toggle = useCallback(
+    async (id: string, enabled: boolean) => {
+      try {
+        await native.extensionSetEnabled(id, enabled);
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [refresh],
+  );
+
+  const saveDevPaths = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setExts(await native.extensionSetDevPaths(devPaths));
+      setErrors(await native.extensionErrors());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [devPaths]);
+
+  return (
+    <Section
+      title="Extensions"
+      description="Extensions run in isolated child processes and can only do what their manifest declares. Nothing runs in the launcher itself."
+    >
+      <Field label="Installed" hint="Disable an extension to hide its commands; a repeatedly crashing extension is disabled automatically.">
+        {exts.length === 0 ? (
+          <p className="settings-note">No extensions found. Add a folder below to load some.</p>
+        ) : (
+          <div className="settings-ext-list">
+            {exts.map((e) => (
+              <div key={e.id} className="settings-ext">
+                <div className="settings-ext-main">
+                  <div className="settings-ext-title">
+                    {e.title} <span className="settings-ext-ver">v{e.version || '0.0.0'}</span>
+                    {e.crashed && <span className="settings-ext-badge">crashed — disabled</span>}
+                  </div>
+                  <div className="settings-ext-meta">
+                    {e.command_count} command{e.command_count === 1 ? '' : 's'}
+                    {e.permissions.length > 0 ? ` · ${e.permissions.join(', ')}` : ' · no permissions'}
+                  </div>
+                </div>
+                <Toggle
+                  label=""
+                  checked={e.enabled}
+                  disabled={busy}
+                  onChange={(v) => void toggle(e.id, v)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </Field>
+
+      <Field label="Developer folders" hint="One path per line. Point Orbit at folders containing extensions (e.g. the repo's extensions/examples) to load them.">
+        <textarea
+          className="settings-textarea"
+          rows={2}
+          value={devPaths}
+          onChange={(e) => setDevPaths(e.target.value)}
+          placeholder="C:\path\to\Orbit\extensions\examples"
+        />
+        <button className="settings-btn-ghost" disabled={busy} onClick={() => void saveDevPaths()}>
+          Save &amp; reload
+        </button>
+        <button className="settings-btn-ghost" disabled={busy} onClick={() => void reload()}>
+          Reload
+        </button>
+      </Field>
+
+      {errors.length > 0 && (
+        <Field label="Failed to load">
+          <ul className="settings-ext-errors">
+            {errors.map(([dir, msg]) => (
+              <li key={dir}>
+                <span className="settings-mono">{dir}</span> — {msg}
+              </li>
+            ))}
+          </ul>
+        </Field>
+      )}
       {error && <p className="settings-err">⚠ {error}</p>}
     </Section>
   );

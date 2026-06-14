@@ -38,4 +38,20 @@ export default tseslint.config(
       },
     },
   },
+  {
+    // Extensions + SDK are Node child-process modules (one-shot stdin/stdout).
+    files: ['extensions/**/*.{js,mjs}', 'packages/extension-sdk/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+        crypto: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        globalThis: 'readonly',
+      },
+    },
+  },
 );

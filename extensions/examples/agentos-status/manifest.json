@@ -1,0 +1,20 @@
+{
+  "$schema": 1,
+  "name": "agentos-status",
+  "title": "AgentOS Status",
+  "description": "View the status of AgentOS agents (mock data — no network access).",
+  "author": "orbit",
+  "version": "0.1.0",
+  "platforms": ["windows", "macos", "linux"],
+  "permissions": ["clipboard.write"],
+  "main": "index.mjs",
+  "commands": [
+    {
+      "name": "agent-status",
+      "title": "AgentOS Status",
+      "description": "List agents and their current status",
+      "mode": "list",
+      "keywords": ["agentos", "agent", "status", "mock"]
+    }
+  ]
+}
