@@ -46,6 +46,10 @@ What works and is tested today:
 - **Snippets**: a CRUD manager + root-search provider with placeholder expansion,
   paste-injection into the active app, and **opt-in** system-wide keyword
   expansion (Windows) with a controllable start/stop/restart lifecycle.
+- **Local file search** (opt-in, metadata-only): a background indexer over your
+  chosen folders feeds a root-search file provider (open / reveal / copy path).
+  Nothing is scanned until you enable it; file contents are never read or stored.
+  See [`docs/architecture/FILE_SEARCH.md`](docs/architecture/FILE_SEARCH.md).
 - **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
   placeholder engine, the appearance + shortcut-accelerator models, command

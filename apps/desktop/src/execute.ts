@@ -43,6 +43,9 @@ export async function executeAction(
     case 'open-path':
       await native.launchPath(run.path);
       return { hide: true };
+    case 'reveal-path':
+      if (native.isTauri()) await native.revealPath(run.path);
+      return { hide: true };
     case 'open-url':
       await native.openUrl(run.url);
       return { hide: true };

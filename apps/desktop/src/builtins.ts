@@ -120,6 +120,15 @@ export const BUILTINS: BuiltinCommand[] = [
     },
   },
   {
+    definition: def('builtin.files.reindex', 'Rebuild File Index', 'Orbit', 'refresh-cw', {
+      keywords: ['files', 'index', 'rescan', 'search'],
+      subtitle: 'Re-scan indexed folders for file search',
+    }),
+    effect: async () => {
+      await native.fileIndexRebuild();
+    },
+  },
+  {
     definition: def('builtin.orbit.quit', 'Quit Orbit', 'Orbit', 'power', {
       keywords: ['exit', 'close'],
     }),

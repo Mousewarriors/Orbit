@@ -2498,6 +2498,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "orbit-core",
+ "orbit-files",
  "orbit-input",
  "orbit-search",
  "orbit-window-manager",
@@ -2510,6 +2511,10 @@ dependencies = [
  "tauri-plugin-opener",
  "windows 0.58.0",
 ]
+
+[[package]]
+name = "orbit-files"
+version = "0.1.0"
 
 [[package]]
 name = "orbit-input"

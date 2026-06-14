@@ -10,6 +10,7 @@
 mod apps;
 mod clipboard_monitor;
 mod commands;
+mod file_index;
 mod snippet_watcher;
 mod window_mgmt;
 
@@ -152,6 +153,7 @@ pub fn run() {
                 apps: Mutex::new(apps),
                 last_foreground: Mutex::new(0),
                 active_shortcut: Mutex::new(shortcut),
+                index: file_index::IndexState::default(),
             });
 
             // Register the global activation shortcut.
@@ -179,6 +181,12 @@ pub fn run() {
                         == Some("true");
                     if enabled {
                         snippet_watcher::start();
+                    }
+                    // Refresh the file index in the background if the user has
+                    // enabled it (no-op / no disk scan otherwise).
+                    if file_index::is_enabled(&conn) {
+                        drop(conn);
+                        file_index::rebuild(handle.clone());
                     }
                 }
             }
@@ -223,6 +231,11 @@ pub fn run() {
             commands::set_activation_shortcut,
             commands::diagnostics,
             commands::open_data_dir,
+            commands::file_search,
+            commands::file_index_status,
+            commands::file_index_set_enabled,
+            commands::file_index_rebuild,
+            commands::reveal_path,
             commands::hide_launcher,
             commands::quit_app,
         ])

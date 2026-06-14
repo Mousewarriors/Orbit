@@ -30,11 +30,17 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > pkg, 11 tests + `@orbit/shortcuts`, 6 tests), Snippets (expansion toggle +
 > status + restart), Privacy (clipboard capture toggle / retention / clear — now
 > honoured live by the monitor), Developer (version/paths, open data folder).
-> (3) Fixed Root Search focus restoration when returning from a subview. Counts:
-> **113 JS tests, 50 Rust tests**; lint/typecheck/`cargo check --workspace`/`vite
-> build` all green. Not live-verified this session (compile + unit verified): the
-> Settings window visuals and the live hotkey-rebind/keyword-hook paths — see the
-> manual checklist below.
+> (3) Fixed Root Search focus restoration when returning from a subview.
+> (4) **Local file search** — new `orbit-files` crate (pure rules + std-only
+> cancellable walker, 10 tests), `orbit-core::files` table + FTS5 (7 tests),
+> background self-superseding rebuild in batches (`file_index.rs`), a root-search
+> file provider (≥3 chars), `reveal_path` (no shell), and a Settings → Files
+> section (opt-in toggle, roots/excludes/hidden, rebuild, live status). Indexing
+> is **off by default** and **metadata-only**. Counts: **113 JS tests, 67 Rust
+> tests**; lint/typecheck/`cargo check --workspace`/`vite build` all green. Not
+> live-verified this session (compile + unit verified): the Settings window
+> visuals, the live hotkey-rebind/keyword-hook paths, and a real file-index run —
+> see the manual checklist below.
 
 ## How to verify the build yourself (do this first)
 
@@ -134,10 +140,12 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
    live hook path is not yet verified — that's the first thing to confirm/finish
    next (plus a settings toggle and dynamic-placeholder resolution in
    auto-expansion, which currently injects raw content).
-2. **File search**. Add a Rust file indexer (walk + ignore lists + watcher) into
-   a new crate, persist to the `applications`-style table + FTS5, expose a
-   cancellable file provider that gates on query length (≥2-3 chars). The
-   `SearchProvider` contract and orchestrator already support slow providers.
+2. ~~**File search**~~ — **DONE (session 3)**. `orbit-files` walker + rules,
+   `orbit-core::files` (table + FTS5), background rebuild, root-search provider,
+   Settings → Files. Opt-in, metadata-only. Next for File Search: a filesystem
+   **watcher** for incremental updates (insert already supports upsert), optional
+   **content indexing** behind its own toggle, a dedicated filtered File Search
+   view, and virtualised result rendering for very large indexes.
 3. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
    a Node sidecar child process, a restricted RPC bridge, permission broker in
    Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
@@ -165,6 +173,10 @@ Compile + unit tests are green; these GUI paths still want a human eye:
   retention; "Clear clipboard history" empties it.
 - Developer: version/paths populate; "Open data folder" reveals the dir.
 - Returning from Clipboard/Snippets to Root Search re-focuses the search input.
+- Files: enable indexing → status shows items counting up, then "N items
+  indexed"; type ≥3 chars in the launcher and confirm files appear; Enter opens,
+  "Reveal in File Manager" selects it, "Copy Path" copies; disabling clears the
+  index; "Rebuild File Index" command works.
 
 For any of these, follow CLAUDE.md architecture rules and end on the full
 verification gate + a FEATURE_MATRIX update.

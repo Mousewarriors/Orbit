@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/orbit-core",
+    "crates/orbit-files",
     "crates/orbit-input",
     "crates/orbit-search",
     "crates/orbit-window-manager",

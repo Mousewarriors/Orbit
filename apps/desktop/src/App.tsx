@@ -8,6 +8,7 @@ import { createBuiltinRegistry } from './builtins.js';
 import {
   createAppProvider,
   createCalculatorProvider,
+  createFileProvider,
   createSnippetProvider,
 } from './providers.js';
 import { executeAction } from './execute.js';
@@ -50,6 +51,7 @@ export function App(): JSX.Element {
       createCommandProvider(registry),
       createAppProvider(() => appsRef.current),
       createSnippetProvider(),
+      createFileProvider(),
       createCalculatorProvider(),
     ],
     [registry],

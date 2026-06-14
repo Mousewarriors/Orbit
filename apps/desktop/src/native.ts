@@ -147,6 +147,54 @@ export async function snippetRecordUse(id: string): Promise<void> {
   return invoke('snippet_record_use', { id });
 }
 
+export interface FileRecord {
+  path: string;
+  name: string;
+  parent: string;
+  ext: string | null;
+  kind: string;
+  size: number;
+  created_at: number | null;
+  modified_at: number;
+}
+
+export interface FileIndexStatus {
+  enabled: boolean;
+  running: boolean;
+  indexed: number;
+  total: number;
+  roots: string[];
+}
+
+export async function fileSearch(
+  query: string,
+  opts: { kind?: string; ext?: string; limit?: number } = {},
+): Promise<FileRecord[]> {
+  return invoke<FileRecord[]>('file_search', {
+    query,
+    kind: opts.kind ?? null,
+    ext: opts.ext ?? null,
+    limit: opts.limit ?? 50,
+  });
+}
+
+export async function fileIndexStatus(): Promise<FileIndexStatus> {
+  return invoke<FileIndexStatus>('file_index_status');
+}
+
+export async function fileIndexSetEnabled(enabled: boolean): Promise<FileIndexStatus> {
+  return invoke<FileIndexStatus>('file_index_set_enabled', { enabled });
+}
+
+export async function fileIndexRebuild(): Promise<FileIndexStatus> {
+  return invoke<FileIndexStatus>('file_index_rebuild');
+}
+
+/** Reveal a path in the OS file manager (selects it on Windows). */
+export async function revealPath(path: string): Promise<void> {
+  return invoke('reveal_path', { path });
+}
+
 /** Runtime status of the system-wide snippet-expansion watcher. */
 export interface WatcherStatus {
   running: boolean;

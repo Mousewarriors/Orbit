@@ -33,6 +33,8 @@ pub struct AppState {
     /// The currently-registered global activation shortcut, so the handler can
     /// match it and [`set_activation_shortcut`] can unregister the previous one.
     pub active_shortcut: Mutex<Option<Shortcut>>,
+    /// Background file-index progress/state.
+    pub index: crate::file_index::IndexState,
 }
 
 fn now_ms() -> i64 {
@@ -362,6 +364,116 @@ pub fn paste_text(state: State<'_, AppState>, text: String) -> Result<(), String
     // Give the OS a moment to transfer focus before typing.
     std::thread::sleep(std::time::Duration::from_millis(40));
     inject::send_text(&text)
+}
+
+// ---------------------------------------------------------------------------
+// File search
+// ---------------------------------------------------------------------------
+
+/// Search the local file index. Empty query returns most-recently-modified
+/// entries (subject to filters). Never touches the filesystem — reads the index.
+#[tauri::command]
+pub fn file_search(
+    state: State<'_, AppState>,
+    query: String,
+    kind: Option<String>,
+    ext: Option<String>,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::FileRecord>, String> {
+    let filters = orbit_core::FileFilters {
+        kind: kind.filter(|k| !k.is_empty()),
+        ext: ext.filter(|e| !e.is_empty()),
+        modified_after: None,
+    };
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::files::search(
+        &conn,
+        &query,
+        &filters,
+        limit.unwrap_or(50).clamp(1, 500),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn file_index_status(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> crate::file_index::IndexStatus {
+    crate::file_index::status(&app, &state)
+}
+
+/// Enable/disable local file indexing. Enabling persists the choice and kicks off
+/// a background rebuild; disabling clears the index so nothing lingers on disk.
+#[tauri::command]
+pub fn file_index_set_enabled(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<crate::file_index::IndexStatus, String> {
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        orbit_core::set_setting(
+            &conn,
+            "files.indexing.enabled",
+            if enabled { "true" } else { "false" },
+        )
+        .map_err(|e| e.to_string())?;
+        if !enabled {
+            orbit_core::files::clear(&conn).map_err(|e| e.to_string())?;
+        }
+    }
+    if enabled {
+        crate::file_index::rebuild(app.clone());
+    }
+    Ok(crate::file_index::status(&app, &state))
+}
+
+/// Rebuild the file index now (no-op effect if indexing is disabled).
+#[tauri::command]
+pub fn file_index_rebuild(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<crate::file_index::IndexStatus, String> {
+    let enabled = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        crate::file_index::is_enabled(&conn)
+    };
+    if enabled {
+        crate::file_index::rebuild(app.clone());
+    }
+    Ok(crate::file_index::status(&app, &state))
+}
+
+/// Reveal a path in the OS file manager (selecting it on Windows). The path must
+/// come from Orbit's own index; it is passed as a separate argument, never via a
+/// shell, so there is no injection surface.
+#[tauri::command]
+pub fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
+    let _ = &app; // used on non-Windows; referenced here so Windows has no warning
+    if path.trim().is_empty() {
+        return Err("empty path".into());
+    }
+    #[cfg(windows)]
+    {
+        // explorer.exe /select,<path> highlights the item in its folder.
+        std::process::Command::new("explorer.exe")
+            .arg(format!("/select,{path}"))
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        // Fall back to opening the containing folder.
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(path);
+        app.opener()
+            .open_path(parent, None::<&str>)
+            .map_err(|e| e.to_string())
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -7,12 +7,13 @@ import { initAppearance, saveAppearance } from '../appearance.js';
 import { Toggle, Field, Section, Row } from './controls.js';
 import { ShortcutRecorder } from './ShortcutRecorder.js';
 
-type SectionId = 'general' | 'appearance' | 'snippets' | 'privacy' | 'developer';
+type SectionId = 'general' | 'appearance' | 'snippets' | 'files' | 'privacy' | 'developer';
 
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; icon: string }> = [
   { id: 'general', label: 'General', icon: '⚙' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
   { id: 'snippets', label: 'Snippets', icon: '⌨' },
+  { id: 'files', label: 'Files', icon: '📁' },
   { id: 'privacy', label: 'Privacy', icon: '🔒' },
   { id: 'developer', label: 'Developer', icon: '🛠' },
 ];
@@ -47,6 +48,7 @@ export function Settings(): JSX.Element {
         {active === 'general' && <GeneralSection />}
         {active === 'appearance' && <AppearanceSection />}
         {active === 'snippets' && <SnippetsSection />}
+        {active === 'files' && <FilesSection />}
         {active === 'privacy' && <PrivacySection />}
         {active === 'developer' && <DeveloperSection />}
       </main>
@@ -262,6 +264,130 @@ function SnippetsSection(): JSX.Element {
         snippet's raw text; dynamic placeholders like {'{date}'} are resolved when you paste from the
         launcher.
       </p>
+      {error && <p className="settings-err">⚠ {error}</p>}
+    </Section>
+  );
+}
+
+function FilesSection(): JSX.Element {
+  const [status, setStatus] = useState<native.FileIndexStatus | null>(null);
+  const [roots, setRoots] = useState('');
+  const [excludes, setExcludes] = useState('');
+  const [includeHidden, setIncludeHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setStatus(await native.fileIndexStatus());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    void native.getSetting('files.roots').then((v) => setRoots(v ?? ''));
+    void native.getSetting('files.excludes').then((v) => setExcludes(v ?? ''));
+    void native
+      .getSetting('files.include_hidden')
+      .then((v) => setIncludeHidden(v === 'true'));
+  }, [refresh]);
+
+  // Poll progress while a rebuild is in flight.
+  useEffect(() => {
+    if (!status?.running) return;
+    const t = setInterval(() => void refresh(), 600);
+    return () => clearInterval(t);
+  }, [status?.running, refresh]);
+
+  const setEnabled = useCallback(async (enabled: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setStatus(await native.fileIndexSetEnabled(enabled));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const rebuild = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      // Persist current root/exclude edits first so the rebuild uses them.
+      await native.setSetting('files.roots', roots);
+      await native.setSetting('files.excludes', excludes);
+      await native.setSetting('files.include_hidden', String(includeHidden));
+      setStatus(await native.fileIndexRebuild());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [roots, excludes, includeHidden]);
+
+  const enabled = status?.enabled ?? false;
+
+  return (
+    <Section
+      title="Files"
+      description="Index local files and folders so you can find them from Root Search. Only metadata (names, paths, sizes) is stored — never file contents — and nothing leaves your device."
+    >
+      <Row>
+        <Toggle
+          label="Enable local file indexing"
+          checked={enabled}
+          disabled={busy}
+          onChange={(v) => void setEnabled(v)}
+        />
+      </Row>
+      <div className="settings-status">
+        <span className={`settings-dot${status?.running ? ' is-on' : ''}`} aria-hidden />
+        {status?.running
+          ? `Indexing… ${status.indexed.toLocaleString()} items so far`
+          : `${(status?.total ?? 0).toLocaleString()} items indexed`}
+      </div>
+
+      <Field
+        label="Indexed folders"
+        hint="One path per line. Leave empty to use sensible defaults (Desktop, Documents, Downloads)."
+      >
+        <textarea
+          className="settings-textarea"
+          rows={3}
+          value={roots}
+          placeholder={(status?.roots ?? []).join('\n') || 'Default user folders'}
+          onChange={(e) => setRoots(e.target.value)}
+          onBlur={() => void native.setSetting('files.roots', roots)}
+        />
+      </Field>
+      <Field label="Excluded folders" hint="One name or path per line (node_modules, .git, target are always skipped).">
+        <textarea
+          className="settings-textarea"
+          rows={2}
+          value={excludes}
+          onChange={(e) => setExcludes(e.target.value)}
+          onBlur={() => void native.setSetting('files.excludes', excludes)}
+        />
+      </Field>
+      <Row>
+        <Toggle
+          label="Include hidden files and folders"
+          checked={includeHidden}
+          onChange={(v) => {
+            setIncludeHidden(v);
+            void native.setSetting('files.include_hidden', String(v));
+          }}
+        />
+      </Row>
+      <Field label="Index" hint="Rebuild after changing folders. Runs in the background.">
+        <button className="settings-btn-ghost" disabled={busy || !enabled} onClick={() => void rebuild()}>
+          Rebuild index now
+        </button>
+      </Field>
       {error && <p className="settings-err">⚠ {error}</p>}
     </Section>
   );

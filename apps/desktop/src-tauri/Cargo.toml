@@ -26,6 +26,7 @@ serde_json = { workspace = true }
 rusqlite = { workspace = true }
 arboard = "3"
 orbit-core = { path = "../../../crates/orbit-core" }
+orbit-files = { path = "../../../crates/orbit-files" }
 orbit-input = { path = "../../../crates/orbit-input" }
 orbit-search = { path = "../../../crates/orbit-search" }
 orbit-window-manager = { path = "../../../crates/orbit-window-manager" }

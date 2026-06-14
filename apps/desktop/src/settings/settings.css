@@ -225,6 +225,22 @@
   font-size: 14px;
   padding: 7px 10px;
 }
+.settings-textarea {
+  width: 100%;
+  resize: vertical;
+  background: var(--kbd-bg);
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 8px 10px;
+}
+.settings-textarea:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+}
 input[type='range'] {
   width: 240px;
   accent-color: var(--focus-ring);

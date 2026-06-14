@@ -4,10 +4,12 @@
 
 pub mod clipboard;
 pub mod db;
+pub mod files;
 pub mod migrations;
 pub mod snippets;
 
 pub use clipboard::ClipboardEntry;
+pub use files::{FileFilters, FileInput, FileRecord};
 pub use snippets::Snippet;
 
 pub use db::{

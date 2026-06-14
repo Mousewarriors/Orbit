@@ -93,6 +93,69 @@ export function createSnippetProvider(): SearchProvider {
   };
 }
 
+/** Human-readable file size for a subtitle. */
+function formatSize(bytes: number): string {
+  if (bytes <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i += 1;
+  }
+  return `${n >= 10 || i === 0 ? Math.round(n) : n.toFixed(1)} ${units[i]}`;
+}
+
+/**
+ * Local file-search provider. Queries the native file index (metadata only).
+ * Gated to ≥3 characters and to the Tauri shell so it never blocks instant
+ * results or runs in browser preview; the orchestrator runs it concurrently with
+ * a per-provider timeout, so a large index can't stall apps/commands.
+ */
+export function createFileProvider(): SearchProvider {
+  return {
+    id: 'files',
+    source: 'file',
+    canHandle: (q) => native.isTauri() && q.trim().length >= 3,
+    async search(query): Promise<SearchItem[]> {
+      const files = await native.fileSearch(query, { limit: 30 });
+      return files.map((f) => {
+        const isDir = f.kind === 'dir';
+        const meta = [isDir ? 'Folder' : f.ext ? f.ext.toUpperCase() : 'File', formatSize(f.size)]
+          .filter(Boolean)
+          .join(' · ');
+        return {
+          id: `file.${f.path}`,
+          title: f.name,
+          subtitle: `${meta} — ${f.parent}`,
+          category: isDir ? 'Folders' : 'Files',
+          source: 'file' as const,
+          icon: { kind: 'builtin' as const, name: isDir ? 'folder' : 'file' },
+          confidence: 0.5,
+          primaryAction: {
+            id: `file.${f.path}.open`,
+            title: isDir ? 'Open Folder' : 'Open',
+            run: { kind: 'open-path' as const, path: f.path },
+            requires: ['files.read' as const],
+          },
+          secondaryActions: [
+            {
+              id: `file.${f.path}.reveal`,
+              title: 'Reveal in File Manager',
+              run: { kind: 'reveal-path' as const, path: f.path },
+            },
+            {
+              id: `file.${f.path}.copy-path`,
+              title: 'Copy Path',
+              run: { kind: 'copy' as const, text: f.path },
+            },
+          ],
+        };
+      });
+    },
+  };
+}
+
 /**
  * Calculator provider. Returns a single high-confidence result when the query
  * parses as a calculation, otherwise nothing (so it never pollutes results).

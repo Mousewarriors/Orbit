@@ -102,6 +102,29 @@ pub const MIGRATIONS: &[&str] = &[
         created_at  INTEGER NOT NULL
     );
     "#,
+    // 0004 — local file index with full-text search over name + path. The path
+    // is the natural key; an external-content FTS table mirrors name/path for
+    // fast prefix search. Content is NOT indexed here (metadata only).
+    r#"
+    CREATE TABLE files (
+        path        TEXT PRIMARY KEY NOT NULL,
+        name        TEXT NOT NULL,
+        parent      TEXT NOT NULL,
+        ext         TEXT,                    -- lowercased, no dot; NULL for none/dirs
+        kind        TEXT NOT NULL,           -- 'file' | 'dir'
+        size        INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER,                 -- ms; NULL where the OS can't report it
+        modified_at INTEGER NOT NULL DEFAULT 0,
+        indexed_at  INTEGER NOT NULL
+    );
+    CREATE INDEX idx_files_modified ON files(modified_at DESC);
+    CREATE INDEX idx_files_ext ON files(ext);
+    CREATE INDEX idx_files_kind ON files(kind);
+
+    CREATE VIRTUAL TABLE files_fts USING fts5(
+        name, path, content='files', content_rowid='rowid'
+    );
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -163,7 +186,14 @@ mod tests {
     fn expected_tables_exist() {
         let mut conn = Connection::open_in_memory().unwrap();
         run(&mut conn).unwrap();
-        for table in ["settings", "commands", "clipboard_entries", "snippets", "quicklinks"] {
+        for table in [
+            "settings",
+            "commands",
+            "clipboard_entries",
+            "snippets",
+            "quicklinks",
+            "files",
+        ] {
             let count: i64 = conn
                 .query_row(
                     "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?1",
