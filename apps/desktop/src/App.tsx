@@ -104,6 +104,13 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
+  // Restore focus to the search input whenever we return to Root Search from a
+  // subview (Clipboard/Snippets/Settings) — the input is freshly mounted, so the
+  // mount-time focus effect above doesn't re-run.
+  useEffect(() => {
+    if (view === 'root') inputRef.current?.focus();
+  }, [view]);
+
   const runItem = useCallback(
     async (ranked: RankedItem | undefined, actionIndex = -1) => {
       if (!ranked) return;

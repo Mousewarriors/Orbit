@@ -87,6 +87,11 @@ impl TriggerMatcher {
         !self.keywords.is_empty()
     }
 
+    /// Number of registered keywords (for status/diagnostics).
+    pub fn keyword_count(&self) -> usize {
+        self.keywords.len()
+    }
+
     /// Handle a Backspace: drop the last buffered character.
     pub fn on_backspace(&mut self) {
         self.buffer.pop();

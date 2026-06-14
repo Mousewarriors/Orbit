@@ -289,6 +289,59 @@ pub fn snippet_record_use(state: State<'_, AppState>, id: String) -> Result<(), 
     orbit_core::snippets::record_use(&conn, &id, now_ms()).map_err(|e| e.to_string())
 }
 
+/// Report whether the system-wide keyword-expansion watcher is running, how many
+/// keywords it knows, and whether the platform supports it at all.
+#[tauri::command]
+pub fn snippet_watcher_status() -> snippet_watcher::WatcherStatus {
+    snippet_watcher::status()
+}
+
+/// Enable or disable system-wide keyword expansion. Persists the preference,
+/// (un)installs the keyboard hook immediately, and returns the new status. The
+/// keyword maps are refreshed from the DB before starting so the hook is current.
+#[tauri::command]
+pub fn snippet_watcher_set_enabled(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<snippet_watcher::WatcherStatus, String> {
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        orbit_core::set_setting(
+            &conn,
+            "snippets.expansion.enabled",
+            if enabled { "true" } else { "false" },
+        )
+        .map_err(|e| e.to_string())?;
+        if enabled {
+            refresh_watcher(&conn);
+        }
+    }
+    if enabled {
+        snippet_watcher::start();
+    } else {
+        snippet_watcher::stop();
+    }
+    Ok(snippet_watcher::status())
+}
+
+/// Reinstall the keyboard hook (e.g. after the user reports it stopped firing).
+/// No-op when expansion is disabled. Refreshes keywords from the DB first.
+#[tauri::command]
+pub fn snippet_watcher_restart(
+    state: State<'_, AppState>,
+) -> Result<snippet_watcher::WatcherStatus, String> {
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        refresh_watcher(&conn);
+    }
+    // Only reinstall if expansion is actually enabled; restarting a stopped
+    // watcher would silently turn it on.
+    if snippet_watcher::status().running {
+        snippet_watcher::restart();
+    }
+    Ok(snippet_watcher::status())
+}
+
 /// Inject `text` into the user's previously-focused window as real keystrokes.
 /// The renderer hides the launcher first; we restore focus to the prior window
 /// and type, which works in any app without clobbering the clipboard.

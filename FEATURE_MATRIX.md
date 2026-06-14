@@ -15,7 +15,7 @@ permissions + error handling + keyboard + tests are all present.
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
 | Vitest unit tests | ✅ | 96 passing |
-| Rust unit/integration tests | ✅ | 45 passing (orbit-core 19, orbit-input 10, orbit-search 8, orbit-window-manager 8) |
+| Rust unit/integration tests | ✅ | 50 passing (orbit-core 19, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -58,7 +58,7 @@ permissions + error handling + keyboard + tests are all present.
 | Calculator (arithmetic, functions, %, units, currency, base) | ✅ | `@orbit/calculator`, 20 tests, no `eval` |
 | Clipboard history | ✅ | `arboard` poll monitor → SQLite (dedupe, retention, sensitive-flag heuristic); navigable view with filter, copy-back, **paste-into-active-app (⌘↵)**, delete, pin, sensitive masking. `orbit-core::clipboard` has 6 tests |
 | Snippets manager (create/edit/delete/search, paste) | ✅ (Windows) | `orbit-core::snippets` CRUD + FTS (8 tests), validated input (`@orbit/validation`, re-checked natively), Snippets view + root provider; paste resolves placeholders then injects keystrokes. Created/listed verified live |
-| Snippets expansion (system-wide keyword) | 🟡 | Pure trigger matcher fully tested (`orbit-input`, 10 tests) + Win32 low-level-keyboard-hook watcher wired to it. **Opt-in** via setting `snippets.expansion.enabled` (off by default; toggle UI pending); the live hook path is not yet verified end-to-end. Auto-expansion injects raw content (dynamic placeholders resolve on the manual paste path only) |
+| Snippets expansion (system-wide keyword) | 🟡 | Pure trigger matcher (`orbit-input`, 10 tests) + pure lifecycle state machine (5 tests) + Win32 low-level-keyboard-hook watcher with a **controllable lifecycle** (start/stop/restart/status, idempotent, clean `UnhookWindowsHookEx` via `WM_QUIT`). IPC: `snippet_watcher_status` / `_set_enabled` / `_restart`. **Opt-in** via `snippets.expansion.enabled` (off by default; toggled live from Settings → Snippets). The live hook path (keystroke into a 3rd-party app) is still not verified end-to-end here (Defender blocks synthetic input). Auto-expansion injects raw content (dynamic placeholders resolve on the manual paste path only) |
 | Snippet/Quicklink placeholder engine | ✅ | `@orbit/placeholders`, 13 tests (also used by snippet paste) |
 | Quicklinks | 🧪 | DB table + placeholder engine; no UI |
 | Window management | ✅ (Windows) / 🟡 | 16 layouts; pure geometry tested (`orbit-window-manager`, 8 tests) + Win32 apply via captured foreground window. macOS/Linux return graceful "Windows only" error |

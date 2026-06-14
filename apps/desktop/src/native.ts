@@ -147,6 +147,27 @@ export async function snippetRecordUse(id: string): Promise<void> {
   return invoke('snippet_record_use', { id });
 }
 
+/** Runtime status of the system-wide snippet-expansion watcher. */
+export interface WatcherStatus {
+  running: boolean;
+  keyword_count: number;
+  supported: boolean;
+}
+
+export async function snippetWatcherStatus(): Promise<WatcherStatus> {
+  return invoke<WatcherStatus>('snippet_watcher_status');
+}
+
+/** Enable/disable system-wide keyword expansion; persists and applies at once. */
+export async function snippetWatcherSetEnabled(enabled: boolean): Promise<WatcherStatus> {
+  return invoke<WatcherStatus>('snippet_watcher_set_enabled', { enabled });
+}
+
+/** Reinstall the keyboard hook (only acts when expansion is enabled). */
+export async function snippetWatcherRestart(): Promise<WatcherStatus> {
+  return invoke<WatcherStatus>('snippet_watcher_restart');
+}
+
 /** Inject text into the previously-focused window as real keystrokes. */
 export async function pasteText(text: string): Promise<void> {
   return invoke('paste_text', { text });

@@ -9,9 +9,11 @@
 //!   - [`platform`] performs the actual effect (synthesise Backspace + Unicode
 //!     keystrokes). On non-Windows targets it returns a graceful error.
 
+pub mod lifecycle;
 pub mod platform;
 pub mod trigger;
 
+pub use lifecycle::{Lifecycle, Transition};
 pub use trigger::{Expansion, TriggerMatcher};
 
 /// Marker stamped into `dwExtraInfo` of every event Orbit synthesises, so the
