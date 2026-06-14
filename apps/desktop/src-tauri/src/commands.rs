@@ -367,6 +367,75 @@ pub fn paste_text(state: State<'_, AppState>, text: String) -> Result<(), String
 }
 
 // ---------------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------------
+
+const MAX_NOTE_BODY: usize = 1_000_000;
+
+fn validate_note(title: &str, body: &str) -> Result<(), String> {
+    if title.chars().count() > MAX_SNIPPET_FIELD {
+        return Err("note title too long (max 200)".into());
+    }
+    if body.len() > MAX_NOTE_BODY {
+        return Err("note is too large".into());
+    }
+    if title.trim().is_empty() && body.trim().is_empty() {
+        return Err("note is empty".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn note_list(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::Note>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::notes::list(&conn, &query, limit.unwrap_or(200).clamp(1, 1000))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn note_create(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+    body: String,
+) -> Result<orbit_core::Note, String> {
+    if id.is_empty() || id.len() > MAX_SNIPPET_FIELD {
+        return Err("invalid note id".into());
+    }
+    validate_note(&title, &body)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::notes::create(&conn, &id, title.trim(), &body, now_ms()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn note_update(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+    body: String,
+) -> Result<orbit_core::Note, String> {
+    validate_note(&title, &body)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::notes::update(&conn, &id, title.trim(), &body, now_ms()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn note_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::notes::delete(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn note_set_pinned(state: State<'_, AppState>, id: String, pinned: bool) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::notes::set_pinned(&conn, &id, pinned).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Quicklinks
 // ---------------------------------------------------------------------------
 

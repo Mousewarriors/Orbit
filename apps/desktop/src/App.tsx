@@ -9,6 +9,7 @@ import {
   createAppProvider,
   createCalculatorProvider,
   createFileProvider,
+  createNoteProvider,
   createQuicklinkProvider,
   createSnippetProvider,
 } from './providers.js';
@@ -20,8 +21,9 @@ import { Footer } from './components/Footer.js';
 import { ClipboardView } from './components/ClipboardView.js';
 import { SnippetsView } from './components/SnippetsView.js';
 import { QuicklinksView } from './components/QuicklinksView.js';
+import { NotesView } from './components/NotesView.js';
 
-type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks';
+type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -39,6 +41,7 @@ export function App(): JSX.Element {
   const [selected, setSelected] = useState(0);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [view, setView] = useState<View>('root');
+  const [viewArg, setViewArg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const appsRef = useRef<native.NativeApp[]>([]);
@@ -54,6 +57,7 @@ export function App(): JSX.Element {
       createAppProvider(() => appsRef.current),
       createSnippetProvider(),
       createQuicklinkProvider(),
+      createNoteProvider(),
       createFileProvider(),
       createCalculatorProvider(),
     ],
@@ -139,8 +143,10 @@ export function App(): JSX.Element {
         if (
           outcome.pushView === 'clipboard' ||
           outcome.pushView === 'snippets' ||
-          outcome.pushView === 'quicklinks'
+          outcome.pushView === 'quicklinks' ||
+          outcome.pushView === 'notes'
         ) {
+          setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
         } else if (outcome.hide) {
           setQuery('');
@@ -196,6 +202,10 @@ export function App(): JSX.Element {
 
   if (view === 'quicklinks') {
     return <QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />;
+  }
+
+  if (view === 'notes') {
+    return <NotesView initialNoteId={viewArg} onPop={() => setView('root')} />;
   }
 
   return (

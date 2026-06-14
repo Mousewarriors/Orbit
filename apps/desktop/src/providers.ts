@@ -93,6 +93,35 @@ export function createSnippetProvider(): SearchProvider {
   };
 }
 
+/**
+ * Notes provider. Surfaces matching notes (title + body FTS) and opens the
+ * selected one in the Notes editor via a push-view action carrying its id.
+ */
+export function createNoteProvider(): SearchProvider {
+  return {
+    id: 'notes',
+    source: 'note',
+    canHandle: (q) => native.isTauri() && q.trim().length >= 2,
+    async search(query): Promise<SearchItem[]> {
+      const notes = await native.noteList(query, 15);
+      return notes.map((n) => ({
+        id: `note.${n.id}`,
+        title: n.title || 'Untitled',
+        subtitle: n.body.split('\n')[0]?.slice(0, 80) || 'Empty note',
+        category: 'Notes',
+        source: 'note' as const,
+        icon: { kind: 'builtin' as const, name: 'file-text' },
+        confidence: 0.55,
+        primaryAction: {
+          id: `note.${n.id}.open`,
+          title: 'Open Note',
+          run: { kind: 'push-view' as const, viewId: 'notes', args: { id: n.id } },
+        },
+      }));
+    },
+  };
+}
+
 /** Does a (resolved) target use a web/mail scheme we open as a URL? */
 function isWebTarget(target: string): boolean {
   return /^(https?|mailto):/i.test(target.trim());

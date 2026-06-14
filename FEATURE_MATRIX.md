@@ -15,7 +15,7 @@ permissions + error handling + keyboard + tests are all present.
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
 | Vitest unit tests | ✅ | 116 passing |
-| Rust unit/integration tests | ✅ | 71 passing (orbit-core 30, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
+| Rust unit/integration tests | ✅ | 76 passing (orbit-core 35, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -51,7 +51,8 @@ permissions + error handling + keyboard + tests are all present.
 | Calculator provider | ✅ | slice |
 | Snippet provider (root search) | ✅ | placeholder-resolved, gated to ≥2 chars; paste-injects on Enter |
 | File provider (root search) | ✅ | queries the local file index, gated to ≥3 chars, runs concurrently under the per-provider timeout; actions: open / reveal / copy path |
-| Clipboard / note / calendar providers | ⬜ | engines partly exist (see below) |
+| Note provider (root search) | ✅ | title+body FTS, gated ≥2 chars; opens the note in the Notes editor via a push-view action carrying its id |
+| Clipboard / calendar providers | ⬜ | clipboard has its own view; calendar not started |
 | Action Panel (keyboard, secondary actions) | 🟡 | compact menu implemented |
 | Diagnostics ("why this ranked") | 🧪 | data produced; no UI |
 
@@ -67,6 +68,7 @@ permissions + error handling + keyboard + tests are all present.
 | Quicklinks | ✅ | `orbit-core::quicklinks` CRUD (4 tests), Zod validation with scheme allowlist (`@orbit/validation`, re-checked natively), management view (create/edit/delete/open), root-search provider with `{query}` argument from an alias/title prefix + date/time/uuid resolution; web/mail targets open as URLs, paths via the OS handler. Tags/hotkeys/favourites/custom-icons/import-export are future |
 | Window management | ✅ (Windows) / 🟡 | 16 layouts; pure geometry tested (`orbit-window-manager`, 8 tests) + Win32 apply via captured foreground window. macOS/Linux return graceful "Windows only" error |
 | Local file search | ✅ (Windows) / 🟡 | **Opt-in, metadata-only.** Pure walker + rules (`orbit-files`, 10 tests), `files` table + FTS5 (`orbit-core::files`, 7 tests), background cancellable/self-superseding rebuild in transactional batches, root-search provider, Settings → Files (roots/excludes/hidden/rebuild/status), `reveal_path` (no shell). Full-rebuild only (no fs watcher yet); no content indexing. See [docs/architecture/FILE_SEARCH.md](docs/architecture/FILE_SEARCH.md). Cross-platform walker; reveal selects on Windows, opens parent elsewhere |
+| Notes | ✅ | `orbit-core::notes` CRUD + FTS5 over title+body, pin/archive (5 tests); Notes view with a searchable list + autosaving editor (debounced + on-blur), ⌘N/⌘⌫, crash-safe (saves on blur/escape); root-search note provider. Markdown is stored/edited as plain text (no rendered preview yet); version snapshots are future |
 | Emoji & symbols | ⬜ | — |
 | System commands | 🟡 | "Open Settings", "Rebuild File Index", "Reindex Applications", "Quit" exist as built-ins; broader system commands ⬜ |
 

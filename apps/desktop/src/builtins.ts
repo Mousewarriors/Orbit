@@ -109,6 +109,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'quicklinks' }),
   },
   {
+    definition: def('builtin.notes.manage', 'Notes', 'Notes', 'file-text', {
+      keywords: ['note', 'notes', 'scratch', 'memo', 'write', 'markdown'],
+      subtitle: 'Write and search local notes',
+    }),
+    effect: (): EffectResult => ({ pushView: 'notes' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',

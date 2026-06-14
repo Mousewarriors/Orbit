@@ -45,6 +45,10 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > (compile + unit verified): the Settings window visuals, the live hotkey-rebind/
 > keyword-hook paths, a real file-index run, and Quicklink open — see the manual
 > checklist below.
+> (6) **Notes** — `orbit-core::notes` CRUD + FTS5 + pin/archive (5 tests), a Notes
+> view with an autosaving editor + searchable list, and a root-search note
+> provider (opens a note via a push-view action carrying its id). Counts: **116 JS
+> tests, 76 Rust tests**; full gate green.
 
 ## How to verify the build yourself (do this first)
 
@@ -166,8 +170,12 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
 5. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
    a Node sidecar child process, a restricted RPC bridge, permission broker in
    Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
-6. **Notes** and **small built-ins** (emoji/UUID/hash/JSON/colour) are good
-   medium-sized follow-ups once the extension host is scoped.
+6. ~~**Notes**~~ — **DONE (session 3)**. `orbit-core::notes` (CRUD + FTS5,
+   pin/archive), a Notes view with an autosaving editor + searchable list, and a
+   root-search note provider. Next: rendered Markdown preview, version snapshots,
+   note templates, and an archive browser.
+7. **Small built-ins** (emoji/UUID/hash/JSON/colour/password) — pure, easily
+   tested provider tools; a good next batch.
 
 ## Manual desktop test checklist (session 3 — verify on next `tauri dev`)
 
@@ -193,6 +201,9 @@ Compile + unit tests are green; these GUI paths still want a human eye:
   `https://github.com/search?q={query}`, alias "ghs"); Enter opens it; from Root
   Search type "ghs tauri" and confirm it opens the search for "tauri"; a
   `javascript:` target is rejected with an error; edit/delete work.
+- Notes: run "Notes" → type a title/body; confirm "saved" appears (autosave) and
+  the note persists after closing/reopening; search finds it by title and body;
+  from Root Search a matching note opens straight into the editor; ⌘N/⌘⌫ work.
 
 For any of these, follow CLAUDE.md architecture rules and end on the full
 verification gate + a FEATURE_MATRIX update.

@@ -125,6 +125,23 @@ pub const MIGRATIONS: &[&str] = &[
         name, path, content='files', content_rowid='rowid'
     );
     "#,
+    // 0005 — local notes with full-text search over title + body.
+    r#"
+    CREATE TABLE notes (
+        id          TEXT PRIMARY KEY NOT NULL,
+        title       TEXT NOT NULL DEFAULT '',
+        body        TEXT NOT NULL DEFAULT '',
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        archived    INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL,
+        updated_at  INTEGER NOT NULL
+    );
+    CREATE INDEX idx_notes_updated ON notes(updated_at DESC);
+
+    CREATE VIRTUAL TABLE notes_fts USING fts5(
+        title, body, content='notes', content_rowid='rowid'
+    );
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -193,6 +210,7 @@ mod tests {
             "snippets",
             "quicklinks",
             "files",
+            "notes",
         ] {
             let count: i64 = conn
                 .query_row(

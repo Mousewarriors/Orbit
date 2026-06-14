@@ -147,6 +147,44 @@ export async function snippetRecordUse(id: string): Promise<void> {
   return invoke('snippet_record_use', { id });
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  body: string;
+  pinned: boolean;
+  archived: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export async function noteList(query: string, limit = 200): Promise<Note[]> {
+  return invoke<Note[]>('note_list', { query, limit });
+}
+
+export async function noteCreate(input: {
+  id: string;
+  title: string;
+  body: string;
+}): Promise<Note> {
+  return invoke<Note>('note_create', input);
+}
+
+export async function noteUpdate(input: {
+  id: string;
+  title: string;
+  body: string;
+}): Promise<Note> {
+  return invoke<Note>('note_update', input);
+}
+
+export async function noteDelete(id: string): Promise<void> {
+  return invoke('note_delete', { id });
+}
+
+export async function noteSetPinned(id: string, pinned: boolean): Promise<void> {
+  return invoke('note_set_pinned', { id, pinned });
+}
+
 export interface Quicklink {
   id: string;
   title: string;

@@ -53,6 +53,8 @@ What works and is tested today:
 - **Quicklinks**: saved, parameterised links (websites, web searches, files,
   mailto). Type an alias then your query — e.g. `ghs tauri` — and `{query}` is
   filled in. Managed in a dedicated view; dangerous URL schemes are rejected.
+- **Notes**: fast local notes with an autosaving editor and full-text search;
+  surfaced in Root Search and opened straight into the editor.
 - **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
   placeholder engine, the appearance + shortcut-accelerator models, command

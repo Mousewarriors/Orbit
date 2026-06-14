@@ -25,6 +25,8 @@ export interface ExecuteContext {
 export interface ExecuteOutcome {
   readonly hide: boolean;
   readonly pushView?: string;
+  /** Optional id passed to the pushed view (e.g. which note to open). */
+  readonly pushViewArg?: string;
 }
 
 async function copyText(text: string): Promise<void> {
@@ -64,8 +66,12 @@ export async function executeAction(
         await copyText(run.text);
       }
       return { hide: true };
-    case 'push-view':
-      return { hide: false, pushView: run.viewId };
+    case 'push-view': {
+      const id = run.args?.['id'];
+      return typeof id === 'string'
+        ? { hide: false, pushView: run.viewId, pushViewArg: id }
+        : { hide: false, pushView: run.viewId };
+    }
     case 'builtin':
       if (run.handler === 'run-command') {
         const id = run.args?.['commandId'];
