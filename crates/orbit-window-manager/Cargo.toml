@@ -1,0 +1,9 @@
+[package]
+name = "orbit-window-manager"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "orbit_window_manager"
+path = "src/lib.rs"

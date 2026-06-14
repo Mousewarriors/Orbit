@@ -1,0 +1,17 @@
+[package]
+name = "orbit-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "orbit_input"
+path = "src/lib.rs"
+
+# Win32 synthetic input (SendInput) for text injection. The pure trigger-matcher
+# logic in `trigger.rs` has no platform dependency and is unit-tested everywhere.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_KeyboardAndMouse",
+] }

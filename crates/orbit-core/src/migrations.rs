@@ -1,0 +1,177 @@
+//! Forward-only schema migrations driven by SQLite's `user_version` pragma.
+//!
+//! Each migration is an idempotent-on-fresh SQL script applied in order. The
+//! current schema version is stored in `user_version`; on startup we apply every
+//! migration whose index is greater than the stored version, inside a single
+//! transaction per migration so a failure leaves the database on the last good
+//! version. Data is therefore preserved across app updates.
+
+use rusqlite::Connection;
+
+/// Ordered list of migrations. NEVER reorder or edit a shipped migration —
+/// append a new one. Index 0 → user_version 1, etc.
+pub const MIGRATIONS: &[&str] = &[
+    // 0001 — foundational tables for the Phase 1 vertical slice.
+    r#"
+    CREATE TABLE settings (
+        key   TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+    );
+
+    CREATE TABLE commands (
+        id        TEXT PRIMARY KEY NOT NULL,
+        title     TEXT NOT NULL,
+        subtitle  TEXT,
+        category  TEXT NOT NULL,
+        mode      TEXT NOT NULL,
+        source    TEXT NOT NULL,
+        enabled   INTEGER NOT NULL DEFAULT 1
+    );
+
+    -- Customisations & usage are keyed by LOGICAL command id. Built-in and
+    -- extension commands are defined in code and may not have a row in
+    -- `commands`, so these intentionally have no foreign key to it.
+    CREATE TABLE command_customisations (
+        command_id TEXT PRIMARY KEY NOT NULL,
+        alias      TEXT,
+        hotkey     TEXT,
+        favourite  INTEGER NOT NULL DEFAULT 0,
+        pinned     INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE command_usage (
+        command_id   TEXT PRIMARY KEY NOT NULL,
+        use_count    INTEGER NOT NULL DEFAULT 0,
+        last_used_at INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_usage_last_used ON command_usage(last_used_at DESC);
+
+    CREATE TABLE applications (
+        id          TEXT PRIMARY KEY NOT NULL,
+        name        TEXT NOT NULL,
+        path        TEXT NOT NULL,
+        icon_path   TEXT,
+        kind        TEXT NOT NULL DEFAULT 'app',
+        indexed_at  INTEGER NOT NULL
+    );
+    CREATE INDEX idx_apps_name ON applications(name);
+    "#,
+    // 0002 — clipboard history with sensitivity flag and source app.
+    r#"
+    CREATE TABLE clipboard_entries (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind         TEXT NOT NULL,           -- text | rtf | url | color | image | files | html
+        content      TEXT,                    -- text payload or path reference
+        preview      TEXT,
+        source_app   TEXT,
+        sensitive    INTEGER NOT NULL DEFAULT 0,
+        pinned       INTEGER NOT NULL DEFAULT 0,
+        created_at   INTEGER NOT NULL,
+        hash         TEXT                     -- for duplicate collapsing
+    );
+    CREATE INDEX idx_clip_created ON clipboard_entries(created_at DESC);
+    CREATE UNIQUE INDEX idx_clip_hash ON clipboard_entries(hash) WHERE hash IS NOT NULL;
+    "#,
+    // 0003 — snippets and quicklinks with full-text search over snippet bodies.
+    r#"
+    CREATE TABLE snippets (
+        id          TEXT PRIMARY KEY NOT NULL,
+        name        TEXT NOT NULL,
+        keyword     TEXT,
+        content     TEXT NOT NULL,
+        description TEXT,
+        created_at  INTEGER NOT NULL,
+        updated_at  INTEGER NOT NULL,
+        use_count   INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_snippets_keyword ON snippets(keyword);
+
+    CREATE VIRTUAL TABLE snippets_fts USING fts5(
+        name, content, description, content='snippets', content_rowid='rowid'
+    );
+
+    CREATE TABLE quicklinks (
+        id          TEXT PRIMARY KEY NOT NULL,
+        title       TEXT NOT NULL,
+        target      TEXT NOT NULL,
+        icon        TEXT,
+        alias       TEXT,
+        hotkey      TEXT,
+        browser     TEXT,
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL
+    );
+    "#,
+];
+
+#[derive(Debug, thiserror::Error)]
+pub enum MigrationError {
+    #[error("sqlite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+}
+
+/// Current schema version (number of migrations).
+pub fn target_version() -> i64 {
+    MIGRATIONS.len() as i64
+}
+
+/// Read the database's current schema version from `user_version`.
+pub fn current_version(conn: &Connection) -> Result<i64, MigrationError> {
+    let v: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    Ok(v)
+}
+
+/// Apply all pending migrations. Returns the number applied.
+pub fn run(conn: &mut Connection) -> Result<usize, MigrationError> {
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    let from = current_version(conn)?;
+    let to = target_version();
+    let mut applied = 0;
+    for version in from..to {
+        let sql = MIGRATIONS[version as usize];
+        let tx = conn.transaction()?;
+        tx.execute_batch(sql)?;
+        // user_version cannot be parameterised; value is a trusted integer.
+        tx.execute_batch(&format!("PRAGMA user_version = {};", version + 1))?;
+        tx.commit()?;
+        applied += 1;
+    }
+    Ok(applied)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn applies_all_migrations_on_fresh_db() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        let applied = run(&mut conn).unwrap();
+        assert_eq!(applied, MIGRATIONS.len());
+        assert_eq!(current_version(&conn).unwrap(), target_version());
+    }
+
+    #[test]
+    fn is_idempotent_when_run_twice() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run(&mut conn).unwrap();
+        let second = run(&mut conn).unwrap();
+        assert_eq!(second, 0, "no migrations should reapply");
+    }
+
+    #[test]
+    fn expected_tables_exist() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run(&mut conn).unwrap();
+        for table in ["settings", "commands", "clipboard_entries", "snippets", "quicklinks"] {
+            let count: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?1",
+                    [table],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 1, "table {table} should exist");
+        }
+    }
+}

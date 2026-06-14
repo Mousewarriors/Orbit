@@ -1,0 +1,6 @@
+# Orbit uses npm workspaces by default on this machine (see README for why),
+# but this file lets contributors who prefer pnpm use it transparently.
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "extensions/examples/*"

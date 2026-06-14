@@ -1,0 +1,9 @@
+[package]
+name = "orbit-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "orbit_search"
+path = "src/lib.rs"

@@ -1,0 +1,44 @@
+[package]
+name = "orbit-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Orbit — the universal command layer for your computer."
+default-run = "orbit-desktop"
+
+[lib]
+name = "orbit_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "orbit-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-opener = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+arboard = "3"
+orbit-core = { path = "../../../crates/orbit-core" }
+orbit-input = { path = "../../../crates/orbit-input" }
+orbit-search = { path = "../../../crates/orbit-search" }
+orbit-window-manager = { path = "../../../crates/orbit-window-manager" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+] }
+
+[features]
+# Enables the Tauri custom-protocol asset loader in release builds.
+custom-protocol = ["tauri/custom-protocol"]
