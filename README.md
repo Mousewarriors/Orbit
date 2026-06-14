@@ -50,6 +50,9 @@ What works and is tested today:
   chosen folders feeds a root-search file provider (open / reveal / copy path).
   Nothing is scanned until you enable it; file contents are never read or stored.
   See [`docs/architecture/FILE_SEARCH.md`](docs/architecture/FILE_SEARCH.md).
+- **Quicklinks**: saved, parameterised links (websites, web searches, files,
+  mailto). Type an alias then your query — e.g. `ghs tauri` — and `{query}` is
+  filled in. Managed in a dedicated view; dangerous URL schemes are rejected.
 - **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
   placeholder engine, the appearance + shortcut-accelerator models, command

@@ -147,6 +147,44 @@ export async function snippetRecordUse(id: string): Promise<void> {
   return invoke('snippet_record_use', { id });
 }
 
+export interface Quicklink {
+  id: string;
+  title: string;
+  target: string;
+  icon: string | null;
+  alias: string | null;
+  hotkey: string | null;
+  browser: string | null;
+  pinned: boolean;
+  created_at: number;
+}
+
+export async function quicklinkList(query: string, limit = 200): Promise<Quicklink[]> {
+  return invoke<Quicklink[]>('quicklink_list', { query, limit });
+}
+
+export async function quicklinkCreate(input: {
+  id: string;
+  title: string;
+  target: string;
+  alias: string | null;
+}): Promise<Quicklink> {
+  return invoke<Quicklink>('quicklink_create', input);
+}
+
+export async function quicklinkUpdate(input: {
+  id: string;
+  title: string;
+  target: string;
+  alias: string | null;
+}): Promise<Quicklink> {
+  return invoke<Quicklink>('quicklink_update', input);
+}
+
+export async function quicklinkDelete(id: string): Promise<void> {
+  return invoke('quicklink_delete', { id });
+}
+
 export interface FileRecord {
   path: string;
   name: string;

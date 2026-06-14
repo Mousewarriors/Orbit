@@ -14,8 +14,8 @@ permissions + error handling + keyboard + tests are all present.
 | Monorepo (npm + cargo workspaces) | ✅ | pnpm also supported |
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
-| Vitest unit tests | ✅ | 113 passing |
-| Rust unit/integration tests | ✅ | 67 passing (orbit-core 26, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
+| Vitest unit tests | ✅ | 116 passing |
+| Rust unit/integration tests | ✅ | 71 passing (orbit-core 30, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -64,7 +64,7 @@ permissions + error handling + keyboard + tests are all present.
 | Snippets manager (create/edit/delete/search, paste) | ✅ (Windows) | `orbit-core::snippets` CRUD + FTS (8 tests), validated input (`@orbit/validation`, re-checked natively), Snippets view + root provider; paste resolves placeholders then injects keystrokes. Created/listed verified live |
 | Snippets expansion (system-wide keyword) | 🟡 | Pure trigger matcher (`orbit-input`, 10 tests) + pure lifecycle state machine (5 tests) + Win32 low-level-keyboard-hook watcher with a **controllable lifecycle** (start/stop/restart/status, idempotent, clean `UnhookWindowsHookEx` via `WM_QUIT`). IPC: `snippet_watcher_status` / `_set_enabled` / `_restart`. **Opt-in** via `snippets.expansion.enabled` (off by default; toggled live from Settings → Snippets). The live hook path (keystroke into a 3rd-party app) is still not verified end-to-end here (Defender blocks synthetic input). Auto-expansion injects raw content (dynamic placeholders resolve on the manual paste path only) |
 | Snippet/Quicklink placeholder engine | ✅ | `@orbit/placeholders`, 13 tests (also used by snippet paste) |
-| Quicklinks | 🧪 | DB table + placeholder engine; no UI |
+| Quicklinks | ✅ | `orbit-core::quicklinks` CRUD (4 tests), Zod validation with scheme allowlist (`@orbit/validation`, re-checked natively), management view (create/edit/delete/open), root-search provider with `{query}` argument from an alias/title prefix + date/time/uuid resolution; web/mail targets open as URLs, paths via the OS handler. Tags/hotkeys/favourites/custom-icons/import-export are future |
 | Window management | ✅ (Windows) / 🟡 | 16 layouts; pure geometry tested (`orbit-window-manager`, 8 tests) + Win32 apply via captured foreground window. macOS/Linux return graceful "Windows only" error |
 | Local file search | ✅ (Windows) / 🟡 | **Opt-in, metadata-only.** Pure walker + rules (`orbit-files`, 10 tests), `files` table + FTS5 (`orbit-core::files`, 7 tests), background cancellable/self-superseding rebuild in transactional batches, root-search provider, Settings → Files (roots/excludes/hidden/rebuild/status), `reveal_path` (no shell). Full-rebuild only (no fs watcher yet); no content indexing. See [docs/architecture/FILE_SEARCH.md](docs/architecture/FILE_SEARCH.md). Cross-platform walker; reveal selects on Windows, opens parent elsewhere |
 | Emoji & symbols | ⬜ | — |

@@ -36,11 +36,15 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > background self-superseding rebuild in batches (`file_index.rs`), a root-search
 > file provider (≥3 chars), `reveal_path` (no shell), and a Settings → Files
 > section (opt-in toggle, roots/excludes/hidden, rebuild, live status). Indexing
-> is **off by default** and **metadata-only**. Counts: **113 JS tests, 67 Rust
-> tests**; lint/typecheck/`cargo check --workspace`/`vite build` all green. Not
-> live-verified this session (compile + unit verified): the Settings window
-> visuals, the live hotkey-rebind/keyword-hook paths, and a real file-index run —
-> see the manual checklist below.
+> is **off by default** and **metadata-only**.
+> (5) **Quicklinks** — `orbit-core::quicklinks` CRUD (4 tests), `@orbit/validation`
+> quicklink schema with a scheme allowlist (3 tests, re-checked natively), a
+> management view, and a root-search provider that fills `{query}` from an
+> alias/title prefix. Counts: **116 JS tests, 71 Rust tests**; lint/typecheck/
+> `cargo check --workspace`/`vite build` all green. Not live-verified this session
+> (compile + unit verified): the Settings window visuals, the live hotkey-rebind/
+> keyword-hook paths, a real file-index run, and Quicklink open — see the manual
+> checklist below.
 
 ## How to verify the build yourself (do this first)
 
@@ -146,9 +150,12 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
    **watcher** for incremental updates (insert already supports upsert), optional
    **content indexing** behind its own toggle, a dedicated filtered File Search
    view, and virtualised result rendering for very large indexes.
-3. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
-   a Node sidecar child process, a restricted RPC bridge, permission broker in
-   Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
+3. ~~**Quicklinks**~~ — **DONE (session 3)**. `orbit-core::quicklinks` CRUD,
+   `@orbit/validation` quicklink schema (scheme allowlist), management view +
+   root-search provider with `{query}` argument resolution. Next for Quicklinks:
+   tags/favourites/per-link hotkeys, custom icons, browser selection, import/
+   export, and clipboard/selection placeholders in the provider path.
+
 4. ~~**Settings window + configurable hotkey/theme**~~ — **DONE (session 3)**.
    Standalone native window with General/Appearance/Snippets/Privacy/Developer;
    configurable global hotkey (live re-register), theme/opacity/transparency/
@@ -156,6 +163,11 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
    in `@orbit/appearance` + `@orbit/shortcuts`. Remaining Settings polish (not
    blocking): a Files section (will land with the File Search slice), launch-at-
    login (needs the autostart plugin), and excluded-apps for snippets/clipboard.
+5. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
+   a Node sidecar child process, a restricted RPC bridge, permission broker in
+   Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
+6. **Notes** and **small built-ins** (emoji/UUID/hash/JSON/colour) are good
+   medium-sized follow-ups once the extension host is scoped.
 
 ## Manual desktop test checklist (session 3 — verify on next `tauri dev`)
 
@@ -177,6 +189,10 @@ Compile + unit tests are green; these GUI paths still want a human eye:
   indexed"; type ≥3 chars in the launcher and confirm files appear; Enter opens,
   "Reveal in File Manager" selects it, "Copy Path" copies; disabling clears the
   index; "Rebuild File Index" command works.
+- Quicklinks: run "Quicklinks" → ⌘N create (e.g. title "GitHub Search", target
+  `https://github.com/search?q={query}`, alias "ghs"); Enter opens it; from Root
+  Search type "ghs tauri" and confirm it opens the search for "tauri"; a
+  `javascript:` target is rejected with an error; edit/delete work.
 
 For any of these, follow CLAUDE.md architecture rules and end on the full
 verification gate + a FEATURE_MATRIX update.

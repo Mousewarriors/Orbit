@@ -367,6 +367,93 @@ pub fn paste_text(state: State<'_, AppState>, text: String) -> Result<(), String
 }
 
 // ---------------------------------------------------------------------------
+// Quicklinks
+// ---------------------------------------------------------------------------
+
+/// Re-check a Quicklink target on the native side (defence-in-depth): bounded
+/// lengths and a scheme allowlist (http/https/mailto or a scheme-less path).
+fn validate_quicklink(title: &str, target: &str, alias: &Option<String>) -> Result<(), String> {
+    let title = title.trim();
+    if title.is_empty() || title.chars().count() > MAX_SNIPPET_FIELD {
+        return Err("quicklink title must be 1–200 characters".into());
+    }
+    let target = target.trim();
+    if target.is_empty() || target.len() > 4000 {
+        return Err("quicklink target must be 1–4000 characters".into());
+    }
+    if let Some(scheme) = target.split_once(':').map(|(s, _)| s) {
+        // Only treat the prefix as a scheme if it looks like one (no spaces, no
+        // path separators) — otherwise it's a Windows drive path like C:\…
+        let looks_scheme = !scheme.is_empty()
+            && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
+            && scheme.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+            && scheme.len() > 1;
+        if looks_scheme {
+            let s = scheme.to_ascii_lowercase();
+            if s != "http" && s != "https" && s != "mailto" {
+                return Err(format!("unsupported quicklink scheme '{s}'"));
+            }
+        }
+    }
+    if let Some(a) = alias {
+        if a.chars().count() > MAX_SNIPPET_FIELD {
+            return Err("quicklink alias too long".into());
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn quicklink_list(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::Quicklink>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::quicklinks::list(&conn, &query, limit.unwrap_or(200).clamp(1, 1000))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn quicklink_create(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+    target: String,
+    alias: Option<String>,
+) -> Result<orbit_core::Quicklink, String> {
+    if id.is_empty() || id.len() > MAX_SNIPPET_FIELD {
+        return Err("invalid quicklink id".into());
+    }
+    let alias = alias.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
+    validate_quicklink(&title, &target, &alias)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::quicklinks::create(&conn, &id, title.trim(), target.trim(), alias.as_deref(), now_ms())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn quicklink_update(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+    target: String,
+    alias: Option<String>,
+) -> Result<orbit_core::Quicklink, String> {
+    let alias = alias.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
+    validate_quicklink(&title, &target, &alias)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::quicklinks::update(&conn, &id, title.trim(), target.trim(), alias.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn quicklink_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::quicklinks::delete(&conn, &id).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // File search
 // ---------------------------------------------------------------------------
 

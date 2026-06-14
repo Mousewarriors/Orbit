@@ -102,6 +102,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'snippets' }),
   },
   {
+    definition: def('builtin.quicklinks.manage', 'Quicklinks', 'Quicklinks', 'link', {
+      keywords: ['quicklink', 'link', 'bookmark', 'url', 'shortcut', 'open'],
+      subtitle: 'Create and open parameterised links',
+    }),
+    effect: (): EffectResult => ({ pushView: 'quicklinks' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',

@@ -9,6 +9,7 @@ import {
   createAppProvider,
   createCalculatorProvider,
   createFileProvider,
+  createQuicklinkProvider,
   createSnippetProvider,
 } from './providers.js';
 import { executeAction } from './execute.js';
@@ -18,8 +19,9 @@ import { ActionMenu } from './components/ActionMenu.js';
 import { Footer } from './components/Footer.js';
 import { ClipboardView } from './components/ClipboardView.js';
 import { SnippetsView } from './components/SnippetsView.js';
+import { QuicklinksView } from './components/QuicklinksView.js';
 
-type View = 'root' | 'clipboard' | 'snippets';
+type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -51,6 +53,7 @@ export function App(): JSX.Element {
       createCommandProvider(registry),
       createAppProvider(() => appsRef.current),
       createSnippetProvider(),
+      createQuicklinkProvider(),
       createFileProvider(),
       createCalculatorProvider(),
     ],
@@ -133,7 +136,11 @@ export function App(): JSX.Element {
         // Learn from usage for ranking (keyed by item id).
         if (native.isTauri()) void native.recordCommandUsage(item.id).catch(() => {});
         setActionMenuOpen(false);
-        if (outcome.pushView === 'clipboard' || outcome.pushView === 'snippets') {
+        if (
+          outcome.pushView === 'clipboard' ||
+          outcome.pushView === 'snippets' ||
+          outcome.pushView === 'quicklinks'
+        ) {
           setView(outcome.pushView);
         } else if (outcome.hide) {
           setQuery('');
@@ -185,6 +192,10 @@ export function App(): JSX.Element {
 
   if (view === 'snippets') {
     return <SnippetsView onPop={() => setView('root')} onPasted={closeToRoot} />;
+  }
+
+  if (view === 'quicklinks') {
+    return <QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />;
   }
 
   return (

@@ -7,6 +7,8 @@ import {
   parseDeeplink,
   validateManifest,
   validateSnippetInput,
+  validateQuicklinkInput,
+  isValidQuicklinkTarget,
 } from './index.js';
 
 const validManifest = {
@@ -159,5 +161,31 @@ describe('shell & url safety', () => {
     expect(isSafeExternalUrl('javascript:alert(1)')).toBe(false);
     expect(isSafeExternalUrl('file:///etc/passwd')).toBe(false);
     expect(isSafeExternalUrl('data:text/html,<script>')).toBe(false);
+  });
+});
+
+describe('quicklink validation', () => {
+  it('accepts http(s)/mailto URLs, templates and bare paths', () => {
+    expect(isValidQuicklinkTarget('https://github.com')).toBe(true);
+    expect(isValidQuicklinkTarget('https://google.com/search?q={query}')).toBe(true);
+    expect(isValidQuicklinkTarget('mailto:a@b.com')).toBe(true);
+    expect(isValidQuicklinkTarget('C:\\Users\\me\\notes')).toBe(true);
+    expect(isValidQuicklinkTarget('/home/me/notes')).toBe(true);
+  });
+
+  it('rejects dangerous schemes', () => {
+    expect(isValidQuicklinkTarget('javascript:alert(1)')).toBe(false);
+    expect(isValidQuicklinkTarget('file:///etc/passwd')).toBe(false);
+    expect(isValidQuicklinkTarget('data:text/html,x')).toBe(false);
+    expect(isValidQuicklinkTarget('vbscript:msgbox')).toBe(false);
+    expect(isValidQuicklinkTarget('')).toBe(false);
+  });
+
+  it('validates full quicklink input', () => {
+    expect(
+      validateQuicklinkInput({ title: 'GitHub', target: 'https://github.com', alias: 'gh' }).ok,
+    ).toBe(true);
+    expect(validateQuicklinkInput({ title: '', target: 'https://x.com' }).ok).toBe(false);
+    expect(validateQuicklinkInput({ title: 'Bad', target: 'javascript:x' }).ok).toBe(false);
   });
 });

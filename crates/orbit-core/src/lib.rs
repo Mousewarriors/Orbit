@@ -6,10 +6,12 @@ pub mod clipboard;
 pub mod db;
 pub mod files;
 pub mod migrations;
+pub mod quicklinks;
 pub mod snippets;
 
 pub use clipboard::ClipboardEntry;
 pub use files::{FileFilters, FileInput, FileRecord};
+pub use quicklinks::Quicklink;
 pub use snippets::Snippet;
 
 pub use db::{

@@ -93,6 +93,76 @@ export function createSnippetProvider(): SearchProvider {
   };
 }
 
+/** Does a (resolved) target use a web/mail scheme we open as a URL? */
+function isWebTarget(target: string): boolean {
+  return /^(https?|mailto):/i.test(target.trim());
+}
+
+/**
+ * Derive the `{query}` argument for a Quicklink from the typed text. If the text
+ * starts with the link's alias or title followed by a space, the remainder is the
+ * argument (e.g. "gh tauri" → "tauri"); an exact alias/title match yields an
+ * empty argument; otherwise the whole query is used.
+ */
+function deriveQuicklinkArg(query: string, ql: native.Quicklink): string {
+  const q = query.trim();
+  const lower = q.toLowerCase();
+  for (const prefix of [ql.alias, ql.title]) {
+    if (!prefix) continue;
+    const p = prefix.toLowerCase();
+    if (lower === p) return '';
+    if (lower.startsWith(`${p} `)) return q.slice(p.length).trim();
+  }
+  return q;
+}
+
+/**
+ * Quicklink provider. Surfaces saved links matching the typed text and opens
+ * their (placeholder-resolved) target. `{query}` is filled from the text after a
+ * matching alias/title prefix; date/time/uuid resolve automatically. Web/mail
+ * targets open as URLs (scheme re-checked natively); everything else opens as a
+ * path via the OS handler.
+ */
+export function createQuicklinkProvider(): SearchProvider {
+  return {
+    id: 'quicklinks',
+    source: 'quicklink',
+    canHandle: (q) => native.isTauri() && q.trim().length >= 2,
+    async search(query): Promise<SearchItem[]> {
+      const links = await native.quicklinkList(query, 20);
+      const now = new Date();
+      return links.map((ql) => {
+        const arg = deriveQuicklinkArg(query, ql);
+        const resolved = resolveTemplate(ql.target, { query: arg, now }).text;
+        const web = isWebTarget(resolved);
+        return {
+          id: `quicklink.${ql.id}`,
+          title: ql.title,
+          subtitle: `${ql.alias ? `⚡ ${ql.alias} · ` : ''}${resolved}`,
+          category: 'Quicklinks',
+          source: 'quicklink' as const,
+          icon: { kind: 'builtin' as const, name: 'link' },
+          confidence: 0.65,
+          primaryAction: {
+            id: `quicklink.${ql.id}.open`,
+            title: web ? 'Open Link' : 'Open',
+            run: web
+              ? { kind: 'open-url' as const, url: resolved }
+              : { kind: 'open-path' as const, path: resolved },
+          },
+          secondaryActions: [
+            {
+              id: `quicklink.${ql.id}.copy`,
+              title: 'Copy Target',
+              run: { kind: 'copy' as const, text: resolved },
+            },
+          ],
+        };
+      });
+    },
+  };
+}
+
 /** Human-readable file size for a subtitle. */
 function formatSize(bytes: number): string {
   if (bytes <= 0) return '';
