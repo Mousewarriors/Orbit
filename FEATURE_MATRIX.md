@@ -14,7 +14,7 @@ permissions + error handling + keyboard + tests are all present.
 | Monorepo (npm + cargo workspaces) | ✅ | pnpm also supported |
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
-| Vitest unit tests | ✅ | 116 passing |
+| Vitest unit tests | ✅ | 127 passing |
 | Rust unit/integration tests | ✅ | 76 passing (orbit-core 35, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
@@ -69,6 +69,7 @@ permissions + error handling + keyboard + tests are all present.
 | Window management | ✅ (Windows) / 🟡 | 16 layouts; pure geometry tested (`orbit-window-manager`, 8 tests) + Win32 apply via captured foreground window. macOS/Linux return graceful "Windows only" error |
 | Local file search | ✅ (Windows) / 🟡 | **Opt-in, metadata-only.** Pure walker + rules (`orbit-files`, 10 tests), `files` table + FTS5 (`orbit-core::files`, 7 tests), background cancellable/self-superseding rebuild in transactional batches, root-search provider, Settings → Files (roots/excludes/hidden/rebuild/status), `reveal_path` (no shell). Full-rebuild only (no fs watcher yet); no content indexing. See [docs/architecture/FILE_SEARCH.md](docs/architecture/FILE_SEARCH.md). Cross-platform walker; reveal selects on Windows, opens parent elsewhere |
 | Notes | ✅ | `orbit-core::notes` CRUD + FTS5 over title+body, pin/archive (5 tests); Notes view with a searchable list + autosaving editor (debounced + on-blur), ⌘N/⌘⌫, crash-safe (saves on blur/escape); root-search note provider. Markdown is stored/edited as plain text (no rendered preview yet); version snapshots are future |
+| Built-in tools (UUID / password / colour / JSON) | ✅ | pure `@orbit/tools` (11 tests): colour conversion (#hex/rgb→hex/rgb/hsl), JSON format/minify, secure password (crypto RNG, guaranteed character classes), UUID; surfaced as instant Root Search results that copy on Enter |
 | Emoji & symbols | ⬜ | — |
 | System commands | 🟡 | "Open Settings", "Rebuild File Index", "Reindex Applications", "Quit" exist as built-ins; broader system commands ⬜ |
 

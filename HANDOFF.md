@@ -47,8 +47,10 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > checklist below.
 > (6) **Notes** — `orbit-core::notes` CRUD + FTS5 + pin/archive (5 tests), a Notes
 > view with an autosaving editor + searchable list, and a root-search note
-> provider (opens a note via a push-view action carrying its id). Counts: **116 JS
-> tests, 76 Rust tests**; full gate green.
+> provider (opens a note via a push-view action carrying its id).
+> (7) **Built-in tools** — pure `@orbit/tools` (colour conversion, JSON format/
+> minify, crypto-secure password, UUID; 11 tests) surfaced as instant Root Search
+> results. Counts: **127 JS tests, 76 Rust tests**; full gate green.
 
 ## How to verify the build yourself (do this first)
 
@@ -174,8 +176,10 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
    pin/archive), a Notes view with an autosaving editor + searchable list, and a
    root-search note provider. Next: rendered Markdown preview, version snapshots,
    note templates, and an archive browser.
-7. **Small built-ins** (emoji/UUID/hash/JSON/colour/password) — pure, easily
-   tested provider tools; a good next batch.
+7. ~~**Small built-ins**~~ — **DONE (session 3)**: `@orbit/tools` (colour, JSON,
+   secure password, UUID) wired as an instant Root Search tools provider. Next
+   easy additions: hash (Web Crypto), emoji/symbol picker, base/number convert,
+   lorem ipsum, slug.
 
 ## Manual desktop test checklist (session 3 — verify on next `tauri dev`)
 

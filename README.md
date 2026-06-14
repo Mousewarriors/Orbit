@@ -55,6 +55,8 @@ What works and is tested today:
   filled in. Managed in a dedicated view; dangerous URL schemes are rejected.
 - **Notes**: fast local notes with an autosaving editor and full-text search;
   surfaced in Root Search and opened straight into the editor.
+- **Built-in tools**: type `uuid`, `password 24`, a colour like `#ff8800`, or
+  `json {…}` to get instant results you can copy.
 - **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
   placeholder engine, the appearance + shortcut-accelerator models, command

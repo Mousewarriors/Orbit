@@ -22,6 +22,7 @@
     "@orbit/search-engine": "*",
     "@orbit/shared-types": "*",
     "@orbit/shortcuts": "*",
+    "@orbit/tools": "*",
     "@orbit/validation": "*",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-global-shortcut": "^2.2.0",

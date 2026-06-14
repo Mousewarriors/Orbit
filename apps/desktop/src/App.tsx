@@ -12,6 +12,7 @@ import {
   createNoteProvider,
   createQuicklinkProvider,
   createSnippetProvider,
+  createToolsProvider,
 } from './providers.js';
 import { executeAction } from './execute.js';
 import { initAppearance } from './appearance.js';
@@ -59,6 +60,7 @@ export function App(): JSX.Element {
       createQuicklinkProvider(),
       createNoteProvider(),
       createFileProvider(),
+      createToolsProvider(),
       createCalculatorProvider(),
     ],
     [registry],

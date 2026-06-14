@@ -6,6 +6,12 @@
 import type { SearchItem, SearchProvider } from '@orbit/shared-types';
 import { calculate, FALLBACK_RATES } from '@orbit/calculator';
 import { resolveTemplate } from '@orbit/placeholders';
+import {
+  DEFAULT_PASSWORD_OPTIONS,
+  colorConversions,
+  formatJson,
+  generatePassword,
+} from '@orbit/tools';
 import * as native from './native.js';
 import type { NativeApp } from './native.js';
 
@@ -251,6 +257,99 @@ export function createFileProvider(): SearchProvider {
           ],
         };
       });
+    },
+  };
+}
+
+/** Cryptographically secure float in [0, 1) for password generation. */
+function secureRandom(): number {
+  const a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return a[0]! / 2 ** 32;
+}
+
+function toolItem(
+  id: string,
+  title: string,
+  subtitle: string,
+  copy: string,
+  keyword: string,
+): SearchItem {
+  return {
+    id,
+    title,
+    subtitle,
+    keywords: [keyword],
+    category: 'Tools',
+    source: 'system' as const,
+    icon: { kind: 'builtin' as const, name: 'tool' },
+    confidence: 0.9,
+    primaryAction: {
+      id: `${id}.copy`,
+      title: 'Copy',
+      run: { kind: 'copy' as const, text: copy },
+    },
+  };
+}
+
+/**
+ * Built-in developer tools surfaced as instant results: UUID, secure password,
+ * colour conversion (#hex / rgb()), and JSON formatting (`json {…}`). All compute
+ * locally and synchronously; the primary action copies the result.
+ */
+export function createToolsProvider(): SearchProvider {
+  return {
+    id: 'tools',
+    source: 'system',
+    canHandle: (q) => q.trim().length >= 2,
+    async search(query): Promise<SearchItem[]> {
+      const q = query.trim();
+      const lower = q.toLowerCase();
+      const items: SearchItem[] = [];
+
+      if (lower === 'uuid' || lower === 'guid') {
+        const id = crypto.randomUUID();
+        items.push(toolItem('tool.uuid', id, 'Generated UUID v4 — Enter to copy', id, q));
+      }
+
+      const pw = /^(password|pw|pass)(?:\s+(\d{1,3}))?$/.exec(lower);
+      if (pw) {
+        const length = pw[2] ? Number(pw[2]) : DEFAULT_PASSWORD_OPTIONS.length;
+        const value = generatePassword({ ...DEFAULT_PASSWORD_OPTIONS, length }, secureRandom);
+        items.push(
+          toolItem('tool.password', value, `Secure ${value.length}-char password`, value, q),
+        );
+      }
+
+      const colors = colorConversions(q);
+      if (colors) {
+        items.push(toolItem('tool.color.hex', colors.hex, `HEX · ${colors.rgb}`, colors.hex, q));
+        items.push(toolItem('tool.color.rgb', colors.rgb, `RGB · ${colors.hsl}`, colors.rgb, q));
+        items.push(toolItem('tool.color.hsl', colors.hsl, `HSL · ${colors.hex}`, colors.hsl, q));
+      }
+
+      const jsonMatch = /^json\s+([\s\S]+)$/i.exec(q);
+      if (jsonMatch) {
+        const result = formatJson(jsonMatch[1]!);
+        if (result.ok) {
+          const preview = result.text.replace(/\s+/g, ' ').slice(0, 80);
+          items.push(toolItem('tool.json', 'Format JSON', preview, result.text, q));
+        } else {
+          items.push({
+            id: 'tool.json.error',
+            title: 'Invalid JSON',
+            subtitle: result.error,
+            keywords: [q],
+            category: 'Tools',
+            source: 'system' as const,
+            icon: { kind: 'builtin' as const, name: 'tool' },
+            confidence: 0.9,
+            primaryAction: { id: 'tool.json.noop', title: 'OK', run: { kind: 'copy', text: '' } },
+          });
+        }
+      }
+
+      return items;
     },
   };
 }
