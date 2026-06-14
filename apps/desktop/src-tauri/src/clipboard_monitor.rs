@@ -12,7 +12,28 @@ use tauri::{AppHandle, Manager};
 use crate::commands::AppState;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(700);
-const RETENTION: i64 = 500;
+const DEFAULT_RETENTION: i64 = 500;
+
+/// Read the clipboard-history retention cap from settings (default 500), clamped
+/// to a sane range.
+fn retention(conn: &rusqlite::Connection) -> i64 {
+    orbit_core::get_setting(conn, "privacy.clipboard.retention")
+        .ok()
+        .flatten()
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(DEFAULT_RETENTION)
+        .clamp(10, 10_000)
+}
+
+/// Whether clipboard monitoring is enabled (default true). Honoured live so the
+/// Privacy toggle takes effect without a restart.
+fn monitoring_enabled(conn: &rusqlite::Connection) -> bool {
+    orbit_core::get_setting(conn, "privacy.clipboard.enabled")
+        .ok()
+        .flatten()
+        .as_deref()
+        != Some("false")
+}
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -57,9 +78,14 @@ pub fn spawn(app: AppHandle) {
                 continue;
             };
             let Ok(conn) = state.db.lock() else { continue };
+            // Respect the user's privacy toggle (checked live each tick). We still
+            // updated `last` above so re-enabling won't capture stale content.
+            if !monitoring_enabled(&conn) {
+                continue;
+            }
             let sensitive = looks_sensitive(&text);
             if orbit_core::clipboard::insert_text(&conn, &text, None, sensitive, now_ms()).is_ok() {
-                let _ = orbit_core::clipboard::prune(&conn, RETENTION);
+                let _ = orbit_core::clipboard::prune(&conn, retention(&conn));
             }
         }
     });

@@ -35,9 +35,19 @@ cross-extension data access; AI tool misuse.
 | **No `eval`** anywhere; calculator is a hand-written recursive-descent parser | `calculator/parser.ts` |
 | Manifest hardening: bounded lengths, constrained identifiers, no `..`/absolute icon paths, enumerated permissions | `validation/manifest.ts` (tested) |
 | Native commands validate inputs and never interpolate into a shell (apps launched via OS opener with a trusted indexed path) | `commands.rs::launch_path` / `open_url` |
+| Activation shortcut is parsed/validated before (re)registration; an invalid or already-claimed accelerator returns a clear error and leaves the previous binding intact | `commands.rs::set_activation_shortcut` |
+| Settings is a second webview of the **same** bundle/origin under the same CSP; it reaches native only through the typed IPC surface (no extra origin trust) | `open_settings` + `main.tsx` hash route |
+| Snippet keyboard hook never logs/persists raw keystrokes; the buffer holds only the trailing chars needed to match a keyword and resets on focus/navigation breaks; self-injected events are tagged and ignored | `snippet_watcher.rs` + `orbit_input::trigger` |
+| Clipboard capture is user-disableable and honoured live; nothing leaves the device | `clipboard_monitor.rs` (`privacy.clipboard.enabled`) |
 
 Defence-in-depth: validation exists in TS **and** the native layer re-checks
 (e.g. `open_url` independently rejects non-http(s)/mailto schemes).
+
+**Residual risks (this build):** the snippet LL keyboard hook is a high-privilege
+surface — it is **opt-in / off by default**, has a controllable lifecycle, and
+cannot inject into higher-integrity (elevated) windows from a non-elevated Orbit
+(a Windows boundary we deliberately do not bypass). The local SQLite store
+(clipboard/snippets) is **not yet encrypted at rest**.
 
 ## Planned controls
 

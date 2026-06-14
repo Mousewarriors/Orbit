@@ -25,9 +25,14 @@ for an honest, line-by-line status.
 
 What works and is tested today:
 
-- **Native shell** (Tauri 2 + Rust): system tray, `Alt+Space` global hotkey,
-  frameless always-on-top launcher window, hide-on-blur, SQLite database with
-  forward-only migrations.
+- **Native shell** (Tauri 2 + Rust): system tray, a **configurable** global
+  hotkey (default `Alt+Space`), frameless always-on-top launcher window,
+  hide-on-blur, SQLite database with forward-only migrations.
+- **Settings window** (standalone, native): configure the activation shortcut,
+  appearance (theme, opacity, reduced transparency for high contrast on busy
+  backgrounds, reduced motion), system-wide snippet expansion, clipboard privacy
+  (capture toggle, retention, clear), and view diagnostics. Open it from the tray,
+  the "Open Settings" command, or `Alt+Space` → "Settings".
 - **Root Search slice**: applications (real OS enumeration), built-in commands,
   and a natural-language calculator — fuzzy-matched and ranked with usage/recency
   learning, fully keyboard-driven, with an Action Panel.
@@ -36,14 +41,19 @@ What works and is tested today:
   geometry unit-tested in a pure crate.
 - **Clipboard history**: background monitor → local SQLite store with duplicate
   collapsing, retention cap, and a navigable history view (filter, copy back,
-  delete, pin, sensitive-content masking). At-rest encryption is planned.
-- **Verifiable core packages** (platform-agnostic, 91 unit tests):
+  paste into the active app, delete, pin, sensitive-content masking). Capture is
+  user-toggleable; at-rest encryption is planned.
+- **Snippets**: a CRUD manager + root-search provider with placeholder expansion,
+  paste-injection into the active app, and **opt-in** system-wide keyword
+  expansion (Windows) with a controllable start/stop/restart lifecycle.
+- **Verifiable core packages** (platform-agnostic, 113 unit tests):
   search/ranking, calculator + unit/currency/base conversions, snippet/Quicklink
-  placeholder engine, command registry + hotkey-conflict detection, and Zod
-  validation for manifests / deeplinks / path & shell safety.
+  placeholder engine, the appearance + shortcut-accelerator models, command
+  registry + hotkey-conflict detection, and Zod validation for manifests /
+  deeplinks / path & shell safety.
 
 Verification gates currently green: ESLint, `tsc` (strict) across all packages,
-Vitest (91), `cargo test` (27), `cargo check` on the whole workspace, and
+Vitest (113), `cargo test` (50 lib), `cargo check` on the whole workspace, and
 `vite build`.
 
 ## Repository layout
@@ -59,8 +69,11 @@ packages/
   search-engine/      Fuzzy matcher, ranking engine, cancellable orchestrator
   calculator/         Safe expression parser, units, currency, base conversions
   placeholders/       Snippet & Quicklink dynamic-placeholder engine
+  appearance/         Pure theme/opacity/transparency/motion model
+  shortcuts/          Pure global-shortcut accelerator parse/format
 crates/
   orbit-core/         SQLite open + migrations + data access (Rust)
+  orbit-input/        Text injection (SendInput) + keyword trigger + lifecycle
   orbit-search/       Native fuzzy matcher mirroring the TS engine (Rust)
 docs/                 Architecture, security, data model, etc.
 scripts/              Tooling (e.g. original app-icon generator)

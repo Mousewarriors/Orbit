@@ -14,7 +14,7 @@ permissions + error handling + keyboard + tests are all present.
 | Monorepo (npm + cargo workspaces) | ✅ | pnpm also supported |
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
-| Vitest unit tests | ✅ | 96 passing |
+| Vitest unit tests | ✅ | 113 passing |
 | Rust unit/integration tests | ✅ | 50 passing (orbit-core 19, orbit-input 15, orbit-search 8, orbit-window-manager 8) |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
@@ -26,8 +26,10 @@ permissions + error handling + keyboard + tests are all present.
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| System tray (open/quit) | ✅ | `lib.rs::build_tray` |
-| Global hotkey (Alt+Space) | ✅ | configurable value not yet in UI |
+| System tray (open/quit/settings) | ✅ | `lib.rs::build_tray` |
+| Global hotkey (Alt+Space) | ✅ | **configurable** at runtime via Settings → General (shortcut recorder); re-registered live and persisted (`general.hotkey`) |
+| Settings window (native, standalone) | ✅ | second decorated Tauri window (`index.html#/settings`); sections: General (hotkey), Appearance, Snippets, Privacy, Developer. Opened from tray, the "Open Settings" command, or `open_settings` IPC |
+| Appearance (theme / opacity / reduced transparency / reduced motion) | ✅ | pure `@orbit/appearance` model (11 tests); applied live to the Settings window, applied to the launcher on next show; addresses low-contrast-on-busy-backgrounds via solid/reduced-transparency mode |
 | Launcher window (frameless, on-top, centred, hide-on-blur) | ✅ | `tauri.conf.json` + `lib.rs`; **run end-to-end** — Alt+Space toggle, search, calc, clipboard & snippets views verified live (fixed a startup panic from a malformed `plugins.global-shortcut` config) |
 | Text injection / paste (SendInput) | ✅ (Windows) / 🟡 | `orbit-input` crate; powers snippet & clipboard paste into the active app; macOS/Linux return a graceful error |
 | SQLite open + migrations | ✅ | `orbit-core`, `user_version` strategy, tested |
@@ -35,6 +37,7 @@ permissions + error handling + keyboard + tests are all present.
 | Application enumeration | ✅ (Win/mac/Linux) | Start Menu `.lnk` / `.app` / `.desktop` |
 | Crash recovery (renderer/ext host) | ⬜ | — |
 | Per-command hotkeys / aliases UI | ⬜ | model exists, no UI |
+| Privacy controls (clipboard capture toggle, retention, clear) | ✅ | Settings → Privacy; honoured live by the clipboard monitor (`privacy.clipboard.enabled` / `.retention`) |
 
 ## Root Search
 

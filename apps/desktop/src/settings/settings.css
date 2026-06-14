@@ -1,0 +1,289 @@
+/*
+ * Settings window styling. Reuses the launcher's design tokens (defined in
+ * styles.css) so theme/contrast settings apply here too, but lays out a normal
+ * decorated window: a left section nav and a scrolling content pane.
+ */
+.settings-root {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  height: 100vh;
+  background: var(--window-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--separator);
+  background: rgba(var(--window-rgb), 0.4);
+  overflow-y: auto;
+}
+.settings-brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding: 6px 10px 12px;
+}
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.settings-nav-item:hover {
+  background: var(--row-hover);
+}
+.settings-nav-item.is-active {
+  background: var(--row-selected);
+  color: var(--text-primary);
+}
+.settings-nav-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.settings-content {
+  overflow-y: auto;
+  padding: 26px 30px;
+}
+
+.settings-section-head h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.settings-section-desc {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 56ch;
+  line-height: 1.5;
+}
+.settings-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 60ch;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.settings-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.settings-field-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.settings-field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+}
+
+/* Toggle switch */
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.settings-toggle.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.settings-toggle-label {
+  font-size: 13.5px;
+}
+.settings-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--kbd-bg);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.settings-switch.is-on {
+  background: var(--focus-ring);
+}
+.settings-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+.settings-switch.is-on .settings-switch-knob {
+  transform: translateX(16px);
+}
+
+/* Segmented control (theme) */
+.settings-segment {
+  display: inline-flex;
+  background: var(--kbd-bg);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 2px;
+}
+.settings-segment-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.settings-segment-btn.is-active {
+  background: var(--row-selected);
+  color: var(--text-primary);
+}
+
+/* Buttons */
+.settings-btn-ghost,
+.settings-btn-danger {
+  border: 1px solid var(--separator);
+  background: var(--kbd-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.settings-btn-ghost:hover {
+  background: var(--row-hover);
+}
+.settings-btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.settings-btn-danger {
+  color: var(--destructive);
+  border-color: var(--destructive);
+  background: transparent;
+}
+.settings-btn-danger:hover {
+  background: rgba(255, 92, 112, 0.12);
+}
+
+/* Shortcut recorder */
+.settings-recorder {
+  min-width: 180px;
+  border: 1px solid var(--separator);
+  background: var(--kbd-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13.5px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.settings-recorder.is-recording {
+  border-color: var(--focus-ring);
+  color: var(--focus-ring);
+}
+
+/* Inputs */
+.settings-input-narrow {
+  width: 110px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 7px 10px;
+}
+input[type='range'] {
+  width: 240px;
+  accent-color: var(--focus-ring);
+}
+
+/* Status line */
+.settings-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.settings-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.settings-dot.is-on {
+  background: #43c6ac;
+  box-shadow: 0 0 0 3px rgba(67, 198, 172, 0.2);
+}
+
+/* Misc text */
+.settings-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 56ch;
+}
+.settings-ok {
+  color: #43c6ac;
+  font-size: 12.5px;
+  margin: 0;
+}
+.settings-err {
+  color: var(--destructive);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+/* Developer key/value table */
+.settings-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 18px;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+.settings-kv dt {
+  color: var(--text-muted);
+}
+.settings-kv dd {
+  margin: 0;
+}
+.settings-mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
+  word-break: break-all;
+}

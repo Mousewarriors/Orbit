@@ -177,6 +177,32 @@ export async function hideLauncher(): Promise<void> {
   return invoke('hide_launcher');
 }
 
+/** Open (or focus) the standalone Settings window. */
+export async function openSettings(): Promise<void> {
+  return invoke('open_settings');
+}
+
+/** Re-bind the global activation shortcut to `accelerator` (e.g. "Alt+Space"). */
+export async function setActivationShortcut(accelerator: string): Promise<void> {
+  return invoke('set_activation_shortcut', { accelerator });
+}
+
+export interface Diagnostics {
+  version: string;
+  data_dir: string;
+  db_path: string;
+  platform: string;
+}
+
+export async function diagnostics(): Promise<Diagnostics> {
+  return invoke<Diagnostics>('diagnostics');
+}
+
+/** Reveal the application data directory in the OS file manager. */
+export async function openDataDir(): Promise<void> {
+  return invoke('open_data_dir');
+}
+
 export async function quitApp(): Promise<void> {
   return invoke('quit_app');
 }

@@ -18,6 +18,23 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > manager (create/list round-trip). Not live-verified: actual keystroke output
 > into a 3rd-party app and the opt-in keyword-expansion hook (synthetic input is
 > intermittently blocked by Defender here) — these rest on unit-tested logic.
+>
+> **Update (session 3, 2026-06-14, branch `claude/autonomous-orbit-build`):**
+> (1) **Snippet watcher now has a controllable lifecycle** — start/stop/restart/
+> status, idempotent, clean `UnhookWindowsHookEx` via `WM_QUIT`, backed by a pure
+> `orbit_input::Lifecycle` (5 tests). IPC: `snippet_watcher_status/_set_enabled/
+> _restart`. (2) **Native Settings window** (`index.html#/settings`, opened from
+> tray / "Open Settings" command / `open_settings`) with General (configurable
+> global hotkey via a shortcut recorder, re-registered live), Appearance (theme /
+> opacity / reduced-transparency / reduced-motion — new pure `@orbit/appearance`
+> pkg, 11 tests + `@orbit/shortcuts`, 6 tests), Snippets (expansion toggle +
+> status + restart), Privacy (clipboard capture toggle / retention / clear — now
+> honoured live by the monitor), Developer (version/paths, open data folder).
+> (3) Fixed Root Search focus restoration when returning from a subview. Counts:
+> **113 JS tests, 50 Rust tests**; lint/typecheck/`cargo check --workspace`/`vite
+> build` all green. Not live-verified this session (compile + unit verified): the
+> Settings window visuals and the live hotkey-rebind/keyword-hook paths — see the
+> manual checklist below.
 
 ## How to verify the build yourself (do this first)
 
@@ -124,9 +141,30 @@ auto-update; packaging signing; secret vault; CI workflows. See FEATURE_MATRIX.m
 3. **Extension host**. Manifest validation (`@orbit/validation`) is done. Next:
    a Node sidecar child process, a restricted RPC bridge, permission broker in
    Rust, per-extension storage. Big; design in docs/EXTENSION_RUNTIME.md first.
-4. **Settings window + configurable hotkey/theme**. The model exists
-   (CommandRegistry customisations, theme tokens, settings table); needs a second
-   Tauri window + UI.
+4. ~~**Settings window + configurable hotkey/theme**~~ — **DONE (session 3)**.
+   Standalone native window with General/Appearance/Snippets/Privacy/Developer;
+   configurable global hotkey (live re-register), theme/opacity/transparency/
+   motion, watcher controls, clipboard privacy controls, diagnostics. Pure logic
+   in `@orbit/appearance` + `@orbit/shortcuts`. Remaining Settings polish (not
+   blocking): a Files section (will land with the File Search slice), launch-at-
+   login (needs the autostart plugin), and excluded-apps for snippets/clipboard.
+
+## Manual desktop test checklist (session 3 — verify on next `tauri dev`)
+
+Compile + unit tests are green; these GUI paths still want a human eye:
+- Tray → "Settings…" (and the "Open Settings" command) opens a decorated window.
+- General: record a new shortcut (e.g. Ctrl+Shift+Space); confirm it toggles the
+  launcher and survives a restart; "Reset to Alt+Space" works; invalid/in-use
+  shows an error.
+- Appearance: switch theme + toggle reduced transparency / drag opacity → the
+  Settings window updates instantly; reopen the launcher (Alt+Space) → it reflects
+  the new look (contrast fix on busy wallpapers).
+- Snippets: toggle expansion on → status shows "Watching — N keywords"; off →
+  "Not watching"; Restart watcher is enabled only while running.
+- Privacy: turn off clipboard capture → copying no longer adds history; change
+  retention; "Clear clipboard history" empties it.
+- Developer: version/paths populate; "Open data folder" reveals the dir.
+- Returning from Clipboard/Snippets to Root Search re-focuses the search input.
 
 For any of these, follow CLAUDE.md architecture rules and end on the full
 verification gate + a FEATURE_MATRIX update.

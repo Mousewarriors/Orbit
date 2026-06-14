@@ -41,6 +41,27 @@ into reusable packages and crates.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Windows & long-lived native subsystems
+
+- **Two webview windows, one bundle.** The frameless always-on-top **launcher**
+  (`label="launcher"`) and a normal decorated **Settings** window
+  (`label="settings"`) are the *same* Vite bundle; `main.tsx` renders `<Settings/>`
+  when the URL hash is `#/settings` (the window is created at
+  `index.html#/settings` by `open_settings`). Only the launcher hides-on-blur.
+- **Configurable activation shortcut.** The active `Shortcut` lives in
+  `AppState.active_shortcut`; the global-shortcut handler matches against it, and
+  `set_activation_shortcut` unregisters the old / registers the new / persists
+  `general.hotkey` so a rebind is live and durable.
+- **Snippet-expansion watcher** (`snippet_watcher.rs`, Windows) is a controllable
+  subsystem: a pure `orbit_input::Lifecycle` decides start/stop idempotency; the
+  `WH_KEYBOARD_LL` hook runs on its own thread with a message loop and unhooks
+  cleanly on `WM_QUIT`. Injection happens on a separate worker thread (never from
+  the hook), and self-injected events are tagged + ignored.
+- **Appearance** is a pure model in `@orbit/appearance` (theme resolution,
+  opacity, transparency, motion → DOM attributes/CSS vars); the launcher applies
+  the saved appearance on show, the Settings window applies live. Accelerator
+  parsing/formatting is the pure `@orbit/shortcuts`.
+
 ## Search pipeline
 
 1. The renderer composes a set of `SearchProvider`s (command, application,

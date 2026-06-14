@@ -7,12 +7,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use orbit_input::platform as inject;
 use rusqlite::Connection;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::apps::{scan_applications, AppEntry};
 use crate::snippet_watcher;
 use crate::window_mgmt::platform as winmgmt;
+
+/// The default activation shortcut when the user hasn't chosen one.
+pub const DEFAULT_HOTKEY: &str = "Alt+Space";
 
 /// Cap on snippet text size — generous for templates, bounded against abuse.
 const MAX_SNIPPET_CONTENT: usize = 100_000;
@@ -26,6 +30,9 @@ pub struct AppState {
     /// Raw handle of the window focused immediately before Orbit was summoned,
     /// so window-management commands act on the user's previous window.
     pub last_foreground: Mutex<isize>,
+    /// The currently-registered global activation shortcut, so the handler can
+    /// match it and [`set_activation_shortcut`] can unregister the previous one.
+    pub active_shortcut: Mutex<Option<Shortcut>>,
 }
 
 fn now_ms() -> i64 {
@@ -355,6 +362,97 @@ pub fn paste_text(state: State<'_, AppState>, text: String) -> Result<(), String
     // Give the OS a moment to transfer focus before typing.
     std::thread::sleep(std::time::Duration::from_millis(40));
     inject::send_text(&text)
+}
+
+// ---------------------------------------------------------------------------
+// Settings window + configuration
+// ---------------------------------------------------------------------------
+
+const SETTINGS_LABEL: &str = "settings";
+
+/// Open (or focus, if already open) the standalone Settings window. It is a
+/// normal decorated, resizable window — deliberately *not* the launcher.
+#[tauri::command]
+pub fn open_settings(app: AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(SETTINGS_LABEL) {
+        win.show().map_err(|e| e.to_string())?;
+        win.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(
+        &app,
+        SETTINGS_LABEL,
+        WebviewUrl::App("index.html#/settings".into()),
+    )
+    .title("Orbit Settings")
+    .inner_size(820.0, 600.0)
+    .min_inner_size(640.0, 460.0)
+    .resizable(true)
+    .center()
+    .build()
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+/// Change the global activation shortcut. Parses the accelerator, unregisters the
+/// previous shortcut, registers the new one, persists it, and updates state so
+/// the handler matches. Returns a clear error if the accelerator is invalid.
+#[tauri::command]
+pub fn set_activation_shortcut(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    accelerator: String,
+) -> Result<(), String> {
+    let shortcut: Shortcut = accelerator
+        .parse()
+        .map_err(|_| format!("'{accelerator}' is not a valid shortcut"))?;
+    let gs = app.global_shortcut();
+    // Unregister the previous shortcut (best-effort) before claiming the new one.
+    if let Ok(prev) = state.active_shortcut.lock() {
+        if let Some(p) = prev.as_ref() {
+            let _ = gs.unregister(*p);
+        }
+    }
+    gs.register(shortcut)
+        .map_err(|e| format!("could not register shortcut (already in use?): {e}"))?;
+    *state.active_shortcut.lock().map_err(|e| e.to_string())? = Some(shortcut);
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::set_setting(&conn, "general.hotkey", &accelerator).map_err(|e| e.to_string())
+}
+
+/// Read-only diagnostics for the Developer settings section.
+#[derive(serde::Serialize)]
+pub struct Diagnostics {
+    pub version: String,
+    pub data_dir: String,
+    pub db_path: String,
+    pub platform: String,
+}
+
+#[tauri::command]
+pub fn diagnostics(app: AppHandle) -> Result<Diagnostics, String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .to_string();
+    let db_path = format!("{data_dir}/orbit.sqlite");
+    Ok(Diagnostics {
+        version: app.package_info().version.to_string(),
+        data_dir,
+        db_path,
+        platform: std::env::consts::OS.to_string(),
+    })
+}
+
+/// Reveal the application data directory in the OS file manager.
+#[tauri::command]
+pub fn open_data_dir(app: AppHandle) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

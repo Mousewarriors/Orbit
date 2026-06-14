@@ -14,12 +14,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@orbit/appearance": "*",
     "@orbit/branding": "*",
     "@orbit/calculator": "*",
     "@orbit/command-model": "*",
     "@orbit/placeholders": "*",
     "@orbit/search-engine": "*",
     "@orbit/shared-types": "*",
+    "@orbit/shortcuts": "*",
     "@orbit/validation": "*",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-global-shortcut": "^2.2.0",

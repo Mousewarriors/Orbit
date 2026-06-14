@@ -102,6 +102,15 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'snippets' }),
   },
   {
+    definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
+      keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
+      subtitle: 'Configure shortcut, appearance, snippets and privacy',
+    }),
+    effect: async () => {
+      await native.openSettings();
+    },
+  },
+  {
     definition: def('builtin.apps.reindex', 'Reindex Applications', 'Orbit', 'refresh-cw', {
       keywords: ['rescan', 'refresh', 'apps'],
       subtitle: 'Rescan installed applications',

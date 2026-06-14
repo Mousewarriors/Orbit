@@ -16,9 +16,9 @@ mod window_mgmt;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use commands::AppState;
+use commands::{AppState, DEFAULT_HOTKEY};
 
 const LAUNCHER_LABEL: &str = "launcher";
 
@@ -73,9 +73,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
     let open_i = MenuItem::with_id(app, "open", "Open Orbit", true, Some("Alt+Space"))?;
+    let settings_i = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit Orbit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open_i, &sep, &quit_i])?;
+    let menu = Menu::with_items(app, &[&open_i, &settings_i, &sep, &quit_i])?;
 
     let mut builder = TrayIconBuilder::with_id("orbit-tray")
         .menu(&menu)
@@ -83,6 +84,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .tooltip("Orbit")
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => toggle_launcher(app),
+            "settings" => {
+                let _ = commands::open_settings(app.clone());
+            }
             "quit" => app.exit(0),
             _ => {}
         })
@@ -101,19 +105,22 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Alt+Space is the Windows default; configurable later via settings.
-    let activation = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-    let activation_for_handler = activation.clone();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if shortcut == &activation_for_handler
-                        && event.state() == ShortcutState::Pressed
-                    {
-                        toggle_launcher(app);
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    // Match against the user's configured shortcut (held in state
+                    // so it can be re-bound at runtime from Settings).
+                    if let Some(state) = app.try_state::<AppState>() {
+                        if let Ok(active) = state.active_shortcut.lock() {
+                            if active.as_ref() == Some(shortcut) {
+                                toggle_launcher(app);
+                            }
+                        }
                     }
                 })
                 .build(),
@@ -130,15 +137,28 @@ pub fn run() {
             // Application index (best-effort; empty on permission denial).
             let apps = apps::scan_applications();
 
+            // Resolve the activation shortcut from settings (default Alt+Space),
+            // falling back gracefully if a stored value can't be parsed.
+            let stored_hotkey = orbit_core::get_setting(&conn, "general.hotkey")
+                .ok()
+                .flatten();
+            let shortcut = stored_hotkey
+                .as_deref()
+                .and_then(|s| s.parse::<Shortcut>().ok())
+                .or_else(|| DEFAULT_HOTKEY.parse::<Shortcut>().ok());
+
             app.manage(AppState {
                 db: Mutex::new(conn),
                 apps: Mutex::new(apps),
                 last_foreground: Mutex::new(0),
+                active_shortcut: Mutex::new(shortcut),
             });
 
             // Register the global activation shortcut.
-            if let Err(e) = app.global_shortcut().register(activation.clone()) {
-                eprintln!("[orbit] failed to register global shortcut: {e}");
+            if let Some(sc) = shortcut {
+                if let Err(e) = app.global_shortcut().register(sc) {
+                    eprintln!("[orbit] failed to register global shortcut: {e}");
+                }
             }
 
             build_tray(&handle)?;
@@ -199,6 +219,10 @@ pub fn run() {
             commands::snippet_watcher_set_enabled,
             commands::snippet_watcher_restart,
             commands::paste_text,
+            commands::open_settings,
+            commands::set_activation_shortcut,
+            commands::diagnostics,
+            commands::open_data_dir,
             commands::hide_launcher,
             commands::quit_app,
         ])

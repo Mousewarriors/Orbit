@@ -11,6 +11,7 @@ import {
   createSnippetProvider,
 } from './providers.js';
 import { executeAction } from './execute.js';
+import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
 import { ActionMenu } from './components/ActionMenu.js';
 import { Footer } from './components/Footer.js';
@@ -96,9 +97,14 @@ export function App(): JSX.Element {
     void doSearch(query);
   }, [query, doSearch]);
 
-  // Focus the input whenever the window becomes visible.
+  // Focus the input whenever the window becomes visible, and re-apply the saved
+  // appearance — the Settings window persists changes that we pick up on re-show.
   useEffect(() => {
-    const onFocus = () => inputRef.current?.focus();
+    void initAppearance();
+    const onFocus = () => {
+      inputRef.current?.focus();
+      void initAppearance();
+    };
     window.addEventListener('focus', onFocus);
     inputRef.current?.focus();
     return () => window.removeEventListener('focus', onFocus);
