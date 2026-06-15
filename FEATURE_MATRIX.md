@@ -14,8 +14,8 @@ permissions + error handling + keyboard + tests are all present.
 | Monorepo (npm + cargo workspaces) | ✅ | pnpm also supported |
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
-| Vitest unit tests | ✅ | 144 passing (incl. desktop route-selection, Root Search discoverability, and a Settings render smoke test) |
-| Rust unit/integration tests | ✅ | 104 passing across the workspace (orbit-core 38, orbit-extensions 21, orbit-files 10, orbit-input 15, orbit-search 8, orbit-window-manager 8, orbit-desktop 4) |
+| Vitest unit tests | ✅ | 148 passing (incl. desktop route-selection, Root Search discoverability, the application-launch journey, and a Settings render smoke test) |
+| Rust unit/integration tests | ✅ | 110 passing across the workspace (orbit-core 38, orbit-extensions 21, orbit-input 15, orbit-files 10, orbit-desktop 10, orbit-search 8, orbit-window-manager 8) + 1 opt-in `#[ignore]` real-launch test |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -34,7 +34,8 @@ permissions + error handling + keyboard + tests are all present.
 | Text injection / paste (SendInput) | ✅ (Windows) / 🟡 | `orbit-input` crate; powers snippet & clipboard paste into the active app; macOS/Linux return a graceful error |
 | SQLite open + migrations | ✅ | `orbit-core`, `user_version` strategy, tested |
 | IPC command surface | ✅ | `commands.rs`, all typed `Result` |
-| Application enumeration | ✅ (Win/mac/Linux) | Start Menu `.lnk` / `.app` / `.desktop` |
+| Application enumeration | ✅ (Win/mac/Linux) | Start Menu `.lnk` / `.app` / `.desktop` (fast, synchronous at startup). **Windows also merges UWP / Microsoft Store apps** via `Get-StartApps` in the background (Calculator, Terminal, Notepad, … which have no `.lnk`); `.lnk` wins on a name clash. PowerShell-optional: the `.lnk` baseline always stands |
+| Application launch (native) | ✅ (Windows) / 🟡 | `launcher.rs`: classic apps/`.lnk`/files via `ShellExecuteW` **with COM initialised on the calling thread** + explicit "open" verb + `HINSTANCE` return-code checking (a failed launch is a visible error, never silent — this fixed "results appear but don't launch"); UWP/Store apps via `explorer.exe shell:AppsFolder\<AUMID>`. Stale/missing path → clear error. **Verified end-to-end opening real Calculator (UWP) and Notepad++ (`.lnk`) windows.** macOS/Linux fall back to the opener plugin |
 | Crash recovery (renderer/ext host) | 🟡 | visible React error boundary contains renderer faults (shows the error + stack instead of a blank window); ext-host has a crash-loop breaker; full auto-restart ⬜ |
 | Per-command hotkeys / aliases UI | ⬜ | model exists, no UI |
 | Privacy controls (clipboard capture toggle, retention, clear) | ✅ | Settings → Privacy; honoured live by the clipboard monitor (`privacy.clipboard.enabled` / `.retention`) |
@@ -46,7 +47,7 @@ permissions + error handling + keyboard + tests are all present.
 | Fuzzy matching (exact/prefix/acronym/subsequence/typo) | ✅ | TS + Rust mirror, tested |
 | Ranking (usage/recency/pinned/favourite/confidence) | ✅ | tested, with score explanations |
 | Cancellable, non-blocking provider orchestration | ✅ | tested (timeout/error isolation); desktop regression test confirms one failing optional provider never suppresses results from the others |
-| Application provider | ✅ | slice |
+| Application provider | ✅ | apps (Win32 + UWP) → `open-path` launch action + "Copy Path"; launch failures surface as a visible error and are not recorded as usage (tested in `launch.test.ts`) |
 | Command provider | ✅ | slice (built-ins) |
 | Calculator provider | ✅ | slice |
 | Snippet provider (root search) | ✅ | placeholder-resolved, gated to ≥2 chars; paste-injects on Enter |

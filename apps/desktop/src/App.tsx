@@ -111,6 +111,7 @@ export function App(): JSX.Element {
   );
 
   useEffect(() => {
+    setError(null); // a fresh query clears any stale action error
     void doSearch(query);
   }, [query, doSearch]);
 
@@ -144,8 +145,11 @@ export function App(): JSX.Element {
           : [item.primaryAction, ...(item.secondaryActions ?? [])][actionIndex];
       if (!action) return;
       try {
+        setError(null);
         const outcome = await executeAction(action, { query, effects });
-        // Learn from usage for ranking (keyed by item id).
+        // Learn from usage for ranking (keyed by item id). Only reached when the
+        // action resolved successfully — a failed launch throws and is caught
+        // below, so we never record usage for something that didn't happen.
         if (native.isTauri()) void native.recordCommandUsage(item.id).catch(() => {});
         setActionMenuOpen(false);
         if (

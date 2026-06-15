@@ -1,0 +1,183 @@
+//! Native application & path launching.
+//!
+//! The renderer's `open-path` action funnels through the `launch_path` IPC
+//! command into here. On Windows we deliberately do **not** use the opener
+//! plugin for the critical app-launch path; we call `ShellExecuteW` ourselves,
+//! because:
+//!
+//!   * `.lnk` shortcuts are resolved by COM-based shell handlers, so COM must be
+//!     initialised on the *calling* thread. Tauri runs synchronous commands on a
+//!     runtime worker thread that has no COM apartment, which makes the plugin's
+//!     `ShellExecuteEx` launch silently unreliable for shortcuts — the root cause
+//!     of "application results appear but do not launch".
+//!   * We inspect the returned `HINSTANCE` code and turn any failure into a clear
+//!     error message, so a failed launch is never swallowed (the renderer shows
+//!     it and does not record usage or hide).
+//!
+//! UWP / Microsoft Store apps and other shell items (`shell:AppsFolder\<AUMID>`)
+//! are activated through Explorer, which is the supported way to launch them. The
+//! target is always passed as a single argument — never through a shell — so
+//! there is no command-injection surface. Paths come from Orbit's own index.
+
+#[cfg(windows)]
+pub mod platform {
+    use std::os::windows::process::CommandExt;
+    use std::path::Path;
+    use std::process::Command;
+
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    /// Don't flash a console window when spawning Explorer.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    fn wide(s: &str) -> Vec<u16> {
+        use std::os::windows::ffi::OsStrExt;
+        std::ffi::OsStr::new(s)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    }
+
+    /// Is `target` a shell moniker (e.g. `shell:AppsFolder\<AUMID>`) rather than a
+    /// filesystem path? Those are activated via Explorer, not `ShellExecuteW`.
+    pub fn is_shell_item(target: &str) -> bool {
+        target.len() > "shell:".len() && target[.."shell:".len()].eq_ignore_ascii_case("shell:")
+    }
+
+    /// Map a failing `ShellExecute` `HINSTANCE` code to a human-readable reason.
+    /// (Legacy ShellExecute reports errors as a small integer return value.)
+    pub fn shell_error(code: isize) -> String {
+        let reason = match code {
+            0 => "the system is out of memory or resources",
+            2 => "the file was not found",
+            3 => "the path was not found",
+            5 => "access was denied",
+            8 => "there was not enough memory to complete the operation",
+            26 => "a sharing violation occurred",
+            27 => "the filename association is incomplete or invalid",
+            31 => "there is no application associated with this file",
+            32 => "the associated application failed to start",
+            _ => "the application could not be started",
+        };
+        format!("launch failed: {reason} (code {code})")
+    }
+
+    /// Launch an application, file, folder, shortcut, or shell item.
+    ///
+    /// Returns `Ok(())` only when the OS reports the launch actually started.
+    pub fn launch(target: &str) -> Result<(), String> {
+        let target = target.trim();
+        if target.is_empty() {
+            return Err("empty path".into());
+        }
+
+        // UWP / Store apps and other AppsFolder items: Explorer activates them.
+        if is_shell_item(target) {
+            return Command::new("explorer.exe")
+                .arg(target)
+                .creation_flags(CREATE_NO_WINDOW)
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| format!("launch failed: could not start Explorer ({e})"));
+        }
+
+        // A real filesystem path that no longer exists (stale index, deleted or
+        // moved file) should fail with a clear message, not a vague code.
+        if !Path::new(target).exists() {
+            return Err(format!("launch failed: '{target}' no longer exists"));
+        }
+
+        // `ShellExecuteW` may delegate to COM shell handlers (notably to resolve a
+        // `.lnk` shortcut), which require COM on this thread. Initialise an
+        // apartment here; a benign error if one already exists on the thread.
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+
+        // Keep the wide buffers alive for the duration of the call.
+        let verb = wide("open");
+        let file = wide(target);
+        let hinst = unsafe {
+            ShellExecuteW(
+                HWND::default(),
+                PCWSTR(verb.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // `ShellExecuteW` returns an `HINSTANCE`; a value greater than 32 means the
+        // launch succeeded, anything else is an error code.
+        let code = hinst.0 as isize;
+        if code > 32 {
+            Ok(())
+        } else {
+            Err(shell_error(code))
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn empty_target_errors() {
+            assert!(launch("   ").is_err());
+        }
+
+        #[test]
+        fn missing_path_reports_a_clear_error() {
+            let err = launch(r"C:\orbit\definitely\does\not\exist.lnk").unwrap_err();
+            assert!(err.contains("no longer exists"), "unexpected error: {err}");
+        }
+
+        #[test]
+        fn shell_item_detection() {
+            assert!(is_shell_item(
+                r"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+            ));
+            assert!(is_shell_item("SHELL:Foo"));
+            assert!(!is_shell_item(r"C:\Windows\notepad.exe"));
+            assert!(!is_shell_item("shell:")); // prefix only, nothing to launch
+            assert!(!is_shell_item("shell"));
+        }
+
+        #[test]
+        fn error_messages_are_descriptive() {
+            assert!(shell_error(2).contains("not found"));
+            assert!(shell_error(31).contains("no application"));
+            assert!(shell_error(5).contains("access"));
+        }
+
+        /// Real end-to-end launch — opt-in because it actually opens a window.
+        /// Targets `$ORBIT_LAUNCH_TEST_PATH` if set (use it to exercise the
+        /// `.lnk`/`ShellExecuteW` branch with a real shortcut), otherwise the
+        /// Calculator AppsFolder moniker (the Explorer branch). Run with:
+        /// `cargo test -p orbit-desktop --lib -- --ignored launches_real_target`
+        #[test]
+        #[ignore]
+        fn launches_real_target() {
+            let target = std::env::var("ORBIT_LAUNCH_TEST_PATH").unwrap_or_else(|_| {
+                r"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App".to_string()
+            });
+            launch(&target).unwrap();
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub mod platform {
+    /// Non-Windows callers fall back to the opener plugin (see `commands.rs`).
+    pub fn launch(_target: &str) -> Result<(), String> {
+        Err("the native launcher is implemented on Windows only".into())
+    }
+
+    pub fn is_shell_item(_target: &str) -> bool {
+        false
+    }
+}

@@ -104,8 +104,10 @@ fn scan_paths() -> Vec<PathBuf> {
     files
 }
 
-/// Enumerate installed applications, de-duplicated by name (case-insensitive).
-pub fn scan_applications() -> Vec<AppEntry> {
+/// The dependency-free Start Menu `.lnk` / `.app` / `.desktop` scan (classic
+/// Win32 apps). Always available, fast, and used as the synchronous startup
+/// index; [`scan_applications`] augments it with Store apps on Windows.
+pub fn scan_lnk_apps() -> Vec<AppEntry> {
     let mut seen = std::collections::HashSet::new();
     let mut apps = Vec::new();
     for path in scan_paths() {
@@ -133,6 +135,90 @@ pub fn scan_applications() -> Vec<AppEntry> {
     apps
 }
 
+/// Enumerate installed applications, de-duplicated by name (case-insensitive).
+///
+/// Classic Win32 apps come from the Start Menu `.lnk` scan (always available, no
+/// dependencies). On Windows we then merge in `Get-StartApps`, which adds UWP /
+/// Microsoft Store apps (Calculator, Terminal, Notepad, …) that have no `.lnk`;
+/// those launch via their Explorer AppsFolder moniker. `.lnk` entries win on a
+/// name clash because a concrete filesystem path is the most reliable to launch.
+pub fn scan_applications() -> Vec<AppEntry> {
+    let mut apps = scan_lnk_apps();
+    #[cfg(target_os = "windows")]
+    {
+        let mut seen: std::collections::HashSet<String> =
+            apps.iter().map(|a| a.name.to_lowercase()).collect();
+        for app in scan_start_apps() {
+            if seen.insert(app.name.to_lowercase()) {
+                apps.push(app);
+            }
+        }
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    }
+    apps
+}
+
+/// Enumerate Start apps (Win32 + UWP) via `Get-StartApps`, mapping each to an
+/// Explorer AppsFolder moniker we can launch. Best-effort: returns an empty list
+/// if PowerShell is unavailable, so the `.lnk` baseline always stands.
+#[cfg(target_os = "windows")]
+fn scan_start_apps() -> Vec<AppEntry> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    parse_start_apps(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Parse the JSON emitted by `Get-StartApps … | ConvertTo-Json` into app entries
+/// whose launch path is the Explorer AppsFolder moniker for the app. Pure, so it
+/// is unit-tested without spawning PowerShell. `ConvertTo-Json` emits a bare
+/// object for a single app and an array for many — both are handled.
+#[cfg(target_os = "windows")]
+fn parse_start_apps(json: &str) -> Vec<AppEntry> {
+    let json = json.trim();
+    if json.is_empty() {
+        return Vec::new();
+    }
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    let items: Vec<&serde_json::Value> = match &value {
+        serde_json::Value::Array(a) => a.iter().collect(),
+        serde_json::Value::Object(_) => vec![&value],
+        _ => return Vec::new(),
+    };
+    let mut out = Vec::new();
+    for item in items {
+        let name = item.get("Name").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let app_id = item.get("AppID").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if name.is_empty() || app_id.is_empty() {
+            continue;
+        }
+        let path = format!(r"shell:AppsFolder\{app_id}");
+        out.push(AppEntry {
+            id: make_id(&path),
+            name: name.to_string(),
+            path,
+            kind: "store".into(),
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,6 +235,41 @@ mod tests {
     #[test]
     fn scanning_does_not_panic() {
         // On CI the dirs may be empty; we only assert it returns without error.
-        let _ = scan_applications();
+        // Use the hermetic `.lnk` scan so tests don't spawn PowerShell.
+        let _ = scan_lnk_apps();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn parses_get_startapps_array_into_launchable_entries() {
+        let json = r#"[
+            {"Name":"Calculator","AppID":"Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"},
+            {"Name":"Terminal","AppID":"Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"}
+        ]"#;
+        let apps = parse_start_apps(json);
+        assert_eq!(apps.len(), 2);
+        let calc = &apps[0];
+        assert_eq!(calc.name, "Calculator");
+        assert_eq!(calc.kind, "store");
+        assert_eq!(
+            calc.path,
+            r"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+        );
+        assert!(calc.id.starts_with("app."));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn parses_single_object_and_skips_incomplete_rows() {
+        // ConvertTo-Json emits a bare object when there is exactly one app.
+        let single = r#"{"Name":"Calculator","AppID":"Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"}"#;
+        assert_eq!(parse_start_apps(single).len(), 1);
+        // Rows missing a name or id are dropped; junk input yields nothing.
+        let mixed = r#"[{"Name":"","AppID":"x"},{"Name":"Ok","AppID":"y"},{"Name":"No id","AppID":""}]"#;
+        let apps = parse_start_apps(mixed);
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].name, "Ok");
+        assert!(parse_start_apps("not json").is_empty());
+        assert!(parse_start_apps("").is_empty());
     }
 }

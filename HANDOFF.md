@@ -89,6 +89,30 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > 104 Rust tests**; lint / strict typecheck / `cargo check --workspace` /
 > `vite build` all green.
 
+> **Update (session 5, 2026-06-15, branch `claude/autonomous-orbit-build`):**
+> **Priority 1 — application launching repaired.** Root cause: `launch_path`
+> called the opener plugin's `ShellExecuteEx` on a Tauri runtime worker thread
+> with **no COM apartment**; `.lnk` shortcut resolution delegates to COM shell
+> handlers, so launches were silently unreliable ("results appear but don't
+> launch"). Additionally, UWP / Microsoft Store apps (Calculator, Terminal, modern
+> Notepad) have **no `.lnk`** and weren't even enumerated.
+> Fix: new `apps/desktop/src-tauri/src/launcher.rs` launches via `ShellExecuteW`
+> with `CoInitializeEx` on the calling thread, an explicit "open" verb, and
+> `HINSTANCE` return-code checking (≤32 → a descriptive error, so a failed launch
+> is never swallowed); UWP / shell items launch via `explorer.exe
+> shell:AppsFolder\<AUMID>`. `apps.rs` now augments the fast `.lnk` scan with
+> `Get-StartApps` (UWP apps) in a background thread so startup isn't blocked. The
+> renderer clears stale errors and only records usage when the launch resolved
+> (a failed launch throws → caught → no usage, launcher stays open).
+> **Live-verified end-to-end** by driving the *real compiled* `launch()` against
+> both branches: it opened a real **Calculator** window (UWP/Explorer) and a real
+> **Notepad++** window (`.lnk`/ShellExecuteW+COM), confirming the COM fix works on
+> a non-UI worker thread. Counts: **148 JS tests, 110 Rust tests** (+1 opt-in
+> `#[ignore]` real-launch test); lint / strict typecheck / `cargo check
+> --workspace` / `vite build` all green. Still pending live click-through inside
+> the running launcher GUI (the launch primitive itself is proven); File Search
+> usability (Priority 2) is the next slice.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

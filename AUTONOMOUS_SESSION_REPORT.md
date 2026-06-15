@@ -1,5 +1,87 @@
 # Autonomous Session Report
 
+## Session — Priority 1: application launching (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Remote:** `git@github.com:Mousewarriors/Orbit.git`
+- **Mandate:** repair the complete application-launch journey (Priority 1).
+
+### Root cause (confirmed by code + registry/launch inspection)
+
+Two independent defects:
+
+1. **Silent launch failures.** `launch_path` (commands.rs) delegated to
+   `tauri-plugin-opener::open_path`, which on Windows calls `open::that_detached`
+   → `ShellExecuteEx`. Tauri runs synchronous commands on an async-runtime worker
+   thread that has **no COM apartment**. `ShellExecuteEx` resolves `.lnk`
+   shortcuts via COM-based shell handlers, so without `CoInitializeEx` on that
+   thread the shortcut launch was unreliable — matching the report "application
+   results appear but do not launch", with no visible error.
+2. **UWP / Store apps missing entirely.** `apps.rs` only scanned Start Menu
+   `.lnk` files. Verified on this machine: **Calculator, Windows Terminal and the
+   modern Notepad have no `.lnk`** (they live only in the Explorer AppsFolder), so
+   they never appeared in results at all.
+
+### Fix
+
+- **`apps/desktop/src-tauri/src/launcher.rs`** *(new)* — native launch:
+  - filesystem paths / `.lnk` / files → `ShellExecuteW` with `CoInitializeEx`
+    (apartment-threaded) on the calling thread, explicit "open" verb, and
+    `HINSTANCE` return-code checking (≤ 32 → a descriptive error). A stale/missing
+    path returns a clear "no longer exists" error. **No silent failures.**
+  - UWP / shell items (`shell:AppsFolder\<AUMID>`) → `explorer.exe` with the
+    moniker as a single argument (no shell interpolation).
+- **`apps.rs`** — keep the fast, dependency-free `.lnk` scan (`scan_lnk_apps`) as
+  the synchronous startup index; `scan_applications` augments it with
+  `Get-StartApps` (Win32 + UWP) mapped to AppsFolder monikers. Pure
+  `parse_start_apps` (unit-tested) handles the JSON; `.lnk` wins on a name clash.
+- **`lib.rs`** — startup uses the fast `.lnk` scan, then a background thread runs
+  the full scan (which spawns PowerShell) and swaps in the augmented index, so
+  window show is never blocked.
+- **`commands.rs`** — `launch_path` routes through `launcher` on Windows
+  (opener fallback off-Windows).
+- **`App.tsx`** — clears stale errors on a new query / new action; usage is only
+  recorded after a non-throwing (successful) launch, so a failed launch keeps the
+  launcher open and records nothing.
+
+### Verification gate (all green)
+
+- **JS/Vitest:** 148 passed (+4: `apps/desktop/src/launch.test.ts` — result →
+  `open-path` action → native launch for both `.lnk` and UWP, "Copy Path"
+  secondary action, and error propagation on a failed launch).
+- **Lint:** `eslint . --max-warnings=0` clean. **Types:** strict `tsc` clean.
+- **Rust:** `cargo test --workspace --lib` → 110 passed (+6: launcher branch/
+  error-mapping/shell-item detection + `parse_start_apps`), 1 opt-in `#[ignore]`
+  real-launch test. `cargo check --workspace` clean.
+- **Production build:** `vite build` clean (91 modules).
+- **Live, real-window verification (not unit-only):** ran the *compiled*
+  `launcher::platform::launch()` via the opt-in test against both code paths and
+  confirmed actual windows opened — **Calculator** (UWP via Explorer) and
+  **Notepad++** (`.lnk` via `ShellExecuteW` + COM) — then closed them. This proves
+  the COM fix works on a non-UI worker thread (the exact failing scenario).
+  `Get-StartApps` confirmed to list Calculator/Terminal/Notepad with launchable
+  AppIDs, and `explorer.exe shell:AppsFolder\…` confirmed to launch Calculator.
+
+### Honest limitations
+
+- Click-through *inside the running launcher window* (Alt+Space → type → Enter)
+  was not performed this session; the **launch primitive itself is proven** with
+  real windows, and the renderer→native wiring is covered by `launch.test.ts`.
+- UWP launch via Explorer can't report per-app activation failure (Explorer always
+  returns quickly); classic/`.lnk` launches do report failure precisely.
+
+### Files changed
+
+- `apps/desktop/src-tauri/src/launcher.rs` *(new)*,
+  `apps/desktop/src-tauri/src/apps.rs`,
+  `apps/desktop/src-tauri/src/lib.rs`,
+  `apps/desktop/src-tauri/src/commands.rs`,
+  `apps/desktop/src-tauri/Cargo.toml` (windows `Win32_UI_Shell` + `Win32_System_Com`),
+  `apps/desktop/src/App.tsx`, `apps/desktop/src/launch.test.ts` *(new)*,
+  `HANDOFF.md`, `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Settings routing repair (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`

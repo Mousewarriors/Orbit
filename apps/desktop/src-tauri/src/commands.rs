@@ -92,16 +92,29 @@ pub fn usage_snapshot(state: State<'_, AppState>) -> Result<Vec<(String, i64, i6
     orbit_core::usage_snapshot(&conn).map_err(|e| e.to_string())
 }
 
-/// Launch an application or open a file/folder via the OS default handler.
-/// `path` must come from Orbit's own index; we never pass it to a shell.
+/// Launch an application or open a file/folder. `path` must come from Orbit's own
+/// index; it is never passed to a shell.
+///
+/// On Windows this goes through [`crate::launcher`] (direct `ShellExecuteW` with
+/// COM initialised on this thread + return-code checking, and Explorer activation
+/// for `shell:` items) so that `.lnk` shortcuts and Store apps launch reliably and
+/// a failed launch surfaces as an error instead of being silently dropped.
 #[tauri::command]
 pub fn launch_path(app: AppHandle, path: String) -> Result<(), String> {
     if path.trim().is_empty() {
         return Err("empty path".into());
     }
-    app.opener()
-        .open_path(path, None::<&str>)
-        .map_err(|e| e.to_string())
+    #[cfg(windows)]
+    {
+        let _ = &app; // opener is only needed on non-Windows
+        crate::launcher::platform::launch(&path)
+    }
+    #[cfg(not(windows))]
+    {
+        app.opener()
+            .open_path(path, None::<&str>)
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Open an external URL. Only http(s)/mailto schemes are permitted.

@@ -12,6 +12,7 @@ mod clipboard_monitor;
 mod commands;
 mod extension_host;
 mod file_index;
+mod launcher;
 mod snippet_watcher;
 mod window_mgmt;
 
@@ -137,8 +138,11 @@ pub fn run() {
                 std::io::Error::new(std::io::ErrorKind::Other, e)
             })?;
 
-            // Application index (best-effort; empty on permission denial).
-            let apps = apps::scan_applications();
+            // Application index. Use the fast, dependency-free Start Menu `.lnk`
+            // scan synchronously so startup isn't blocked; the full scan (which
+            // also enumerates UWP / Store apps via PowerShell) runs in the
+            // background below and replaces this list.
+            let apps = apps::scan_lnk_apps();
 
             // Resolve the activation shortcut from settings (default Alt+Space),
             // falling back gracefully if a stored value can't be parsed.
@@ -164,6 +168,20 @@ pub fn run() {
                 if let Err(e) = app.global_shortcut().register(sc) {
                     eprintln!("[orbit] failed to register global shortcut: {e}");
                 }
+            }
+
+            // Augment the fast `.lnk` index with UWP / Store apps in the
+            // background (this spawns PowerShell, so it must not block startup).
+            {
+                let handle = handle.clone();
+                std::thread::spawn(move || {
+                    let full = apps::scan_applications();
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        if let Ok(mut apps) = state.apps.lock() {
+                            *apps = full;
+                        }
+                    }
+                });
             }
 
             build_tray(&handle)?;
