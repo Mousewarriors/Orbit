@@ -436,6 +436,15 @@ export async function extensionReloadOne(extId: string): Promise<ExtensionInfo[]
   return invoke<ExtensionInfo[]>('extension_reload_one', { extId });
 }
 
+/**
+ * Install Orbit's bundled sample extensions (Developer Utilities, AgentOS
+ * Controller) into the local extensions folder if they aren't already
+ * present, then reload. Safe to call repeatedly.
+ */
+export async function extensionInstallBundled(): Promise<ExtensionInfo[]> {
+  return invoke<ExtensionInfo[]>('extension_install_bundled');
+}
+
 export async function extensionErrors(): Promise<Array<[string, string]>> {
   return invoke<Array<[string, string]>>('extension_errors');
 }

@@ -60,6 +60,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../../../extensions/examples": "extensions/examples"
+    },
     "publisher": "Orbit Labs",
     "copyright": "© Orbit Labs",
     "category": "Productivity",

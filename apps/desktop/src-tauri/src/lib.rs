@@ -179,6 +179,20 @@ pub fn run() {
                 .and_then(|s| s.parse::<Shortcut>().ok())
                 .or_else(|| DEFAULT_HOTKEY.parse::<Shortcut>().ok());
 
+            // First run only: install the bundled sample extensions (Developer
+            // Utilities, AgentOS Controller) so they're discoverable without a
+            // manual "Developer folders" setup. Gated by a one-time flag so a
+            // deliberate uninstall (deleting the folder) isn't silently undone
+            // on the next launch.
+            if orbit_core::get_setting(&conn, "extensions.bundled_installed")
+                .ok()
+                .flatten()
+                .is_none()
+            {
+                extension_host::install_bundled(&handle);
+                let _ = orbit_core::set_setting(&conn, "extensions.bundled_installed", "true");
+            }
+
             app.manage(AppState {
                 db: Mutex::new(conn),
                 apps: Mutex::new(apps),
@@ -193,6 +207,20 @@ pub fn run() {
                 if let Err(e) = app.global_shortcut().register(sc) {
                     eprintln!("[orbit] failed to register global shortcut: {e}");
                 }
+            }
+
+            // Discover extensions (filesystem-only — no child process spawned)
+            // so any installed/bundled extensions are searchable immediately,
+            // without requiring a manual visit to Settings → Extensions.
+            {
+                let state = app.state::<AppState>();
+                let roots = {
+                    let conn = state.db.lock().map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                    })?;
+                    extension_host::roots(&handle, &conn)
+                };
+                state.ext_host.reload(&roots);
             }
 
             // Augment the fast `.lnk` index with UWP / Store apps in the
@@ -307,6 +335,7 @@ pub fn run() {
             commands::extension_set_enabled,
             commands::extension_reload,
             commands::extension_reload_one,
+            commands::extension_install_bundled,
             commands::extension_errors,
             commands::extension_get_dev_paths,
             commands::extension_set_dev_paths,

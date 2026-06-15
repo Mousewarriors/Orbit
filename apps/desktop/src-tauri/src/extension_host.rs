@@ -169,6 +169,83 @@ pub fn roots(app: &AppHandle, conn: &rusqlite::Connection) -> Vec<PathBuf> {
     roots
 }
 
+/// Names of the repository's bundled sample extensions that Orbit offers to
+/// install locally (copied into `<app data>/extensions/<name>`).
+pub const BUNDLED_EXTENSIONS: &[&str] = &["developer-utilities", "agentos-controller"];
+
+/// Locate the folder containing the bundled sample extensions (each a
+/// subdirectory with `manifest.json` + `index.mjs`), if available.
+///
+/// In a packaged build these are bundled as a resource at
+/// `extensions/examples` (see `tauri.conf.json`); in development they're read
+/// straight from the repo via `CARGO_MANIFEST_DIR` (this crate lives at
+/// `apps/desktop/src-tauri`, so the repo root is three levels up).
+fn bundled_extensions_dir(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(res) = app.path().resource_dir() {
+        let p = res.join("extensions").join("examples");
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("extensions")
+        .join("examples");
+    if dev.exists() {
+        return Some(dev);
+    }
+    None
+}
+
+/// Recursively copy a directory tree (std-only; small extension folders).
+fn copy_dir(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dest.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&from, &to)?;
+        } else {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// Install any of [`BUNDLED_EXTENSIONS`] that aren't already present under
+/// `<app data>/extensions/<name>`. Existing folders are left untouched — this
+/// is what makes the install idempotent and safe to call on every startup
+/// without undoing a deliberate uninstall (deleting the folder) or disable
+/// (which only flips a flag in the database, leaving the folder in place).
+/// Returns the names actually installed.
+pub fn install_bundled(app: &AppHandle) -> Vec<String> {
+    let Ok(data_dir) = app.path().app_data_dir() else {
+        return Vec::new();
+    };
+    let dest_root = data_dir.join("extensions");
+    if std::fs::create_dir_all(&dest_root).is_err() {
+        return Vec::new();
+    }
+    let Some(src_root) = bundled_extensions_dir(app) else {
+        return Vec::new();
+    };
+    let mut installed = Vec::new();
+    for name in BUNDLED_EXTENSIONS {
+        let dest = dest_root.join(name);
+        if dest.exists() {
+            continue;
+        }
+        let src = src_root.join(name);
+        if src.join("manifest.json").exists() && copy_dir(&src, &dest).is_ok() {
+            installed.push((*name).to_string());
+        }
+    }
+    installed
+}
+
 fn effect_to_action(effect: &Effect) -> RunAction {
     match effect {
         Effect::OpenUrl { url } => RunAction { kind: "open-url".into(), value: url.clone() },
@@ -663,5 +740,49 @@ mod tests {
         assert_eq!(host.test_is_tripped("alpha"), Some(false), "alpha untouched");
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// `copy_dir` recursively copies nested files/folders, which underlies
+    /// `install_bundled` copying a sample extension's tree into `<app
+    /// data>/extensions/<name>`.
+    #[test]
+    fn copy_dir_recurses_into_subfolders() {
+        let src = temp_root("copy-src");
+        let dest = temp_root("copy-dest");
+        fs::remove_dir_all(&dest).unwrap();
+
+        write_ext(&src, ".");
+        fs::write(src.join("index.mjs"), b"export default {};").unwrap();
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("sub").join("nested.txt"), b"hello").unwrap();
+
+        copy_dir(&src, &dest).expect("copy succeeds");
+
+        assert!(dest.join("manifest.json").exists());
+        assert!(dest.join("index.mjs").exists());
+        assert_eq!(fs::read_to_string(dest.join("sub").join("nested.txt")).unwrap(), "hello");
+
+        let _ = fs::remove_dir_all(&src);
+        let _ = fs::remove_dir_all(&dest);
+    }
+
+    /// Bundled extensions resolve to the repo's `extensions/examples` in dev
+    /// (this crate is at `apps/desktop/src-tauri`, three levels below the repo
+    /// root) and contain both extensions Orbit offers to install.
+    #[test]
+    fn dev_bundled_extensions_dir_contains_expected_samples() {
+        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("extensions")
+            .join("examples");
+        assert!(dev.exists(), "extensions/examples should exist at {dev:?}");
+        for name in BUNDLED_EXTENSIONS {
+            assert!(
+                dev.join(name).join("manifest.json").exists(),
+                "{name} should have a manifest"
+            );
+        }
     }
 }

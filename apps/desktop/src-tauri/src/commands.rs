@@ -750,6 +750,20 @@ pub fn extension_errors(state: State<'_, AppState>) -> Vec<(String, String)> {
     state.ext_host.errors()
 }
 
+/// Install Orbit's bundled sample extensions (Developer Utilities, AgentOS
+/// Controller) into `<app data>/extensions` if they aren't already present,
+/// then reload so they appear immediately. Safe to call repeatedly: existing
+/// folders (including ones the user has since modified or removed) are left
+/// alone.
+#[tauri::command]
+pub fn extension_install_bundled(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::extension_host::ExtensionInfo>, String> {
+    crate::extension_host::install_bundled(&app);
+    extension_reload(app, state)
+}
+
 #[tauri::command]
 pub fn extension_get_dev_paths(state: State<'_, AppState>) -> Result<String, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;

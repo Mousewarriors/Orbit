@@ -585,6 +585,19 @@ function ExtensionsSection(): JSX.Element {
     [refresh],
   );
 
+  const installBundled = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setExts(await native.extensionInstallBundled());
+      setErrors(await native.extensionErrors());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const saveDevPaths = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -603,6 +616,15 @@ function ExtensionsSection(): JSX.Element {
       title="Extensions"
       description="Extensions run in isolated child processes and can only do what their manifest declares. Nothing runs in the launcher itself."
     >
+      <Field
+        label="Bundled extensions"
+        hint="Developer Utilities and AgentOS Controller ship with Orbit. Installing copies them into your local extensions folder; existing folders are left untouched, so this never undoes a deliberate uninstall or disable."
+      >
+        <button className="settings-btn-ghost" disabled={busy} onClick={() => void installBundled()}>
+          Install Bundled Extensions
+        </button>
+      </Field>
+
       <Field label="Installed" hint="Disable an extension to hide its commands; a repeatedly crashing extension is disabled automatically.">
         {exts.length === 0 ? (
           <p className="settings-note">No extensions found. Add a folder below to load some.</p>
