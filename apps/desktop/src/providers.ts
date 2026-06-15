@@ -316,13 +316,14 @@ function toolItem(
   subtitle: string,
   copy: string,
   keyword: string,
+  category = 'Tools',
 ): SearchItem {
   return {
     id,
     title,
     subtitle,
     keywords: [keyword],
-    category: 'Tools',
+    category,
     source: 'system' as const,
     icon: { kind: 'builtin' as const, name: 'tool' },
     confidence: 0.9,
@@ -334,9 +335,71 @@ function toolItem(
   };
 }
 
+/** Strip a leading "generate"/"new"/"create" verb so command-name phrasing
+ * ("Generate UUID", "New Password 24") matches the same as the bare noun. */
+function stripGenerateVerb(lower: string): string {
+  return lower.replace(/^(generate|new|create)\s+/, '');
+}
+
+/**
+ * The five Developer Utilities surfaced when browsing the category by name
+ * ("Developer Utilities", "Dev Tools", …). UUID and password generate fresh
+ * values immediately; JSON/colour tools show the exact phrase to type next
+ * (the command name itself doubles as the syntax — nothing hidden).
+ */
+function developerUtilityItems(): SearchItem[] {
+  const uuid = crypto.randomUUID();
+  const password = generatePassword(DEFAULT_PASSWORD_OPTIONS, secureRandom);
+  return [
+    toolItem(
+      'devutil.uuid',
+      'Generate UUID',
+      `${uuid} — Enter to copy`,
+      uuid,
+      'developer utilities',
+      'Developer Utilities',
+    ),
+    toolItem(
+      'devutil.password',
+      'Generate Password',
+      `${password} — Enter to copy`,
+      password,
+      'developer utilities',
+      'Developer Utilities',
+    ),
+    toolItem(
+      'devutil.json.format',
+      'Format JSON',
+      'Type "Format JSON { ... }" to pretty-print',
+      'Format JSON { "example": true }',
+      'developer utilities',
+      'Developer Utilities',
+    ),
+    toolItem(
+      'devutil.json.validate',
+      'Validate JSON',
+      'Type "Validate JSON { ... }" to check syntax',
+      'Validate JSON { "example": true }',
+      'developer utilities',
+      'Developer Utilities',
+    ),
+    toolItem(
+      'devutil.color',
+      'Convert Colour',
+      'Type "Convert Colour #ff0000" to convert',
+      'Convert Colour #ff0000',
+      'developer utilities',
+      'Developer Utilities',
+    ),
+  ];
+}
+
 /**
  * Built-in developer tools surfaced as instant results: UUID, secure password,
- * colour conversion (#hex / rgb()), and JSON formatting (`json {…}`). All compute
+ * colour conversion (#hex / rgb()), and JSON formatting/validation. Recognized
+ * either by their bare syntax ("uuid", "#ff0000", "json {…}") or by command
+ * name ("Generate UUID", "Convert Colour #ff0000", "Format JSON {…}", "Validate
+ * JSON {…}"); typing "Developer Utilities" browses all five. All compute
  * locally and synchronously; the primary action copies the result.
  */
 export function createToolsProvider(): SearchProvider {
@@ -349,12 +412,17 @@ export function createToolsProvider(): SearchProvider {
       const lower = q.toLowerCase();
       const items: SearchItem[] = [];
 
-      if (lower === 'uuid' || lower === 'guid') {
+      if (/^(developer\s+utilities|dev\s*(utilities|utils|tools)?)$/.test(lower)) {
+        return developerUtilityItems();
+      }
+
+      const generatorLower = stripGenerateVerb(lower);
+      if (generatorLower === 'uuid' || generatorLower === 'guid') {
         const id = crypto.randomUUID();
         items.push(toolItem('tool.uuid', id, 'Generated UUID v4 — Enter to copy', id, q));
       }
 
-      const pw = /^(password|pw|pass)(?:\s+(\d{1,3}))?$/.exec(lower);
+      const pw = /^(password|pw|pass)(?:\s+(\d{1,3}))?$/.exec(generatorLower);
       if (pw) {
         const length = pw[2] ? Number(pw[2]) : DEFAULT_PASSWORD_OPTIONS.length;
         const value = generatePassword({ ...DEFAULT_PASSWORD_OPTIONS, length }, secureRandom);
@@ -363,19 +431,24 @@ export function createToolsProvider(): SearchProvider {
         );
       }
 
-      const colors = colorConversions(q);
+      const colorInput = /^convert\s+colou?r\s+(.+)$/i.exec(q)?.[1] ?? q;
+      const colors = colorConversions(colorInput);
       if (colors) {
         items.push(toolItem('tool.color.hex', colors.hex, `HEX · ${colors.rgb}`, colors.hex, q));
         items.push(toolItem('tool.color.rgb', colors.rgb, `RGB · ${colors.hsl}`, colors.rgb, q));
         items.push(toolItem('tool.color.hsl', colors.hsl, `HSL · ${colors.hex}`, colors.hsl, q));
       }
 
-      const jsonMatch = /^json\s+([\s\S]+)$/i.exec(q);
+      const jsonMatch = /^(?:format|validate)?\s*json\s+([\s\S]+)$/i.exec(q);
       if (jsonMatch) {
+        const isValidate = /^validate/i.test(q);
         const result = formatJson(jsonMatch[1]!);
         if (result.ok) {
-          const preview = result.text.replace(/\s+/g, ' ').slice(0, 80);
-          items.push(toolItem('tool.json', 'Format JSON', preview, result.text, q));
+          const title = isValidate ? 'Valid JSON' : 'Format JSON';
+          const preview = isValidate
+            ? 'Syntax OK — Enter to copy formatted JSON'
+            : result.text.replace(/\s+/g, ' ').slice(0, 80);
+          items.push(toolItem(isValidate ? 'tool.json.valid' : 'tool.json', title, preview, result.text, q));
         } else {
           items.push({
             id: 'tool.json.error',
