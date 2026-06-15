@@ -135,12 +135,19 @@ export const BUILTINS: BuiltinCommand[] = [
   },
   {
     definition: def('builtin.files.reindex', 'Rebuild File Index', 'Orbit', 'refresh-cw', {
-      keywords: ['files', 'index', 'rescan', 'search'],
-      subtitle: 'Re-scan indexed folders for file search',
+      keywords: ['files', 'index', 'index files', 'rescan', 'search'],
+      subtitle: 'Re-scan indexed folders for file search (enables indexing on first use)',
     }),
     effect: async () => {
       await native.fileIndexRebuild();
     },
+  },
+  {
+    definition: def('builtin.commands.browse', 'Browse Commands', 'Orbit', 'list', {
+      keywords: ['all commands', 'commands', 'actions', 'browse', 'list'],
+      subtitle: 'See every command grouped by category',
+    }),
+    effect: (): EffectResult => ({ pushView: 'all-commands' }),
   },
   {
     definition: def('builtin.orbit.quit', 'Quit Orbit', 'Orbit', 'power', {
@@ -167,6 +174,34 @@ export const BUILTINS: BuiltinCommand[] = [
     ['docs', 'web', 'javascript'],
   ),
 ];
+
+/** Minimal shape of native.FileIndexStatus this helper depends on. */
+export interface FileIndexStatusLike {
+  enabled: boolean;
+}
+
+/** Native calls needed to dispatch "Rebuild File Index" / "Index Files". */
+export interface FileIndexDeps {
+  status: () => Promise<FileIndexStatusLike>;
+  setEnabled: (enabled: boolean) => Promise<unknown>;
+  rebuild: () => Promise<unknown>;
+}
+
+/**
+ * Dispatch the "Rebuild File Index" command through the same indexing service
+ * Settings → Files uses: if indexing has never been enabled, enable it (which
+ * also kicks off the initial scan); otherwise trigger a rebuild of the existing
+ * index. Returns a human-readable status message for the caller to display.
+ */
+export async function triggerFileIndex(deps: FileIndexDeps): Promise<string> {
+  const current = await deps.status();
+  if (!current.enabled) {
+    await deps.setEnabled(true);
+    return 'File indexing enabled — indexing started…';
+  }
+  await deps.rebuild();
+  return 'Rebuilding file index…';
+}
 
 /** Build a registry seeded with the built-ins and a map of effects by id. */
 export function createBuiltinRegistry(): {

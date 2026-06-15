@@ -164,6 +164,15 @@ body {
   border-bottom: 1px solid var(--separator);
 }
 
+/* Visible feedback for long-running commands run from Root Search (e.g.
+   "Rebuild File Index"), so they're never silently a no-op. */
+.orbit-status {
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  border-bottom: 1px solid var(--separator);
+}
+
 /* Subtle, non-blocking note when one or more search sources degraded. */
 .orbit-degraded {
   padding: 5px 16px;
@@ -213,6 +222,15 @@ body {
   border-radius: 6px;
   background: var(--kbd-bg);
   flex-shrink: 0;
+}
+.orbit-category-header {
+  padding: 4px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* Icons */
