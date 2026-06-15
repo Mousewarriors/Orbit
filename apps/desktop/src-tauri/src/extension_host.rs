@@ -45,6 +45,8 @@ struct LoadedExt {
     dir: PathBuf,
     manifest: Manifest,
     crash: CrashTracker,
+    /// Last invocation error (transport/crash/handler), shown in Settings.
+    last_error: Option<String>,
 }
 
 struct HostInner {
@@ -69,16 +71,32 @@ impl Default for ExtensionHost {
     }
 }
 
+/// Lightweight command metadata for the management UI.
+#[derive(Debug, Clone, Serialize)]
+pub struct ExtCmdMeta {
+    pub name: String,
+    pub title: String,
+    pub mode: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ExtensionInfo {
     pub id: String,
     pub title: String,
+    pub description: String,
     pub version: String,
     pub enabled: bool,
     /// True when crash-loop protection has tripped (host refuses to invoke).
     pub crashed: bool,
+    /// Derived state: "disabled" | "unhealthy" | "degraded" | "ready".
+    pub health: String,
     pub command_count: usize,
+    pub commands: Vec<ExtCmdMeta>,
     pub permissions: Vec<String>,
+    /// Absolute folder, so the UI can offer "Open folder".
+    pub dir: String,
+    /// Last invocation error, if any.
+    pub last_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -174,6 +192,7 @@ impl ExtensionHost {
                         dir: d.dir,
                         manifest: d.manifest,
                         crash: CrashTracker::default(),
+                        last_error: None,
                     });
                 }
             }
@@ -196,14 +215,41 @@ impl ExtensionHost {
         inner
             .exts
             .iter()
-            .map(|e| ExtensionInfo {
-                id: e.id.clone(),
-                title: e.manifest.title.clone(),
-                version: e.manifest.version.clone(),
-                enabled: orbit_core::extstore::is_enabled(conn, &e.id).unwrap_or(true),
-                crashed: e.crash.is_tripped(),
-                command_count: e.manifest.commands.len(),
-                permissions: e.manifest.permissions.clone(),
+            .map(|e| {
+                let enabled = orbit_core::extstore::is_enabled(conn, &e.id).unwrap_or(true);
+                let crashed = e.crash.is_tripped();
+                let health = if !enabled {
+                    "disabled"
+                } else if crashed {
+                    "unhealthy"
+                } else if e.last_error.is_some() {
+                    "degraded"
+                } else {
+                    "ready"
+                };
+                ExtensionInfo {
+                    id: e.id.clone(),
+                    title: e.manifest.title.clone(),
+                    description: e.manifest.description.clone(),
+                    version: e.manifest.version.clone(),
+                    enabled,
+                    crashed,
+                    health: health.to_string(),
+                    command_count: e.manifest.commands.len(),
+                    commands: e
+                        .manifest
+                        .commands
+                        .iter()
+                        .map(|c| ExtCmdMeta {
+                            name: c.name.clone(),
+                            title: c.title.clone(),
+                            mode: c.mode.clone(),
+                        })
+                        .collect(),
+                    permissions: e.manifest.permissions.clone(),
+                    dir: e.dir.to_string_lossy().to_string(),
+                    last_error: e.last_error.clone(),
+                }
             })
             .collect()
     }
@@ -293,23 +339,30 @@ impl ExtensionHost {
         // No locks held across the child spawn.
         match invoke_child(&entry, &request) {
             Ok(response) => {
-                self.record(ext_id, true);
+                // A handler can still return a logical error; reflect that too.
+                let logical_err = match &response {
+                    InvokeResponse::Error { message, .. } => Some(message.clone()),
+                    _ => None,
+                };
+                self.record(ext_id, logical_err.is_none(), logical_err);
                 self.handle_response(app, state, ext_id, &permissions, response)
             }
             Err(e) => {
-                self.record(ext_id, false);
+                self.record(ext_id, false, Some(e.clone()));
                 Err(e)
             }
         }
     }
 
-    fn record(&self, ext_id: &str, success: bool) {
+    fn record(&self, ext_id: &str, success: bool, last_error: Option<String>) {
         if let Ok(mut inner) = self.inner.lock() {
             if let Some(ext) = inner.exts.iter_mut().find(|e| e.id == ext_id) {
                 if success {
                     ext.crash.record_success();
+                    ext.last_error = None;
                 } else {
                     ext.crash.record_failure(now_ms());
+                    ext.last_error = last_error;
                 }
             }
         }

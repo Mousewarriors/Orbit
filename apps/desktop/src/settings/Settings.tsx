@@ -551,12 +551,28 @@ function ExtensionsSection(): JSX.Element {
                 <div className="settings-ext-main">
                   <div className="settings-ext-title">
                     {e.title} <span className="settings-ext-ver">v{e.version || '0.0.0'}</span>
-                    {e.crashed && <span className="settings-ext-badge">crashed — disabled</span>}
+                    <span className={`settings-ext-health is-${e.health}`}>{e.health}</span>
+                  </div>
+                  {e.description && <div className="settings-ext-desc">{e.description}</div>}
+                  <div className="settings-ext-meta">
+                    {e.commands.length > 0
+                      ? e.commands.map((c) => c.title).join(' · ')
+                      : 'no commands'}
                   </div>
                   <div className="settings-ext-meta">
-                    {e.command_count} command{e.command_count === 1 ? '' : 's'}
-                    {e.permissions.length > 0 ? ` · ${e.permissions.join(', ')}` : ' · no permissions'}
+                    {e.permissions.length > 0
+                      ? `Permissions: ${e.permissions.join(', ')}`
+                      : 'No permissions requested'}
                   </div>
+                  {e.last_error && (
+                    <div className="settings-ext-error">Last error: {e.last_error}</div>
+                  )}
+                  <button
+                    className="settings-link"
+                    onClick={() => void native.launchPath(e.dir).catch(() => {})}
+                  >
+                    Open folder
+                  </button>
                 </div>
                 <Toggle
                   label=""

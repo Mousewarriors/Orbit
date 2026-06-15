@@ -355,14 +355,27 @@ export async function openDataDir(): Promise<void> {
 
 // --- Extensions ---
 
+export interface ExtCmdMeta {
+  name: string;
+  title: string;
+  mode: string;
+}
+
 export interface ExtensionInfo {
   id: string;
   title: string;
+  description: string;
   version: string;
   enabled: boolean;
   crashed: boolean;
+  /** "disabled" | "unhealthy" | "degraded" | "ready". */
+  health: string;
   command_count: number;
+  commands: ExtCmdMeta[];
   permissions: string[];
+  /** Absolute extension folder (for "Open folder"). */
+  dir: string;
+  last_error: string | null;
 }
 
 export interface ExtCommandInfo {

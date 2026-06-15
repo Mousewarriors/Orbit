@@ -121,4 +121,33 @@ mod tests {
         set_enabled(&conn, "ext.a", true).unwrap();
         assert!(is_enabled(&conn, "ext.a").unwrap());
     }
+
+    #[test]
+    fn disabled_state_survives_a_restart() {
+        // A real "does disabling persist after restart?" check: write to a
+        // file-backed DB, drop the connection, reopen, and confirm the state.
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "orbit-extstore-{}-{}.sqlite",
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_file(&path);
+        let p = path.to_string_lossy().to_string();
+        {
+            let conn = crate::open(&p).unwrap();
+            set_enabled(&conn, "ext.a", false).unwrap();
+        } // connection dropped — simulates quitting Orbit
+        {
+            let conn = crate::open(&p).unwrap(); // simulates relaunch
+            assert!(!is_enabled(&conn, "ext.a").unwrap(), "disable must persist");
+            set_enabled(&conn, "ext.a", true).unwrap();
+        }
+        {
+            let conn = crate::open(&p).unwrap();
+            assert!(is_enabled(&conn, "ext.a").unwrap(), "re-enable must persist");
+        }
+        let _ = std::fs::remove_file(&path);
+    }
 }

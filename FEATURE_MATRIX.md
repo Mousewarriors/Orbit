@@ -15,7 +15,7 @@ permissions + error handling + keyboard + tests are all present.
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
 | Vitest unit tests | ✅ | 148 passing (incl. desktop route-selection, Root Search discoverability, the application-launch journey, and a Settings render smoke test) |
-| Rust unit/integration tests | ✅ | 112 passing across the workspace (orbit-core 38, orbit-extensions 21, orbit-input 15, orbit-desktop 12, orbit-files 10, orbit-search 8, orbit-window-manager 8) + 1 opt-in `#[ignore]` real-launch test |
+| Rust unit/integration tests | ✅ | 113 passing across the workspace (orbit-core 39, orbit-extensions 21, orbit-input 15, orbit-desktop 12, orbit-files 10, orbit-search 8, orbit-window-manager 8) + 1 opt-in `#[ignore]` real-launch test |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
@@ -80,7 +80,8 @@ permissions + error handling + keyboard + tests are all present.
 | Area | Status | Notes |
 | --- | --- | --- |
 | Extension manifest schema + validation | ✅ | `@orbit/validation` (renderer) + `orbit-extensions::manifest` (host), both tested |
-| Extension runtime (host, RPC, broker, storage, crash isolation) | 🟡 | **Foundation built.** Isolated child-process host (spawn-per-invocation), versioned schema-validated RPC, permission-brokered effects, namespaced storage (`orbit-core::extstore`), crash-loop breaker, Root Search command provider + list view, Settings → Extensions, two sample extensions. Verified by unit tests (orbit-extensions 21) + real Node RPC round-trips. **Not** OS-sandboxed beyond process isolation; uses `node` from PATH; not GUI-run here. See [docs/architecture/EXTENSION_RUNTIME.md](docs/architecture/EXTENSION_RUNTIME.md) |
+| Extension runtime (host, RPC, broker, storage, crash isolation) | 🟡 | **Foundation built + verified end-to-end via real Node RPC this session** (random-uuid → UUID+copy+storage+toast; uuid-history list; unknown-command error; agentos-status mock list). Isolated child-process host (spawn-per-invocation), versioned schema-validated RPC, permission-brokered effects, namespaced storage (`orbit-core::extstore`), crash-loop breaker, Root Search command provider + list view, two sample extensions. **Not** OS-sandboxed beyond process isolation; uses `node` from PATH. See [docs/architecture/EXTENSION_RUNTIME.md](docs/architecture/EXTENSION_RUNTIME.md) |
+| Extension management (Settings) | 🟡 | Settings → Extensions shows, per extension: title, version, **description**, **health** (ready/degraded/unhealthy/disabled), **registered commands**, **requested permissions**, **last error**, an **Open folder** action, plus an obvious enable/disable toggle (no hidden menus). Developer folders (load by path), reload-all, and load-error diagnostics. Enable/disable **persists across restart** (file-backed DB test). Per-extension reload, uninstall, and live log streaming are future |
 | Extension SDK | 🟡 | `@orbit/extension-sdk` (one-shot stdin/stdout helper) + two working samples; no typed npm package/CLI yet |
 | Extension store | ⬜ | not started (intentionally deferred) |
 | AI (Quick AI, Chat, commands, agents) | ⬜ | — |

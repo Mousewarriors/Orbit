@@ -126,6 +126,23 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > is already isolated under the orchestrator timeout, so a File Search failure
 > never suppresses other Root Search providers.
 
+> **Update (session 5c, 2026-06-15) — Priorities 3/4/5 progress.**
+> **Verified the extension runtime end-to-end with real Node** (the host's exact
+> RPC): `developer-utilities` `random-uuid` returns a UUID + a brokered `copy`
+> effect + a storage write + a toast; `uuid-history` renders list items from
+> storage; an unknown command returns a structured error; `agentos-status`
+> returns its mock agent list. So the Priority 4 (Developer Utilities) and
+> Priority 5 (AgentOS Status) command runtimes genuinely execute.
+> **Priority 3 (extension management):** `ExtensionInfo` now carries description,
+> health (ready/degraded/unhealthy/disabled), the registered commands, requested
+> permissions, last error, and the folder path; Settings → Extensions renders all
+> of these with an obvious enable/disable toggle and an "Open folder" action
+> (reuses the native launcher). Added a file-backed DB test proving disable/enable
+> **persists across a restart**. Counts: **148 JS, 113 Rust** (+1), gate green.
+> Still to do for Priority 3: per-extension reload (today: reload-all), uninstall,
+> and live log streaming. Sample extensions still load opt-in via Settings →
+> Extensions → Developer folders (point at `extensions/examples`).
+
 ## How to verify the build yourself (do this first)
 
 ```bash

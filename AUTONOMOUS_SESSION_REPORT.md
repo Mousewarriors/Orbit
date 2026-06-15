@@ -1,5 +1,65 @@
 # Autonomous Session Report
 
+## Session — Priorities 3/4/5: extension runtime verified + management UI (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Mandate:** make extension management clear (P3); make Developer Utilities (P4)
+  and AgentOS Status (P5) genuinely run through the real extension system.
+
+### End-to-end runtime verification (real Node, the host's exact RPC)
+
+Drove both sample extensions through the protocol the host uses
+(`{v:1,type:'invoke',command,query,storage}` on stdin → one JSON result on stdout):
+
+- `developer-utilities/random-uuid` (no-view) → `{type:'result', effects:[{kind:'copy',text:<uuid>}], storageWrites:{history:[…]}, toast:'Copied …'}` — a real UUID v4, the brokered copy effect, a namespaced storage write, and a toast.
+- `developer-utilities/uuid-history` (list) → list items built from seeded storage, each with a `copy` action.
+- unknown command → `{type:'error', message:'unknown command: …'}`.
+- `agentos-status/agent-status` (list) → the safe offline mock agent list.
+
+This proves the Priority 4 / Priority 5 command runtimes execute through the real
+extension system (not duplicated internal commands). The Root Search
+discoverability test already confirms these commands surface when the example
+folder is added (opt-in, by design).
+
+### Priority 3 — clearer extension management
+
+- `ExtensionInfo` enriched: `description`, `health` (ready / degraded /
+  unhealthy / disabled), `commands` (name/title/mode), requested `permissions`,
+  `dir`, and `last_error`. The host now tracks `last_error` per extension
+  (cleared on success, set on transport/handler error) in `record()`.
+- Settings → Extensions renders all of it: title + version + a health pill,
+  description, the registered command titles, requested permissions, the last
+  error, an **Open folder** action (reuses the native launcher), and an obvious
+  enable/disable toggle (not hidden in a menu).
+- **Persistence test:** a new file-backed test opens the DB, disables an
+  extension, drops the connection (simulating quit), reopens (relaunch) and
+  asserts it is still disabled, then re-enables and confirms that persists too.
+
+### Verification gate (all green)
+
+- JS/Vitest 148; lint clean; strict typecheck clean.
+- Rust `cargo test --workspace --lib` → 113 passed (+1 restart-persistence) + 1
+  ignored; `cargo check --workspace` clean. `vite build` clean.
+
+### Honest limitations / remaining Priority 3 work
+
+- Per-extension reload (today: reload-all resets every crash breaker), uninstall,
+  and live log streaming are not yet implemented.
+- The extension child is process-isolated but not OS-sandboxed; uses `node` from
+  PATH (documented in EXTENSION_RUNTIME.md).
+- Not click-tested inside the running GUI this session; the runtime is proven via
+  real Node and the management data is unit-tested + server-renders.
+
+### Files changed
+
+- `apps/desktop/src-tauri/src/extension_host.rs` (richer info + last_error),
+  `apps/desktop/src/native.ts` (ExtensionInfo + ExtCmdMeta),
+  `apps/desktop/src/settings/Settings.tsx`, `apps/desktop/src/settings/settings.css`,
+  `crates/orbit-core/src/extstore.rs` (restart-persistence test),
+  `HANDOFF.md`, `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 2a: File Search usability & diagnostics (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`
