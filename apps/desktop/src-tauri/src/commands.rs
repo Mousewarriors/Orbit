@@ -731,10 +731,16 @@ pub fn open_settings(app: AppHandle) -> Result<(), String> {
         win.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
+    // Load the bundle with a query parameter, NOT a `#/settings` hash. Tauri
+    // resolves `WebviewUrl::App` via `Url::join`, so a `?view=settings` query is
+    // preserved as a query string the renderer reads with `URLSearchParams`,
+    // whereas a hash route is more fragile across dev/asset-protocol shells. The
+    // renderer also keys off this window's label (`settings`), so the route holds
+    // even if the query were ever dropped. See apps/desktop/src/route.ts.
     WebviewWindowBuilder::new(
         &app,
         SETTINGS_LABEL,
-        WebviewUrl::App("index.html#/settings".into()),
+        WebviewUrl::App("index.html?view=settings".into()),
     )
     .title("Orbit Settings")
     .inner_size(820.0, 600.0)

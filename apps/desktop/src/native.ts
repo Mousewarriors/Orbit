@@ -4,6 +4,7 @@
  * so the boundary stays auditable and mockable in tests.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export interface NativeApp {
   id: string;
@@ -15,6 +16,20 @@ export interface NativeApp {
 /** True when running inside the Tauri shell (vs. a plain browser/dev preview). */
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+/**
+ * The current Tauri window's label (e.g. "launcher" or "settings"), or null when
+ * running outside Tauri. Read synchronously from the injected window metadata —
+ * the renderer uses it to pick which root component to mount (see route.ts).
+ */
+export function currentWindowLabel(): string | null {
+  if (!isTauri()) return null;
+  try {
+    return getCurrentWindow().label;
+  } catch {
+    return null;
+  }
 }
 
 export async function listApplications(): Promise<NativeApp[]> {

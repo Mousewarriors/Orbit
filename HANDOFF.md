@@ -61,13 +61,39 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > tests**; full gate green. Not GUI-run here; child not yet OS-sandboxed (uses
 > `node` from PATH) — see EXTENSION_RUNTIME.md.
 
+> **Update (session 4, 2026-06-15, branch `claude/autonomous-orbit-build`):**
+> **Repair session — no new features.** Fixed the blank Settings window and
+> audited Root Search discoverability.
+> (1) **Settings routing.** The window opened with
+> `WebviewUrl::App("index.html#/settings")`. On **Tauri 2.11.2** that does *not*
+> actually 404 (Tauri resolves via `Url::join`, which separates the fragment;
+> `/index.html` serves 200 in dev and the prod asset resolver falls back to
+> `index.html`) — so the silent blank window came from fragile hash routing with
+> **no error boundary**, not an asset-path 404. It now loads
+> `index.html?view=settings` and the renderer picks its root via a pure,
+> unit-tested `selectView()` (`src/route.ts`) keyed on the window **label** →
+> `?view=settings` → legacy `#/settings`. (2) **Visible React error boundary**
+> (`src/components/ErrorBoundary.tsx`) wraps both roots, so a render fault shows
+> the error instead of a blank page. (3) **Discoverability** turned out to be
+> largely a misdiagnosis: a runnable smoke test drives the real providers through
+> the real orchestrator and confirms `Settings`, `Notes`, `Quicklinks`,
+> `File Search`, `uuid`, `password 24`, `#ff0000`, `json {…}`,
+> `Developer Utilities`, `AgentOS Status` all return results; the sample
+> extensions still require adding their folder under Settings → Extensions
+> (opt-in, by design). A regression test confirms one failing optional provider
+> can't suppress the others. Counts: **144 JS tests, 104 Rust tests**; lint /
+> strict typecheck / `cargo check --workspace` / `vite build` all green. Live
+> `npm run dev:desktop` launched cleanly; launcher and Settings routes both serve
+> 200 (an old buggy `orbit-desktop.exe` was found running and stopped first).
+
 ## How to verify the build yourself (do this first)
 
 ```bash
 npm install
-npm test                         # expect 91 passed
+npm test                         # expect 144 passed
 npm run lint                     # expect clean
-cargo test -p orbit-core -p orbit-search -p orbit-window-manager   # expect 27 passed
+npm run typecheck                # expect clean (strict tsc, all workspaces)
+cargo test --workspace           # expect 104 passed
 cargo check --workspace          # expect Finished
 npm run dev:desktop              # opens the launcher; press Alt+Space to toggle
 ```

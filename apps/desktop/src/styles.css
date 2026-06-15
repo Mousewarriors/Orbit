@@ -385,3 +385,46 @@ kbd {
 .orbit-action.is-destructive {
   color: var(--destructive);
 }
+
+/* Error boundary fallback. Solid (non-transparent) surface so a renderer crash
+ * is always legible, in both the launcher and the Settings window. */
+.orbit-error-boundary {
+  height: 100%;
+  overflow: auto;
+  padding: 24px 28px;
+  background: rgb(var(--window-rgb));
+  color: var(--text-primary);
+  font-family: var(--font);
+  user-select: text;
+}
+.orbit-error-boundary-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--destructive);
+}
+.orbit-error-boundary-msg {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.orbit-error-boundary-stack {
+  margin: 0 0 16px;
+  padding: 12px;
+  max-height: 50vh;
+  overflow: auto;
+  border-radius: var(--radius-row);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.orbit-error-boundary-retry {
+  padding: 8px 16px;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-row);
+  background: var(--elevated-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}

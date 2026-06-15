@@ -1,5 +1,90 @@
 # Autonomous Session Report
 
+## Session — Settings routing repair (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Starting commit:** `a734cfe`
+- **Remote:** `git@github.com:Mousewarriors/Orbit.git`
+- **Mandate:** stop new feature work; fix the blank Settings window (reported 404)
+  and the "providers not discoverable in Root Search" report.
+
+### Root cause (Settings)
+
+The Settings window was opened with `WebviewUrl::App("index.html#/settings")`.
+Investigated the actual mechanism in **Tauri 2.11.2** rather than assuming:
+
+- Tauri resolves `WebviewUrl::App(path)` via `Url::join` (`manager/webview.rs`),
+  which correctly **separates the `#/settings` fragment** — verified empirically
+  with the pinned `url` 2.5.8: `join("index.html#/settings")` → path `/index.html`,
+  fragment `/settings` (the hash is **not** folded into the asset path).
+- The dev server returns **HTTP 200** for `/index.html` (the launcher loads `/`),
+  and the production asset resolver strips the leading `/`, serves `index.html`,
+  and even falls back to `index.html` (`manager/mod.rs::get_asset`).
+
+So the literal "hash becomes the asset filename → 404" hypothesis does **not**
+reproduce on this Tauri version. The real failure mode of a *silent blank window*
+is an **uncaught renderer error with no error boundary**, compounded by fragile
+hash-based view selection. The exact URL the old build navigated to was
+`http://localhost:1420/index.html#/settings` (dev) — which serves 200, confirmed
+against the running dev server.
+
+### Fix
+
+1. **Robust routing.** `open_settings` now loads `index.html?view=settings`
+   (`commands.rs`). The renderer selects its root component with a pure,
+   unit-tested `selectView()` (`apps/desktop/src/route.ts`) keyed on, in order:
+   the Tauri **window label** (`settings`), the **`?view=settings`** query, then a
+   legacy `#/settings` hash (back-compat). `main.tsx` uses it.
+2. **Visible error boundary.** `apps/desktop/src/components/ErrorBoundary.tsx`
+   wraps both roots so any render fault shows the error + component stack instead
+   of a blank window.
+3. **Discoverability — investigated, found largely a misdiagnosis.** The command/
+   tools/extension providers are registered (`App.tsx`) and matchable: a runnable
+   smoke test drives the *real* providers through the *real* orchestrator and
+   confirms `Settings`, `Notes`, `Quicklinks`, `File Search`, `uuid`,
+   `password 24`, `#ff0000`, `json {…}`, `Developer Utilities` and
+   `AgentOS Status` all produce the expected result. (`File Search` resolves to
+   the "Rebuild File Index" entry via its subtitle; extension commands match by
+   title/subtitle.) The two sample extensions only appear once their folder is
+   added under Settings → Extensions — **by design** (opt-in), not a bug. A
+   regression test confirms one failing optional provider can't suppress the rest
+   (the orchestrator already isolates per-provider failures).
+
+### Verification gate (all green)
+
+- **JS/Vitest:** 144 passed (was 127; +5 route, +11 discoverability/resilience,
+  +1 Settings render smoke test).
+- **Lint:** `eslint . --max-warnings=0` clean.
+- **Types:** strict `tsc --noEmit` clean across all workspaces.
+- **Rust:** `cargo test --workspace` → 104 passed; `cargo check --workspace` clean.
+- **Production build:** `vite build` (the `frontendDist` artifact) clean — 91
+  modules. (Full `tauri build` installer not bundled — long, needs WiX/NSIS.)
+- **Live GUI:** launched `npm run dev:desktop`; app compiled (9.0s) and ran with
+  no panic/error. Launcher (`/`) and Settings (`/index.html?view=settings`) routes
+  both serve 200 against the running dev server; no 404 in logs. A prior **old**
+  `orbit-desktop.exe` (the buggy build) was found running and stopped first.
+  Note: pixel-level visual confirmation of the on-screen Settings window can't be
+  captured headlessly here — it's covered by the route + render smoke tests.
+
+### Files changed
+
+- `apps/desktop/src-tauri/src/commands.rs` — `?view=settings` URL.
+- `apps/desktop/src/route.ts` *(new)* — pure `selectView()`.
+- `apps/desktop/src/components/ErrorBoundary.tsx` *(new)*.
+- `apps/desktop/src/main.tsx` — robust selection + error boundary.
+- `apps/desktop/src/native.ts` — `currentWindowLabel()`.
+- `apps/desktop/src/styles.css` — error-boundary styles.
+- `apps/desktop/src/route.test.ts`, `apps/desktop/src/discoverability.test.ts`,
+  `apps/desktop/src/settings/settings.render.test.ts` *(new tests)*.
+- `vitest.config.ts` — include `apps/desktop/src`, automatic JSX.
+- `HANDOFF.md`, `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+No new product features were added.
+
+---
+
+## Session — feature build (prior)
+
 - **Session date:** 2026-06-14
 - **Branch:** `claude/autonomous-orbit-build`
 - **Starting commit:** `10c74ec` (foundation + snippets paste injection)
