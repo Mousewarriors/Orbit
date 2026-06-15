@@ -120,4 +120,27 @@ describe('runSearch', () => {
     expect(final.results).toHaveLength(0);
     expect(final.pendingProviders).toHaveLength(0);
   });
+
+  it('isolates a provider whose canHandle throws (no global failure)', async () => {
+    const explosive: SearchProvider = {
+      id: 'explosive',
+      source: 'extension',
+      canHandle: () => {
+        throw new Error('canHandle kaboom');
+      },
+      search: async () => [item('x', 'X')],
+    };
+    const final = await runSearch(
+      'a',
+      [explosive, provider('ok', [item('1', 'Apple')])],
+      { signals: signals() },
+      () => {},
+    );
+    // The healthy provider's result still comes through…
+    expect(final.results.map((r) => r.item.id)).toContain('1');
+    // …and the broken provider is recorded, not silently swallowed.
+    expect(final.errors.get('explosive')).toContain('canHandle failed');
+    // It never became "active", so it isn't pending either.
+    expect(final.pendingProviders).not.toContain('explosive');
+  });
 });

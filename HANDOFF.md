@@ -143,6 +143,16 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > and live log streaming. Sample extensions still load opt-in via Settings →
 > Extensions → Developer folders (point at `extensions/examples`).
 
+> **Update (session 5d, 2026-06-15) — Priority 7: search/action reliability.**
+> Closed the last global-failure vector in the orchestrator: a provider whose
+> **`canHandle` throws** is now caught, recorded, and skipped (previously it threw
+> out of the whole `runSearch`). Provider failures/timeouts are logged (structured
+> `console.warn`) and surfaced as a subtle "some sources unavailable" note in the
+> launcher, while healthy providers are unaffected. Per-provider `search`
+> isolation, cancellation, timeout, and usage-only-on-success were already in
+> place (the latter from the P1 launch work). Counts: **149 JS, 113 Rust**, gate
+> green.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

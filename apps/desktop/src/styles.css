@@ -164,6 +164,14 @@ body {
   border-bottom: 1px solid var(--separator);
 }
 
+/* Subtle, non-blocking note when one or more search sources degraded. */
+.orbit-degraded {
+  padding: 5px 16px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--separator);
+}
+
 .orbit-row {
   display: flex;
   align-items: center;

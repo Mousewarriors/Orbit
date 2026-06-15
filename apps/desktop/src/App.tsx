@@ -46,6 +46,9 @@ export function App(): JSX.Element {
   const [view, setView] = useState<View>('root');
   const [viewArg, setViewArg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Providers that failed/timed out on the last completed search, surfaced as a
+  // subtle diagnostic so a degraded source is visible rather than silent.
+  const [degraded, setDegraded] = useState<string[]>([]);
 
   const appsRef = useRef<native.NativeApp[]>([]);
   const extCommandsRef = useRef<native.ExtCommandInfo[]>([]);
@@ -103,6 +106,17 @@ export function App(): JSX.Element {
         (update) => {
           setResults([...update.results]);
           setSelected((prev) => (prev >= update.results.length ? 0 : prev));
+          if (update.done) {
+            if (update.errors.size > 0) {
+              // Structured logging for diagnostics, plus a visible hint.
+              for (const [id, msg] of update.errors) {
+                console.warn(`[orbit] search provider "${id}" failed: ${msg}`);
+              }
+              setDegraded([...update.errors.keys()]);
+            } else {
+              setDegraded([]);
+            }
+          }
         },
         controller.signal,
       );
@@ -250,6 +264,11 @@ export function App(): JSX.Element {
       </div>
 
       {error && <div className="orbit-error">⚠ {error}</div>}
+      {!error && query.length > 0 && degraded.length > 0 && (
+        <div className="orbit-degraded" title={`Unavailable: ${degraded.join(', ')}`}>
+          Some sources are unavailable ({degraded.join(', ')}); other results are unaffected.
+        </div>
+      )}
 
       <div className="orbit-results" role="listbox" aria-label="Results">
         {results.length === 0 ? (

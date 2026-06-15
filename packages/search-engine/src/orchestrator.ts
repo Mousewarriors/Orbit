@@ -41,10 +41,20 @@ export async function runSearch(
 ): Promise<SearchUpdate> {
   const { signals, weights = DEFAULT_WEIGHTS, limit = 100, providerTimeoutMs = 2000 } = options;
 
-  const active = providers.filter((p) => p.canHandle(query));
   const collected = new Map<string, ReadonlyArray<SearchItem>>();
   const settled = new Set<string>();
   const errors = new Map<string, string>();
+
+  // Build the active set defensively: a provider whose `canHandle` throws must
+  // not take down the whole search — it is recorded as a failure and skipped.
+  const active: SearchProvider[] = [];
+  for (const p of providers) {
+    try {
+      if (p.canHandle(query)) active.push(p);
+    } catch (err) {
+      errors.set(p.id, `canHandle failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   const buildUpdate = (done: boolean): SearchUpdate => {
     const merged: SearchItem[] = [];

@@ -14,7 +14,7 @@ permissions + error handling + keyboard + tests are all present.
 | Monorepo (npm + cargo workspaces) | ✅ | pnpm also supported |
 | Strict TypeScript everywhere | ✅ | `tsconfig.base.json`, all packages clean |
 | ESLint + Prettier | ✅ | flat config, 0 warnings |
-| Vitest unit tests | ✅ | 148 passing (incl. desktop route-selection, Root Search discoverability, the application-launch journey, and a Settings render smoke test) |
+| Vitest unit tests | ✅ | 149 passing (incl. desktop route-selection, Root Search discoverability, the application-launch journey, provider-isolation regression, and a Settings render smoke test) |
 | Rust unit/integration tests | ✅ | 113 passing across the workspace (orbit-core 39, orbit-extensions 21, orbit-input 15, orbit-desktop 12, orbit-files 10, orbit-search 8, orbit-window-manager 8) + 1 opt-in `#[ignore]` real-launch test |
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
@@ -46,7 +46,7 @@ permissions + error handling + keyboard + tests are all present.
 | --- | --- | --- |
 | Fuzzy matching (exact/prefix/acronym/subsequence/typo) | ✅ | TS + Rust mirror, tested |
 | Ranking (usage/recency/pinned/favourite/confidence) | ✅ | tested, with score explanations |
-| Cancellable, non-blocking provider orchestration | ✅ | tested (timeout/error isolation); desktop regression test confirms one failing optional provider never suppresses results from the others |
+| Cancellable, non-blocking provider orchestration | ✅ | tested (timeout/error isolation). A provider whose `search` **or `canHandle`** throws is isolated and recorded, never global-failing the search; failures are logged (structured) and surfaced as a subtle "some sources unavailable" note in the launcher, while healthy providers' results are unaffected |
 | Application provider | ✅ | apps (Win32 + UWP) → `open-path` launch action + "Copy Path"; launch failures surface as a visible error and are not recorded as usage (tested in `launch.test.ts`) |
 | Command provider | ✅ | slice (built-ins) |
 | Calculator provider | ✅ | slice |
