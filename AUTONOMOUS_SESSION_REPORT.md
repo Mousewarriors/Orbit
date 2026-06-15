@@ -1,5 +1,64 @@
 # Autonomous Session Report
 
+## Session — Priority 8: Extension SDK + CLI (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Mandate:** build the typed `@orbit/api` SDK and the `orbit` extension CLI.
+
+### How it was built (and the tooling pitfall fixed)
+
+This was delegated to a worktree-isolated subagent. **Pitfall discovered:** the
+Agent tool's `isolation: "worktree"` creates the worktree from the *harness's*
+primary repo (`C:\AgentOS`), **not** the Orbit repo, so the agent built
+everything in the wrong repository. The agent correctly detected the mismatch and
+produced self-contained, gate-green packages. I **fixed the wrong-repo issue** by:
+(1) copying its `packages/api`, `packages/cli`, and `docs/EXTENSION_SDK.md` into
+the Orbit repo and adapting them to Orbit conventions (repoint tsconfigs to the
+root `tsconfig.base.json`; source-based `types` for in-workspace typecheck, `dist`
+build for Node runtime; a `vitest.globalSetup.ts` that builds `@orbit/api` before
+collection); and (2) cleaning up the stray AgentOS worktree + branch (two of them,
+incl. an earlier lost background agent) so `C:\AgentOS` is back to a clean `main`.
+
+### Deliverables
+
+- **`@orbit/api`** — typed SDK over protocol v1: `defineExtension`; `List`/
+  `List.Item`/`List.Section`; `Detail`; `ActionPanel`/`Action`; `showToast`;
+  `copyToClipboard`/`openUrl`/`openPath` (the three brokered effects only); typed
+  `preferences`; namespaced local storage; structured logging to **stderr**;
+  manifest types + `validateManifest`. Honest about the one-shot model:
+  `showHUD`→toast (`@experimental`), `pushView`/`popView` throw with guidance.
+- **`@orbit/cli` (`orbit`)** — `create|dev|build|validate|package|logs`, 5 working
+  templates, dependency-free `.zip` packaging (`node:zlib`). `create` emits a
+  no-repair-needed extension.
+- **Tests:** 20 SDK unit + a full CLI lifecycle e2e (create→validate→discover→run
+  through the real one-shot protocol→modify→re-run→package, across all templates).
+- **Docs:** `docs/architecture/EXTENSION_SDK.md`.
+
+### Verification gate (all green)
+
+- JS/Vitest **181 passed** (was 149; +32). Lint clean; strict typecheck clean
+  across all workspaces (the SDK/CLI compile under Orbit's strict base unchanged).
+- `vite build` clean. **Real `orbit` bin run end-to-end** (build → `extension
+  create --template list` → `extension validate` → a valid, working extension).
+- No Rust change (Rust stays 113). `dist/` build output is gitignored (not
+  committed).
+
+### Honest scope / deferred
+
+- One-shot protocol limits: no live HUD or mid-handler view push/pop (documented).
+- `orbit extension dev` is a watch+validate loop; true hot-reload into a running
+  launcher needs host integration (future).
+- Priority 9 (AgentOS Controller, which builds on this SDK) not yet started.
+
+### Files changed
+
+- New: `packages/api/**`, `packages/cli/**`, `docs/architecture/EXTENSION_SDK.md`,
+  `vitest.globalSetup.ts`. Edited: `vitest.config.ts` (timeouts + globalSetup),
+  `package-lock.json` (workspace links), `HANDOFF.md`, `FEATURE_MATRIX.md`,
+  `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priorities 3/4/5: extension runtime verified + management UI (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`

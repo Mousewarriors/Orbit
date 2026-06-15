@@ -8,6 +8,13 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
+    // The extension-CLI e2e compiles @orbit/api and spawns Node per template, so
+    // give tests headroom beyond the 5s default.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
+    // Builds @orbit/api to JS once before collection (the CLI + generated
+    // extensions resolve it as built JS). See vitest.globalSetup.ts.
+    globalSetup: ['./vitest.globalSetup.ts'],
     include: [
       'packages/**/src/**/*.{test,spec}.ts',
       'apps/desktop/src/**/*.{test,spec}.ts',

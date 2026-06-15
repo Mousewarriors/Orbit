@@ -153,6 +153,24 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > place (the latter from the P1 launch work). Counts: **149 JS, 113 Rust**, gate
 > green.
 
+> **Update (session 5e, 2026-06-15) — Priority 8: Extension SDK + CLI.**
+> New `@orbit/api` (typed SDK over protocol v1) and `@orbit/cli` (`orbit
+> extension create|dev|build|validate|package|logs` + 5 templates). 32 new tests
+> (SDK unit + a full CLI lifecycle e2e that spawns generated extensions through
+> the real one-shot protocol). **148→181 JS tests**, gate green; the real `orbit`
+> bin was run end-to-end (create→validate). Honest scope: `showHUD`→toast
+> (`@experimental`), `pushView`/`popView` throw (one-shot model). `@orbit/api`
+> builds to `dist` for Node consumers (`vitest.globalSetup.ts` builds it before
+> the suite; `dist/` is gitignored). See [docs/architecture/EXTENSION_SDK.md].
+>
+> ⚠️ **Tooling note for future sessions:** the Agent tool's `isolation: "worktree"`
+> creates the worktree from the **harness's** primary repo (here `C:\AgentOS`),
+> **not** this Orbit repo — a worktree agent ends up in the wrong repository. This
+> P8 work was produced by such an agent and **salvaged** by copying its source
+> into Orbit and adapting it to Orbit's workspace conventions; the stray AgentOS
+> worktree/branch were cleaned up. For Orbit, prefer doing the work in-tree or
+> instruct a non-isolated agent with absolute Orbit paths.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

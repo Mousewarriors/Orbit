@@ -1,0 +1,23 @@
+{
+  "name": "@orbit/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed, ergonomic SDK for building Orbit extensions over the v1 one-shot protocol.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
