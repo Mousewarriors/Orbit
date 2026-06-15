@@ -4,7 +4,7 @@ import { runSearch } from '@orbit/search-engine';
 import { createCommandProvider } from '@orbit/command-model';
 import { BRANDING } from '@orbit/branding';
 import * as native from './native.js';
-import { createBuiltinRegistry } from './builtins.js';
+import { createBuiltinRegistry, triggerFileIndex } from './builtins.js';
 import {
   createAppProvider,
   createCalculatorProvider,
@@ -15,7 +15,7 @@ import {
   createSnippetProvider,
   createToolsProvider,
 } from './providers.js';
-import { executeAction } from './execute.js';
+import { executeAction, type EffectResult } from './execute.js';
 import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
 import { ActionMenu } from './components/ActionMenu.js';
@@ -25,8 +25,9 @@ import { SnippetsView } from './components/SnippetsView.js';
 import { QuicklinksView } from './components/QuicklinksView.js';
 import { NotesView } from './components/NotesView.js';
 import { ExtensionListView } from './components/ExtensionListView.js';
+import { AllCommandsView } from './components/AllCommandsView.js';
 
-type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes' | 'extension-list';
+type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes' | 'extension-list' | 'all-commands';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -49,6 +50,10 @@ export function App(): JSX.Element {
   // Providers that failed/timed out on the last completed search, surfaced as a
   // subtle diagnostic so a degraded source is visible rather than silent.
   const [degraded, setDegraded] = useState<string[]>([]);
+  // Transient status line for long-running commands run from Root Search (e.g.
+  // "Rebuild File Index"), so the launcher gives visible feedback instead of
+  // silently closing.
+  const [status, setStatus] = useState<string | null>(null);
 
   const appsRef = useRef<native.NativeApp[]>([]);
   const extCommandsRef = useRef<native.ExtCommandInfo[]>([]);
@@ -73,6 +78,18 @@ export function App(): JSX.Element {
     [registry],
   );
 
+  // Refresh the cached application list from native (picks up the background
+  // UWP/Store scan — `list_applications` returns whatever the native app index
+  // currently holds, which the background scan replaces shortly after startup).
+  const refreshApps = useCallback(async () => {
+    if (!native.isTauri()) return;
+    try {
+      appsRef.current = await native.listApplications();
+    } catch {
+      // Keep the previous cache on failure; the next focus/reindex retries.
+    }
+  }, []);
+
   // Initial load: applications + usage signals (only when inside Tauri).
   useEffect(() => {
     if (!native.isTauri()) return;
@@ -91,8 +108,65 @@ export function App(): JSX.Element {
         setError(e instanceof Error ? e.message : String(e));
       }
     })();
+    // The fast startup scan (Start Menu `.lnk` only) is replaced a moment later
+    // by a background scan that also enumerates UWP/Store apps (e.g. Calculator)
+    // via `Get-StartApps`; re-fetch once that's had time to finish.
+    const timer = setTimeout(() => void refreshApps(), 2000);
+    return () => clearTimeout(timer);
     // Intentionally run once on mount; doSearch/query are stable enough here.
   }, []);
+
+  // Make "Reindex Applications" actually refresh what the launcher searches —
+  // otherwise the renderer's cached app list never picks up the rescan.
+  useEffect(() => {
+    effects.set('builtin.apps.reindex', async () => {
+      await native.reindexApplications();
+      await refreshApps();
+    });
+  }, [effects, refreshApps]);
+
+  // Poll the file index until the background rebuild finishes, updating the
+  // status line with progress and the final indexed/error counts.
+  const pollFileIndex = useCallback(async () => {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const s = await native.fileIndexStatus().catch(() => null);
+      if (!s) {
+        setStatus('File index status unavailable.');
+        return;
+      }
+      if (s.running) {
+        setStatus(`Indexing files… ${s.indexed} indexed so far`);
+        continue;
+      }
+      const parts = [`Indexed ${s.indexed} file${s.indexed === 1 ? '' : 's'}`];
+      if (s.errors > 0) parts.push(`${s.errors} folder${s.errors === 1 ? '' : 's'} skipped`);
+      if (s.unavailable.length > 0) parts.push(`${s.unavailable.length} root(s) unavailable`);
+      setStatus(parts.join(' · '));
+      return;
+    }
+  }, []);
+
+  // "Rebuild File Index" (aka "Index Files") must use the same indexing service
+  // as Settings → Files: enable indexing on first use (which also kicks off the
+  // initial scan), or trigger a rebuild if already enabled — and give visible
+  // feedback either way instead of silently doing nothing.
+  useEffect(() => {
+    effects.set('builtin.files.reindex', async (): Promise<EffectResult> => {
+      try {
+        const msg = await triggerFileIndex({
+          status: native.fileIndexStatus,
+          setEnabled: native.fileIndexSetEnabled,
+          rebuild: native.fileIndexRebuild,
+        });
+        setStatus(msg);
+        void pollFileIndex();
+      } catch (e) {
+        setStatus(`Index Files failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return { keepOpen: true };
+    });
+  }, [effects, pollFileIndex]);
 
   const doSearch = useCallback(
     (q: string) => {
@@ -136,11 +210,12 @@ export function App(): JSX.Element {
     const onFocus = () => {
       inputRef.current?.focus();
       void initAppearance();
+      void refreshApps();
     };
     window.addEventListener('focus', onFocus);
     inputRef.current?.focus();
     return () => window.removeEventListener('focus', onFocus);
-  }, []);
+  }, [refreshApps]);
 
   // Restore focus to the search input whenever we return to Root Search from a
   // subview (Clipboard/Snippets/Settings) — the input is freshly mounted, so the
@@ -171,7 +246,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'snippets' ||
           outcome.pushView === 'quicklinks' ||
           outcome.pushView === 'notes' ||
-          outcome.pushView === 'extension-list'
+          outcome.pushView === 'extension-list' ||
+          outcome.pushView === 'all-commands'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -219,6 +295,49 @@ export function App(): JSX.Element {
     if (native.isTauri()) void native.hideLauncher().catch(() => {});
   }, []);
 
+  const runCommandById = useCallback(
+    async (id: string) => {
+      const effect = effects.get(id);
+      if (!effect) {
+        setView('root');
+        return;
+      }
+      try {
+        const outcome = (await effect('')) ?? {};
+        const pushTarget = 'pushView' in outcome ? (outcome as EffectResult).pushView : undefined;
+        if (
+          pushTarget === 'clipboard' ||
+          pushTarget === 'snippets' ||
+          pushTarget === 'quicklinks' ||
+          pushTarget === 'notes' ||
+          pushTarget === 'extension-list' ||
+          pushTarget === 'all-commands'
+        ) {
+          setViewArg(null);
+          setView(pushTarget);
+        } else {
+          closeToRoot();
+        }
+      } catch {
+        setView('root');
+      }
+    },
+    [effects, closeToRoot],
+  );
+
+  const runExtFromBrowse = useCallback(
+    (extId: string, command: string, mode: string) => {
+      if (mode === 'list') {
+        setViewArg(`${extId}::${command}`);
+        setView('extension-list');
+      } else {
+        void native.extensionRun(extId, command, '').catch(() => {});
+        closeToRoot();
+      }
+    },
+    [closeToRoot],
+  );
+
   if (view === 'clipboard') {
     return <ClipboardView onPop={() => setView('root')} onCopied={closeToRoot} />;
   }
@@ -245,6 +364,18 @@ export function App(): JSX.Element {
     );
   }
 
+  if (view === 'all-commands') {
+    return (
+      <AllCommandsView
+        definitions={registry.listEnabled()}
+        extCommands={extCommandsRef.current}
+        onPop={() => setView('root')}
+        onRunBuiltin={runCommandById}
+        onRunExtension={runExtFromBrowse}
+      />
+    );
+  }
+
   return (
     <div className="orbit-launcher" onKeyDown={onKeyDown}>
       <div className="orbit-search">
@@ -264,6 +395,7 @@ export function App(): JSX.Element {
       </div>
 
       {error && <div className="orbit-error">⚠ {error}</div>}
+      {!error && status && <div className="orbit-status">{status}</div>}
       {!error && query.length > 0 && degraded.length > 0 && (
         <div className="orbit-degraded" title={`Unavailable: ${degraded.join(', ')}`}>
           Some sources are unavailable ({degraded.join(', ')}); other results are unaffected.

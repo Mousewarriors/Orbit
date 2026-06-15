@@ -13,7 +13,11 @@ import type { RankingSignals, SearchItem, SearchProvider } from '@orbit/shared-t
 import { runSearch } from '@orbit/search-engine';
 import { createCommandProvider } from '@orbit/command-model';
 import { createBuiltinRegistry } from './builtins.js';
-import { createExtensionProvider, createToolsProvider } from './providers.js';
+import {
+  createCalculatorProvider,
+  createExtensionProvider,
+  createToolsProvider,
+} from './providers.js';
 import type { ExtCommandInfo } from './native.js';
 
 // builtins.ts → native.ts imports the Tauri API; stub it so the module graph
@@ -86,6 +90,7 @@ function buildProviders(): SearchProvider[] {
     createCommandProvider(registry),
     createToolsProvider(),
     createExtensionProvider(() => EXT_COMMANDS),
+    createCalculatorProvider(),
   ];
 }
 
@@ -109,6 +114,10 @@ describe('Root Search discoverability', () => {
 
   it('finds a File Search entry point', async () => {
     expect((await search('File Search')).map((i) => i.id)).toContain('builtin.files.reindex');
+  });
+
+  it('finds "Rebuild File Index" when typing "Index Files"', async () => {
+    expect((await search('Index Files')).map((i) => i.id)).toContain('builtin.files.reindex');
   });
 
   it('generates a UUID (uuid)', async () => {
@@ -149,6 +158,16 @@ describe('Root Search discoverability', () => {
 
   it('finds AgentOS pending approvals when loaded', async () => {
     expect((await search('approvals')).map((i) => i.title)).toContain('AgentOS Pending Approvals');
+  });
+
+  it.each([
+    ['125 * 4', '500'],
+    ['10 + 15', '25'],
+    ['144 / 12', '12'],
+    ['(25 + 5) * 3', '90'],
+  ])('shows the inline calculator result for "%s"', async (query, expected) => {
+    const calc = (await search(query)).find((i) => i.id === 'calc.result');
+    expect(calc?.title).toBe(expected);
   });
 });
 
