@@ -27,6 +27,17 @@
         "shadow": true,
         "focus": true,
         "acceptFirstMouse": true
+      },
+      {
+        "label": "settings",
+        "title": "Orbit Settings",
+        "width": 820,
+        "height": 600,
+        "minWidth": 640,
+        "minHeight": 460,
+        "resizable": true,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {

@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use orbit_input::platform as inject;
 use rusqlite::Connection;
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri_plugin_opener::OpenerExt;
 
@@ -722,34 +722,24 @@ pub fn extension_set_dev_paths(
 
 const SETTINGS_LABEL: &str = "settings";
 
-/// Open (or focus, if already open) the standalone Settings window. It is a
-/// normal decorated, resizable window — deliberately *not* the launcher.
+/// Show (and focus) the standalone Settings window.
+///
+/// The window is declared in `tauri.conf.json` and created at startup — exactly
+/// like the launcher — so its webview reliably loads the app. A webview created
+/// at *runtime* (via `WebviewWindowBuilder`) instead strands on `about:blank` in
+/// dev, which was the real cause of the blank Settings window. It is kept alive
+/// across closes (hidden, not destroyed — see `lib.rs`), so this just re-shows
+/// the same already-loaded window. The renderer picks the Settings UI from this
+/// window's label ("settings") via `selectView()` (see apps/desktop/src/route.ts).
 #[tauri::command]
 pub fn open_settings(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window(SETTINGS_LABEL) {
-        win.show().map_err(|e| e.to_string())?;
-        win.set_focus().map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-    // Load the bundle with a query parameter, NOT a `#/settings` hash. Tauri
-    // resolves `WebviewUrl::App` via `Url::join`, so a `?view=settings` query is
-    // preserved as a query string the renderer reads with `URLSearchParams`,
-    // whereas a hash route is more fragile across dev/asset-protocol shells. The
-    // renderer also keys off this window's label (`settings`), so the route holds
-    // even if the query were ever dropped. See apps/desktop/src/route.ts.
-    WebviewWindowBuilder::new(
-        &app,
-        SETTINGS_LABEL,
-        WebviewUrl::App("index.html?view=settings".into()),
-    )
-    .title("Orbit Settings")
-    .inner_size(820.0, 600.0)
-    .min_inner_size(640.0, 460.0)
-    .resizable(true)
-    .center()
-    .build()
-    .map(|_| ())
-    .map_err(|e| e.to_string())
+    let win = app
+        .get_webview_window(SETTINGS_LABEL)
+        .ok_or_else(|| "settings window is not available".to_string())?;
+    win.show().map_err(|e| e.to_string())?;
+    win.unminimize().ok();
+    win.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Change the global activation shortcut. Parses the accelerator, unregisters the

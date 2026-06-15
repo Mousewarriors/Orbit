@@ -8,37 +8,51 @@
 - **Mandate:** stop new feature work; fix the blank Settings window (reported 404)
   and the "providers not discoverable in Root Search" report.
 
-### Root cause (Settings)
+### Root cause (Settings) — confirmed by live GUI debugging
 
 The Settings window was opened with `WebviewUrl::App("index.html#/settings")`.
-Investigated the actual mechanism in **Tauri 2.11.2** rather than assuming:
+The reported "404" is a red herring: the only 404 in the webview console is
+`GET /favicon.ico` (harmless). The real failure was found by attaching to the
+**running** WebView2 over the DevTools Protocol and inspecting the actual Settings
+window — its document was stranded on **`about:blank`**: the runtime-created
+webview never navigated to the app, so nothing rendered (a blank window).
 
-- Tauri resolves `WebviewUrl::App(path)` via `Url::join` (`manager/webview.rs`),
-  which correctly **separates the `#/settings` fragment** — verified empirically
-  with the pinned `url` 2.5.8: `join("index.html#/settings")` → path `/index.html`,
-  fragment `/settings` (the hash is **not** folded into the asset path).
-- The dev server returns **HTTP 200** for `/index.html` (the launcher loads `/`),
-  and the production asset resolver strips the leading `/`, serves `index.html`,
-  and even falls back to `index.html` (`manager/mod.rs::get_asset`).
+Why: the launcher is a window **declared in `tauri.conf.json`**, which Tauri
+creates and navigates to the dev server during setup. The Settings window was
+instead created at **runtime** with `WebviewWindowBuilder` / `WebviewUrl::App`, and
+in `tauri dev` such a runtime webview fails to navigate to the external dev server
+— it is left on `about:blank`. This is **independent of the URL**: re-opening it
+with a bare `index.html` (no route in the URL at all) reproduced the same
+`about:blank`. The real distinction is **config-declared window vs. runtime-created
+window**, not hash vs. query. (The original `#/settings` and the favicon `404`
+were both red herrings.)
 
-So the literal "hash becomes the asset filename → 404" hypothesis does **not**
-reproduce on this Tauri version. The real failure mode of a *silent blank window*
-is an **uncaught renderer error with no error boundary**, compounded by fragile
-hash-based view selection. The exact URL the old build navigated to was
-`http://localhost:1420/index.html#/settings` (dev) — which serves 200, confirmed
-against the running dev server.
+(Earlier static analysis had concluded the hash was harmless because the URL string
+resolves and `/index.html` serves HTTP 200 — true, but it missed that the runtime
+webview never navigates there at all. Live DevTools-Protocol inspection of the
+running WebView2 found the `about:blank` document; a full-screen capture then
+confirmed the working fix.)
 
 ### Fix
 
-1. **Robust routing.** `open_settings` now loads `index.html?view=settings`
-   (`commands.rs`). The renderer selects its root component with a pure,
-   unit-tested `selectView()` (`apps/desktop/src/route.ts`) keyed on, in order:
-   the Tauri **window label** (`settings`), the **`?view=settings`** query, then a
-   legacy `#/settings` hash (back-compat). `main.tsx` uses it.
-2. **Visible error boundary.** `apps/desktop/src/components/ErrorBoundary.tsx`
-   wraps both roots so any render fault shows the error + component stack instead
-   of a blank window.
-3. **Discoverability — investigated, found largely a misdiagnosis.** The command/
+1. **Declare the Settings window in `tauri.conf.json`** (label `settings`,
+   `visible: false`), so Tauri creates and navigates it exactly like the launcher —
+   its webview reliably loads the app instead of stranding on `about:blank`.
+2. **Reuse it across closes.** `lib.rs` intercepts the Settings window's
+   `CloseRequested` and **hides instead of destroying** it, so the window always
+   exists. `open_settings` (`commands.rs`) is now simply *show + focus* of that one
+   window — the broken runtime `WebviewWindowBuilder` path (and its `WebviewUrl`
+   imports) is removed. **Verified in the real desktop GUI** (full-screen capture:
+   the Settings window renders all seven sections).
+3. **Route by window label.** Both windows load the same app URL; the renderer
+   picks the Settings UI from this window's **label** (`settings`) via the pure,
+   unit-tested `selectView()` (`apps/desktop/src/route.ts`), reading the label
+   synchronously through `native.ts::currentWindowLabel` (`getCurrentWindow()`).
+   `?view=settings` / `#/settings` remain as harmless fallbacks.
+4. **Visible error boundary.** `apps/desktop/src/components/ErrorBoundary.tsx`
+   wraps both roots so any future render fault shows the error + component stack
+   instead of a silent blank window.
+5. **Discoverability — investigated, found largely a misdiagnosis.** The command/
    tools/extension providers are registered (`App.tsx`) and matchable: a runnable
    smoke test drives the *real* providers through the *real* orchestrator and
    confirms `Settings`, `Notes`, `Quicklinks`, `File Search`, `uuid`,
@@ -59,20 +73,26 @@ against the running dev server.
 - **Rust:** `cargo test --workspace` → 104 passed; `cargo check --workspace` clean.
 - **Production build:** `vite build` (the `frontendDist` artifact) clean — 91
   modules. (Full `tauri build` installer not bundled — long, needs WiX/NSIS.)
-- **Live GUI:** launched `npm run dev:desktop`; app compiled (9.0s) and ran with
-  no panic/error. Launcher (`/`) and Settings (`/index.html?view=settings`) routes
-  both serve 200 against the running dev server; no 404 in logs. A prior **old**
-  `orbit-desktop.exe` (the buggy build) was found running and stopped first.
-  Note: pixel-level visual confirmation of the on-screen Settings window can't be
-  captured headlessly here — it's covered by the route + render smoke tests.
+- **Live GUI:** ran `npm run dev:desktop` and exercised the real `open_settings`
+  flow. The Settings window now opens and renders fully — confirmed by a
+  full-screen capture showing all seven sections (General/Appearance/Snippets/
+  Files/Extensions/Privacy/Developer) and the General pane. The user also
+  independently confirmed it working. (Diagnosis used WebView2 remote debugging
+  over the DevTools Protocol, which itself can break a second runtime webview, so
+  final confirmation was via the no-debug full-screen capture + user check.)
 
 ### Files changed
 
-- `apps/desktop/src-tauri/src/commands.rs` — `?view=settings` URL.
-- `apps/desktop/src/route.ts` *(new)* — pure `selectView()`.
+- `apps/desktop/src-tauri/tauri.conf.json` — declare the `settings` window
+  (visible:false) so it is created/navigated like the launcher.
+- `apps/desktop/src-tauri/src/lib.rs` — `SETTINGS_LABEL`; hide-on-close handler so
+  the Settings window is reused, not destroyed.
+- `apps/desktop/src-tauri/src/commands.rs` — `open_settings` is now show+focus of
+  the pre-created window; removed the runtime `WebviewWindowBuilder`/`WebviewUrl` path.
+- `apps/desktop/src/route.ts` *(new)* — pure, label-first `selectView()`.
 - `apps/desktop/src/components/ErrorBoundary.tsx` *(new)*.
-- `apps/desktop/src/main.tsx` — robust selection + error boundary.
-- `apps/desktop/src/native.ts` — `currentWindowLabel()`.
+- `apps/desktop/src/main.tsx` — label-based selection + error boundary.
+- `apps/desktop/src/native.ts` — `currentWindowLabel()` (`getCurrentWindow().label`).
 - `apps/desktop/src/styles.css` — error-boundary styles.
 - `apps/desktop/src/route.test.ts`, `apps/desktop/src/discoverability.test.ts`,
   `apps/desktop/src/settings/settings.render.test.ts` *(new tests)*.

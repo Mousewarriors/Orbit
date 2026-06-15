@@ -64,27 +64,30 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > **Update (session 4, 2026-06-15, branch `claude/autonomous-orbit-build`):**
 > **Repair session — no new features.** Fixed the blank Settings window and
 > audited Root Search discoverability.
-> (1) **Settings routing.** The window opened with
-> `WebviewUrl::App("index.html#/settings")`. On **Tauri 2.11.2** that does *not*
-> actually 404 (Tauri resolves via `Url::join`, which separates the fragment;
-> `/index.html` serves 200 in dev and the prod asset resolver falls back to
-> `index.html`) — so the silent blank window came from fragile hash routing with
-> **no error boundary**, not an asset-path 404. It now loads
-> `index.html?view=settings` and the renderer picks its root via a pure,
-> unit-tested `selectView()` (`src/route.ts`) keyed on the window **label** →
-> `?view=settings` → legacy `#/settings`. (2) **Visible React error boundary**
-> (`src/components/ErrorBoundary.tsx`) wraps both roots, so a render fault shows
-> the error instead of a blank page. (3) **Discoverability** turned out to be
-> largely a misdiagnosis: a runnable smoke test drives the real providers through
-> the real orchestrator and confirms `Settings`, `Notes`, `Quicklinks`,
-> `File Search`, `uuid`, `password 24`, `#ff0000`, `json {…}`,
-> `Developer Utilities`, `AgentOS Status` all return results; the sample
-> extensions still require adding their folder under Settings → Extensions
-> (opt-in, by design). A regression test confirms one failing optional provider
-> can't suppress the others. Counts: **144 JS tests, 104 Rust tests**; lint /
-> strict typecheck / `cargo check --workspace` / `vite build` all green. Live
-> `npm run dev:desktop` launched cleanly; launcher and Settings routes both serve
-> 200 (an old buggy `orbit-desktop.exe` was found running and stopped first).
+> (1) **Settings blank window — real root cause (found via live WebView2
+> debugging).** The window was created at **runtime** with
+> `WebviewWindowBuilder`/`WebviewUrl::App`; in `tauri dev` such a runtime webview
+> fails to navigate to the external dev server and is stranded on `about:blank`
+> (the blank window). This is independent of the URL — bare `index.html`
+> reproduced it too — and the reported "404" was just `/favicon.ico`. **Fix:** the
+> Settings window is now **declared in `tauri.conf.json`** (label `settings`,
+> visible:false) so Tauri creates/navigates it like the launcher; `lib.rs`
+> **hides it on close instead of destroying** it; and `open_settings` is just
+> show+focus of that one reusable window (the runtime `WebviewWindowBuilder` path
+> is removed). The renderer picks the Settings UI from the window **label** via a
+> pure, unit-tested `selectView()` (`src/route.ts` / `native.ts::currentWindowLabel`).
+> Confirmed working in the real GUI (full-screen capture: all 7 sections render).
+> (2) **Visible React error boundary** (`src/components/ErrorBoundary.tsx`) wraps
+> both roots, so a render fault shows the error instead of a blank page.
+> (3) **Discoverability** turned out to be largely a misdiagnosis: a runnable smoke
+> test drives the real providers through the real orchestrator and confirms
+> `Settings`, `Notes`, `Quicklinks`, `File Search`, `uuid`, `password 24`,
+> `#ff0000`, `json {…}`, `Developer Utilities`, `AgentOS Status` all return
+> results; the sample extensions still require adding their folder under
+> Settings → Extensions (opt-in, by design). A regression test confirms one
+> failing optional provider can't suppress the others. Counts: **144 JS tests,
+> 104 Rust tests**; lint / strict typecheck / `cargo check --workspace` /
+> `vite build` all green.
 
 ## How to verify the build yourself (do this first)
 

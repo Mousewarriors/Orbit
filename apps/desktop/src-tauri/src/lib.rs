@@ -23,6 +23,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use commands::{AppState, DEFAULT_HOTKEY};
 
 const LAUNCHER_LABEL: &str = "launcher";
+const SETTINGS_LABEL: &str = "settings";
 
 /// Show the launcher if hidden, hide it if visible.
 fn toggle_launcher(app: &AppHandle) {
@@ -202,6 +203,21 @@ pub fn run() {
                 let win_for_event = win.clone();
                 win.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
+                        let _ = win_for_event.hide();
+                    }
+                });
+            }
+
+            // The Settings window is declared in tauri.conf.json (created at startup
+            // like the launcher, so it reliably loads the app — unlike a webview
+            // created at runtime, which strands on about:blank in dev). Keep it
+            // alive across closes: hide it on close instead of destroying it, so
+            // `open_settings` can always re-show this same, already-loaded window.
+            if let Some(win) = app.get_webview_window(SETTINGS_LABEL) {
+                let win_for_event = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
                         let _ = win_for_event.hide();
                     }
                 });
