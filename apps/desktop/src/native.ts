@@ -376,6 +376,8 @@ export interface ExtensionInfo {
   /** Absolute extension folder (for "Open folder"). */
   dir: string;
   last_error: string | null;
+  /** Bounded tail of the most recent invocation's stderr (diagnostics). */
+  recent_logs: string | null;
 }
 
 export interface ExtCommandInfo {
@@ -427,6 +429,11 @@ export async function extensionSetEnabled(extId: string, enabled: boolean): Prom
 
 export async function extensionReload(): Promise<ExtensionInfo[]> {
   return invoke<ExtensionInfo[]>('extension_reload');
+}
+
+/** Reload a single extension by id (resets only its crash breaker). */
+export async function extensionReloadOne(extId: string): Promise<ExtensionInfo[]> {
+  return invoke<ExtensionInfo[]>('extension_reload_one', { extId });
 }
 
 export async function extensionErrors(): Promise<Array<[string, string]>> {

@@ -511,6 +511,24 @@ function ExtensionsSection(): JSX.Element {
     }
   }, []);
 
+  const reloadOne = useCallback(
+    async (id: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        setExts(await native.extensionReloadOne(id));
+        setErrors(await native.extensionErrors());
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        // A missing extension drops out of the list — re-sync so it disappears.
+        await refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
+
   const toggle = useCallback(
     async (id: string, enabled: boolean) => {
       try {
@@ -567,12 +585,27 @@ function ExtensionsSection(): JSX.Element {
                   {e.last_error && (
                     <div className="settings-ext-error">Last error: {e.last_error}</div>
                   )}
-                  <button
-                    className="settings-link"
-                    onClick={() => void native.launchPath(e.dir).catch(() => {})}
-                  >
-                    Open folder
-                  </button>
+                  {e.recent_logs && (
+                    <details className="settings-ext-logs">
+                      <summary>Recent logs</summary>
+                      <pre className="settings-ext-logs-body">{e.recent_logs}</pre>
+                    </details>
+                  )}
+                  <div className="settings-ext-actions">
+                    <button
+                      className="settings-link"
+                      onClick={() => void native.launchPath(e.dir).catch(() => {})}
+                    >
+                      Open folder
+                    </button>
+                    <button
+                      className="settings-link"
+                      disabled={busy}
+                      onClick={() => void reloadOne(e.id)}
+                    >
+                      Reload
+                    </button>
+                  </div>
                 </div>
                 <Toggle
                   label=""

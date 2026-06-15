@@ -9,12 +9,14 @@
 
 pub mod crash;
 pub mod discovery;
+pub mod logs;
 pub mod manifest;
 pub mod permission;
 pub mod protocol;
 
 pub use crash::CrashTracker;
 pub use discovery::{discover_in, Discovered, DiscoveryError};
+pub use logs::bound_logs;
 pub use manifest::{CommandDef, Manifest};
 pub use permission::{allowed_effects, effect_allowed, effect_required_permission};
 pub use protocol::{

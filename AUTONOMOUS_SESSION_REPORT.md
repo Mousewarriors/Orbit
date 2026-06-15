@@ -1,5 +1,47 @@
 # Autonomous Session Report
 
+## Session — Priority 3 remainder: per-extension reload + recent logs (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`. Delegated to a non-isolated
+  subagent (absolute Orbit paths, no commit); I verified the diff was Orbit-only
+  (HEAD unchanged, `C:\AgentOS` untouched) and re-ran the full gate before committing.
+
+### Delivered
+
+- **Per-extension reload** — `ExtensionHost::reload_one(roots, ext_id)` re-discovers
+  and replaces only that extension (fresh manifest, reset crash breaker + last
+  error), leaving other extensions' crash state intact; a removed extension yields
+  a clear error. New `extension_reload_one` IPC + `native.ts` wrapper + a per-row
+  **Reload** button in Settings → Extensions. Test
+  `reload_one_preserves_other_crash_state` proves isolation.
+- **Readable recent logs** — `invoke_child` now pipes and captures the child's
+  stderr (on its own reader thread, deadlock-safe), bounds it to the last ~50
+  lines / 4000 bytes via a new pure `orbit-extensions::logs::bound_logs` (6 tests,
+  incl. multibyte-safety and the SDK's structured-JSON stderr), stores it per
+  extension, and surfaces it in `ExtensionInfo.recent_logs` + a collapsible
+  "Recent logs" block in Settings. No new logging of sensitive data — pass-through
+  only.
+
+### Gate (all green, verified independently)
+
+- Rust: `orbit-extensions` 27 (+6), `orbit-desktop --lib` 14 (+2) → **121 total**;
+  `cargo check --workspace` clean.
+- JS: 184 tests, lint clean, strict typecheck clean.
+
+### Deferred (documented)
+
+- Extension **uninstall** and **live/streaming** log tailing (current capture is
+  the last invocation's bounded tail, refreshed each run).
+
+### Files
+
+- New `crates/orbit-extensions/src/logs.rs`; edited `crates/orbit-extensions/src/lib.rs`,
+  `apps/desktop/src-tauri/src/{extension_host,commands,lib}.rs`,
+  `apps/desktop/src/native.ts`, `apps/desktop/src/settings/{Settings.tsx,settings.css}`,
+  `FEATURE_MATRIX.md`, `HANDOFF.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 9: AgentOS Controller extension (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`

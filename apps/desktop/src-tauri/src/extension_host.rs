@@ -20,8 +20,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use orbit_extensions::{
-    allowed_effects, discover_in, manifest::Manifest, parse_response, CrashTracker, Effect,
-    InvokeRequest, InvokeResponse,
+    allowed_effects, bound_logs, discover_in, manifest::Manifest, parse_response, CrashTracker,
+    Effect, InvokeRequest, InvokeResponse,
 };
 
 use crate::commands::AppState;
@@ -47,6 +47,24 @@ struct LoadedExt {
     crash: CrashTracker,
     /// Last invocation error (transport/crash/handler), shown in Settings.
     last_error: Option<String>,
+    /// Bounded tail of the child's stderr from the most recent invocation, so
+    /// Settings can show "recent logs" for diagnostics. None until first run.
+    recent_logs: Option<String>,
+}
+
+impl LoadedExt {
+    /// Build a freshly-loaded entry from discovery (crash breaker reset, no
+    /// error/log history yet).
+    fn fresh(id: String, dir: PathBuf, manifest: Manifest) -> Self {
+        LoadedExt {
+            id,
+            dir,
+            manifest,
+            crash: CrashTracker::default(),
+            last_error: None,
+            recent_logs: None,
+        }
+    }
 }
 
 struct HostInner {
@@ -97,6 +115,8 @@ pub struct ExtensionInfo {
     pub dir: String,
     /// Last invocation error, if any.
     pub last_error: Option<String>,
+    /// Bounded tail of the most recent invocation's stderr (diagnostics).
+    pub recent_logs: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -187,13 +207,7 @@ impl ExtensionHost {
             let (found, errs) = discover_in(root);
             for d in found {
                 if seen.insert(d.id.clone()) {
-                    exts.push(LoadedExt {
-                        id: d.id,
-                        dir: d.dir,
-                        manifest: d.manifest,
-                        crash: CrashTracker::default(),
-                        last_error: None,
-                    });
+                    exts.push(LoadedExt::fresh(d.id, d.dir, d.manifest));
                 }
             }
             for e in errs {
@@ -203,6 +217,45 @@ impl ExtensionHost {
         if let Ok(mut inner) = self.inner.lock() {
             inner.exts = exts;
             inner.errors = errors;
+        }
+    }
+
+    /// Reload a *single* extension: re-discover it from `roots` and replace only
+    /// its entry with a fresh one (new manifest, reset crash breaker, cleared
+    /// error/log history). Every other extension — including its crash breaker —
+    /// is left untouched. Returns an error if the extension is no longer found on
+    /// disk (in which case it is dropped from the loaded set).
+    pub fn reload_one(&self, roots: &[PathBuf], ext_id: &str) -> Result<(), String> {
+        // Re-discover across the roots and pick the first match by id (the same
+        // first-wins precedence `reload` uses across overlapping roots).
+        let mut found: Option<orbit_extensions::Discovered> = None;
+        for root in roots {
+            let (discovered, _errs) = discover_in(root);
+            if let Some(d) = discovered.into_iter().find(|d| d.id == ext_id) {
+                found = Some(d);
+                break;
+            }
+        }
+
+        let mut inner = self.inner.lock().map_err(|e| e.to_string())?;
+        match found {
+            Some(d) => {
+                let fresh = LoadedExt::fresh(d.id, d.dir, d.manifest);
+                if let Some(slot) = inner.exts.iter_mut().find(|e| e.id == ext_id) {
+                    *slot = fresh;
+                } else {
+                    inner.exts.push(fresh);
+                    inner.exts.sort_by(|a, b| a.id.cmp(&b.id));
+                }
+                Ok(())
+            }
+            None => {
+                // Gone from disk — drop it so the list stays honest.
+                inner.exts.retain(|e| e.id != ext_id);
+                Err(format!(
+                    "extension '{ext_id}' was not found on disk — it may have been removed"
+                ))
+            }
         }
     }
 
@@ -249,6 +302,7 @@ impl ExtensionHost {
                     permissions: e.manifest.permissions.clone(),
                     dir: e.dir.to_string_lossy().to_string(),
                     last_error: e.last_error.clone(),
+                    recent_logs: e.recent_logs.clone(),
                 }
             })
             .collect()
@@ -336,25 +390,27 @@ impl ExtensionHost {
         let request = InvokeRequest::new(command, query, storage).to_json();
         let entry = dir.join(&main);
 
-        // No locks held across the child spawn.
-        match invoke_child(&entry, &request) {
+        // No locks held across the child spawn. Stderr is captured (bounded)
+        // alongside stdout so Settings can surface "recent logs" either way.
+        let (result, logs) = invoke_child(&entry, &request);
+        match result {
             Ok(response) => {
                 // A handler can still return a logical error; reflect that too.
                 let logical_err = match &response {
                     InvokeResponse::Error { message, .. } => Some(message.clone()),
                     _ => None,
                 };
-                self.record(ext_id, logical_err.is_none(), logical_err);
+                self.record(ext_id, logical_err.is_none(), logical_err, logs);
                 self.handle_response(app, state, ext_id, &permissions, response)
             }
             Err(e) => {
-                self.record(ext_id, false, Some(e.clone()));
+                self.record(ext_id, false, Some(e.clone()), logs);
                 Err(e)
             }
         }
     }
 
-    fn record(&self, ext_id: &str, success: bool, last_error: Option<String>) {
+    fn record(&self, ext_id: &str, success: bool, last_error: Option<String>, logs: Option<String>) {
         if let Ok(mut inner) = self.inner.lock() {
             if let Some(ext) = inner.exts.iter_mut().find(|e| e.id == ext_id) {
                 if success {
@@ -363,6 +419,12 @@ impl ExtensionHost {
                 } else {
                     ext.crash.record_failure(now_ms());
                     ext.last_error = last_error;
+                }
+                // Always refresh the captured logs (even on success) so the most
+                // recent diagnostics are shown; keep the old capture if this run
+                // wrote nothing to stderr.
+                if logs.is_some() {
+                    ext.recent_logs = logs;
                 }
             }
         }
@@ -421,49 +483,185 @@ impl ExtensionHost {
     pub fn errors(&self) -> Vec<(String, String)> {
         self.inner.lock().map(|i| i.errors.clone()).unwrap_or_default()
     }
+
+    /// Test-only: force an extension's crash breaker to trip (no child spawn).
+    #[cfg(test)]
+    fn test_trip(&self, ext_id: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(ext) = inner.exts.iter_mut().find(|e| e.id == ext_id) {
+            // Three failures inside the window trips the default breaker.
+            ext.crash.record_failure(1_000);
+            ext.crash.record_failure(2_000);
+            ext.crash.record_failure(3_000);
+        }
+    }
+
+    /// Test-only: whether an extension's crash breaker is currently tripped.
+    /// `None` if the extension isn't loaded.
+    #[cfg(test)]
+    fn test_is_tripped(&self, ext_id: &str) -> Option<bool> {
+        let inner = self.inner.lock().unwrap();
+        inner.exts.iter().find(|e| e.id == ext_id).map(|e| e.crash.is_tripped())
+    }
 }
 
 /// Spawn `node <entry>`, write the request to stdin, read one response from
 /// stdout under a timeout. Any transport failure (spawn error, timeout, empty or
 /// invalid output, version mismatch) is returned as Err and counts as a crash.
-fn invoke_child(entry: &std::path::Path, request: &str) -> Result<InvokeResponse, String> {
+///
+/// Stderr is *captured* (piped) on its own reader thread so it can't deadlock the
+/// stdout read, then trimmed to a bounded tail via [`bound_logs`] and returned
+/// alongside the result — extensions write structured diagnostics there. The
+/// second tuple element is the captured logs, available on both success and
+/// failure (including timeout, where we return whatever was emitted before the
+/// kill).
+fn invoke_child(
+    entry: &std::path::Path,
+    request: &str,
+) -> (Result<InvokeResponse, String>, Option<String>) {
     if !entry.is_file() {
-        return Err(format!("extension entry not found: {}", entry.display()));
+        return (
+            Err(format!("extension entry not found: {}", entry.display())),
+            None,
+        );
     }
-    let mut child = Command::new("node")
+    let mut child = match Command::new("node")
         .arg(entry)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("could not start extension (is Node.js installed?): {e}"))?;
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                Err(format!("could not start extension (is Node.js installed?): {e}")),
+                None,
+            )
+        }
+    };
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(request.as_bytes())
-            .map_err(|e| format!("failed to send request: {e}"))?;
+        if let Err(e) = stdin.write_all(request.as_bytes()) {
+            return (Err(format!("failed to send request: {e}")), None);
+        }
         // Dropping stdin here closes it, signalling end-of-input to the child.
     }
 
-    let mut stdout = child.stdout.take().ok_or("no stdout from extension")?;
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        let mut buf = String::new();
-        let _ = stdout.read_to_string(&mut buf);
-        let _ = tx.send(buf);
-    });
+    // Drain stdout and stderr on separate threads so a full stderr pipe can never
+    // block the stdout read (or vice versa).
+    let (out_tx, out_rx) = mpsc::channel();
+    if let Some(mut stdout) = child.stdout.take() {
+        std::thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = stdout.read_to_string(&mut buf);
+            let _ = out_tx.send(buf);
+        });
+    }
+    let (err_tx, err_rx) = mpsc::channel();
+    if let Some(mut stderr) = child.stderr.take() {
+        std::thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = stderr.read_to_string(&mut buf);
+            let _ = err_tx.send(buf);
+        });
+    }
 
-    let output = match rx.recv_timeout(INVOKE_TIMEOUT) {
+    let output = match out_rx.recv_timeout(INVOKE_TIMEOUT) {
         Ok(s) => s,
         Err(_) => {
             let _ = child.kill();
-            return Err("extension timed out".into());
+            // Surface whatever the child managed to log before we killed it.
+            let logs = err_rx.recv_timeout(Duration::from_millis(200)).ok();
+            return (Err("extension timed out".into()), logs.and_then(|s| bound_logs(&s)));
         }
     };
     let _ = child.wait();
 
+    // Stderr should be at EOF now that stdout closed and the child exited; take
+    // it with a tiny grace period rather than blocking.
+    let logs = err_rx
+        .recv_timeout(Duration::from_millis(200))
+        .ok()
+        .and_then(|s| bound_logs(&s));
+
     if output.trim().is_empty() {
-        return Err("extension produced no output".into());
+        return (Err("extension produced no output".into()), logs);
     }
-    parse_response(&output)
+    (parse_response(&output), logs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn temp_root(tag: &str) -> PathBuf {
+        static N: AtomicUsize = AtomicUsize::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("orbit-host-{tag}-{}-{n}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_ext(root: &std::path::Path, id: &str) {
+        let dir = root.join(id);
+        fs::create_dir_all(&dir).unwrap();
+        let manifest = format!(
+            r#"{{"name":"{id}","title":"{id}","commands":[{{"name":"go","title":"Go","mode":"no-view"}}]}}"#
+        );
+        fs::write(dir.join("manifest.json"), manifest).unwrap();
+    }
+
+    /// Reloading one extension must not reset another extension's crash breaker.
+    #[test]
+    fn reload_one_preserves_other_crash_state() {
+        let root = temp_root("reload-one");
+        write_ext(&root, "alpha");
+        write_ext(&root, "beta");
+        let roots = vec![root.clone()];
+
+        let host = ExtensionHost::default();
+        host.reload(&roots);
+        assert_eq!(host.test_is_tripped("alpha"), Some(false));
+        assert_eq!(host.test_is_tripped("beta"), Some(false));
+
+        // Trip alpha's breaker (simulating repeated crashes).
+        host.test_trip("alpha");
+        assert_eq!(host.test_is_tripped("alpha"), Some(true));
+
+        // Reloading *beta* must leave alpha's tripped breaker untouched.
+        host.reload_one(&roots, "beta").expect("beta reloads");
+        assert_eq!(host.test_is_tripped("alpha"), Some(true), "alpha must stay tripped");
+        assert_eq!(host.test_is_tripped("beta"), Some(false));
+
+        // Reloading *alpha* itself resets only alpha's breaker.
+        host.reload_one(&roots, "alpha").expect("alpha reloads");
+        assert_eq!(host.test_is_tripped("alpha"), Some(false), "alpha reset by its own reload");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Reloading an extension that's gone from disk drops it and errors clearly.
+    #[test]
+    fn reload_one_missing_drops_and_errors() {
+        let root = temp_root("reload-missing");
+        write_ext(&root, "alpha");
+        write_ext(&root, "beta");
+        let roots = vec![root.clone()];
+
+        let host = ExtensionHost::default();
+        host.reload(&roots);
+
+        // Remove beta from disk, then reload just beta.
+        fs::remove_dir_all(root.join("beta")).unwrap();
+        let err = host.reload_one(&roots, "beta").unwrap_err();
+        assert!(err.contains("beta"), "error names the missing extension");
+        assert_eq!(host.test_is_tripped("beta"), None, "beta dropped from the loaded set");
+        assert_eq!(host.test_is_tripped("alpha"), Some(false), "alpha untouched");
+
+        let _ = fs::remove_dir_all(&root);
+    }
 }

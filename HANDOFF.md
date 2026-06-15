@@ -185,6 +185,15 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > UI + `InvokeRequest.preferences` plumbing in `protocol.rs`/`extension_host.rs`)
 > lands; mock works today. See docs/architecture/AGENTOS_ADAPTER.md.
 
+> **Update (session 5g, 2026-06-15) — Priority 3: extension management.**
+> Settings → Extensions now has **per-extension reload** (`reload_one` re-discovers
+> only that extension and resets only its crash breaker, leaving others' breakers
+> intact) and **readable recent logs** (`invoke_child` captures the child's stderr
+> bounded to ~50 lines / 4000 bytes via the pure `orbit_extensions::bound_logs`,
+> stored per extension and shown in a collapsible "Recent logs" block). New IPC
+> `extension_reload_one`; +2 host tests, +6 `bound_logs` tests (**121 Rust**, all
+> gates green).
+
 ## How to verify the build yourself (do this first)
 
 ```bash

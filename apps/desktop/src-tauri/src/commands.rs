@@ -713,6 +713,25 @@ pub fn extension_reload(
     Ok(state.ext_host.list(&conn))
 }
 
+/// Reload a single extension: re-discover only that one from disk and replace
+/// its loaded entry (fresh manifest, reset crash breaker, cleared error/logs),
+/// leaving every other extension — and its crash breaker — untouched. Errors if
+/// the extension is no longer present on disk.
+#[tauri::command]
+pub fn extension_reload_one(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    ext_id: String,
+) -> Result<Vec<crate::extension_host::ExtensionInfo>, String> {
+    let roots = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        crate::extension_host::roots(&app, &conn)
+    };
+    state.ext_host.reload_one(&roots, &ext_id)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    Ok(state.ext_host.list(&conn))
+}
+
 /// Folders that failed to load as extensions, with the reason (diagnostics).
 #[tauri::command]
 pub fn extension_errors(state: State<'_, AppState>) -> Vec<(String, String)> {

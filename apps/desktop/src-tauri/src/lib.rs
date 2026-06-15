@@ -281,6 +281,7 @@ pub fn run() {
             commands::extension_run,
             commands::extension_set_enabled,
             commands::extension_reload,
+            commands::extension_reload_one,
             commands::extension_errors,
             commands::extension_get_dev_paths,
             commands::extension_set_dev_paths,
