@@ -171,6 +171,20 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > worktree/branch were cleaned up. For Orbit, prefer doing the work in-tree or
 > instruct a non-isolated agent with absolute Orbit paths.
 
+> **Update (session 5f, 2026-06-15) — Priority 9: AgentOS Controller extension.**
+> New `extensions/examples/agentos-controller` (uses `@orbit/extension-sdk`): a
+> safe, **observational** controller — list agents/sessions/projects, recent
+> activity, pending approvals, agent health; open dashboard / agent workspace
+> (open-url), open project folder (open-path), copy status/path. Has a 3-way
+> **adapter** (mock [live default] / local-JSON / HTTP with explicit URL, 4s
+> timeout, graceful errors). No shell/SSH/restart/dispatch — observational only.
+> All commands + error paths verified via real Node RPC; +3 discoverability tests
+> (**184 JS**, gate green). **Honest gap:** protocol v1 doesn't yet forward
+> preference *values* to the extension child, so json/http adapters are
+> implemented + documented but only activate once a preferences slice (storage +
+> UI + `InvokeRequest.preferences` plumbing in `protocol.rs`/`extension_host.rs`)
+> lands; mock works today. See docs/architecture/AGENTOS_ADAPTER.md.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

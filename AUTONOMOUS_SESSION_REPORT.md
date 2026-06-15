@@ -1,5 +1,57 @@
 # Autonomous Session Report
 
+## Session — Priority 9: AgentOS Controller extension (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Mandate:** an initial, safe, observational AgentOS Controller (builds on P8).
+- **How:** delegated to a **non-isolated** subagent pinned to absolute Orbit paths
+  (after learning worktree isolation targets the wrong repo). The agent left
+  changes uncommitted; I independently verified the diff was Orbit-only (the
+  `C:\AgentOS` working tree was untouched — its dirty files match the
+  session-start snapshot), re-ran the gate, and re-ran the Node-RPC checks before
+  committing.
+
+### Deliverable
+
+`extensions/examples/agentos-controller` (manifest + index.mjs + package.json,
+using `@orbit/extension-sdk`): observational commands — list agents / sessions /
+projects, recent activity, pending approvals, agent health; actions open the
+dashboard / agent workspace (open-url), open a project folder (open-path), and
+copy status/path (copy). A **provider/adapter interface** with three adapters:
+**mock** (live default, every row labelled "mock data"), **local-JSON** (path
+from a preference), and **HTTP** (explicit base URL, `http(s)` only, 4s
+`AbortSignal.timeout`, errors returned as items/toasts — never thrown).
+Searchable by AgentOS / agent / project / sessions / approvals / "Agent Studio".
+**Strictly observational** — no shell/SSH/service-restart/task-dispatch/code-exec
+(documented in `docs/architecture/AGENTOS_ADAPTER.md`).
+
+### Verification
+
+- Real Node one-shot RPC for every command (mock) — valid `result` payloads;
+  error paths clean (unknown command, non-`http(s)` URL, connection refused,
+  missing JSON, malformed request) — no crashes.
+- Gate: **184 JS tests** (+3 discoverability), lint clean, strict typecheck clean.
+
+### Honest gap (deferred to its own slice)
+
+Protocol v1's `InvokeRequest` (`crates/orbit-extensions/src/protocol.rs`) forwards
+`{v,type,command,query,storage}` but **not** preference *values*, and there is no
+preferences storage/UI yet. So json/http adapters are fully implemented + tested
+via direct RPC but, at runtime, the extension falls back to **mock** until a
+preferences slice (storage + Settings UI + `InvokeRequest.preferences` plumbing in
+`protocol.rs` + `extension_host.rs`) lands. Handlers read `ctx.preferences`
+defensively, so nothing breaks. Also: v1 list items carry one action, so project
+"open folder" vs "copy path" is query-switched rather than dual actions.
+
+### Files
+
+- New: `extensions/examples/agentos-controller/**`,
+  `docs/architecture/AGENTOS_ADAPTER.md`. Edited:
+  `apps/desktop/src/discoverability.test.ts` (+3), `HANDOFF.md`,
+  `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 8: Extension SDK + CLI (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`

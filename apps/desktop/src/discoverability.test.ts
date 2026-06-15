@@ -60,6 +60,24 @@ const EXT_COMMANDS: ExtCommandInfo[] = [
     description: 'List agents and their current status',
     keywords: ['agentos', 'agent', 'status'],
   },
+  {
+    ext_id: 'agentos-controller',
+    ext_title: 'AgentOS Controller',
+    command: 'list-agents',
+    title: 'AgentOS Agents',
+    mode: 'list',
+    description: 'List agents with status, current task, last activity, project and health',
+    keywords: ['agentos', 'agent', 'agents', 'status', 'health', 'agent studio', 'controller'],
+  },
+  {
+    ext_id: 'agentos-controller',
+    ext_title: 'AgentOS Controller',
+    command: 'pending-approvals',
+    title: 'AgentOS Pending Approvals',
+    mode: 'list',
+    description: 'Show actions awaiting human approval (observational; approve elsewhere)',
+    keywords: ['agentos', 'approval', 'approvals', 'pending', 'review', 'agent studio'],
+  },
 ];
 
 function buildProviders(): SearchProvider[] {
@@ -119,6 +137,18 @@ describe('Root Search discoverability', () => {
 
   it('finds the AgentOS Status extension command when loaded', async () => {
     expect((await search('AgentOS Status')).map((i) => i.title)).toContain('AgentOS Status');
+  });
+
+  it('finds the AgentOS Controller agents command when loaded', async () => {
+    expect((await search('AgentOS Agents')).map((i) => i.title)).toContain('AgentOS Agents');
+  });
+
+  it('finds the AgentOS Controller via the "agent studio" keyword', async () => {
+    expect((await search('agent studio')).map((i) => i.title)).toContain('AgentOS Agents');
+  });
+
+  it('finds AgentOS pending approvals when loaded', async () => {
+    expect((await search('approvals')).map((i) => i.title)).toContain('AgentOS Pending Approvals');
   });
 });
 

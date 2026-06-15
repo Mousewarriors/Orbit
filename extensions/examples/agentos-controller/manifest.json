@@ -1,0 +1,100 @@
+{
+  "$schema": 1,
+  "name": "agentos-controller",
+  "title": "AgentOS Controller",
+  "description": "Observe AgentOS agents, sessions, projects, recent activity, pending approvals and health from Orbit. Safe and observational only: mock data by default, with optional local-JSON and HTTP read-only adapters. No shell, no task dispatch, no destructive actions.",
+  "author": "orbit",
+  "version": "0.1.0",
+  "platforms": ["windows", "macos", "linux"],
+  "permissions": ["network", "clipboard.write", "files.read"],
+  "main": "index.mjs",
+  "preferences": [
+    {
+      "name": "source",
+      "title": "Data source",
+      "description": "Where to read AgentOS state from. 'mock' uses bundled sample data (default, fully offline). 'json' reads a local JSON file. 'http' fetches a read-only AgentOS endpoint.",
+      "type": "dropdown",
+      "required": false,
+      "default": "mock",
+      "data": [
+        { "title": "Mock sample data (offline)", "value": "mock" },
+        { "title": "Local JSON file", "value": "json" },
+        { "title": "HTTP endpoint (read-only)", "value": "http" }
+      ]
+    },
+    {
+      "name": "jsonPath",
+      "title": "Local JSON file path",
+      "description": "Absolute path to a JSON file with { agents, sessions, projects, activity, approvals }. Used only when source = json.",
+      "type": "file",
+      "required": false
+    },
+    {
+      "name": "httpBaseUrl",
+      "title": "AgentOS base URL",
+      "description": "Base URL of a read-only AgentOS state endpoint (http/https only), e.g. http://127.0.0.1:8787. Used only when source = http.",
+      "type": "textfield",
+      "required": false
+    },
+    {
+      "name": "dashboardUrl",
+      "title": "Dashboard URL",
+      "description": "URL opened by the 'Open AgentOS Dashboard' action (http/https only).",
+      "type": "textfield",
+      "required": false,
+      "default": "http://127.0.0.1:8787"
+    },
+    {
+      "name": "workspaceUrlTemplate",
+      "title": "Agent workspace URL template",
+      "description": "URL template for opening an agent workspace; {agent} is replaced with the agent name (http/https only). Example: http://127.0.0.1:8787/agents/{agent}",
+      "type": "textfield",
+      "required": false,
+      "default": "http://127.0.0.1:8787/agents/{agent}"
+    }
+  ],
+  "commands": [
+    {
+      "name": "list-agents",
+      "title": "AgentOS Agents",
+      "description": "List agents with status, current task, last activity, project and health",
+      "mode": "list",
+      "keywords": ["agentos", "agent", "agents", "status", "health", "agent studio", "controller"]
+    },
+    {
+      "name": "list-sessions",
+      "title": "AgentOS Sessions",
+      "description": "List active agent sessions",
+      "mode": "list",
+      "keywords": ["agentos", "session", "sessions", "active", "agent studio"]
+    },
+    {
+      "name": "list-projects",
+      "title": "AgentOS Projects",
+      "description": "List projects known to AgentOS (open folder or copy path)",
+      "mode": "list",
+      "keywords": ["agentos", "project", "projects", "folder", "agent studio"]
+    },
+    {
+      "name": "recent-activity",
+      "title": "AgentOS Recent Activity",
+      "description": "Show recent AgentOS activity across agents and projects",
+      "mode": "list",
+      "keywords": ["agentos", "activity", "recent", "events", "log", "agent studio"]
+    },
+    {
+      "name": "pending-approvals",
+      "title": "AgentOS Pending Approvals",
+      "description": "Show actions awaiting human approval (observational; approve elsewhere)",
+      "mode": "list",
+      "keywords": ["agentos", "approval", "approvals", "pending", "review", "agent studio"]
+    },
+    {
+      "name": "agent-health",
+      "title": "AgentOS Agent Health",
+      "description": "Show current health of each agent",
+      "mode": "list",
+      "keywords": ["agentos", "health", "status", "uptime", "errors", "agent studio"]
+    }
+  ]
+}
