@@ -307,6 +307,7 @@ function FilesSection(): JSX.Element {
   const [roots, setRoots] = useState('');
   const [excludes, setExcludes] = useState('');
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [contentIndexing, setContentIndexing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -325,6 +326,9 @@ function FilesSection(): JSX.Element {
     void native
       .getSetting('files.include_hidden')
       .then((v) => setIncludeHidden(v === 'true'));
+    void native
+      .getSetting('files.content_indexing')
+      .then((v) => setContentIndexing(v === 'true'));
   }, [refresh]);
 
   // Poll progress while a rebuild is in flight.
@@ -354,13 +358,14 @@ function FilesSection(): JSX.Element {
       await native.setSetting('files.roots', roots);
       await native.setSetting('files.excludes', excludes);
       await native.setSetting('files.include_hidden', String(includeHidden));
+      await native.setSetting('files.content_indexing', String(contentIndexing));
       setStatus(await native.fileIndexRebuild());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, [roots, excludes, includeHidden]);
+  }, [roots, excludes, includeHidden, contentIndexing]);
 
   const clearIndex = useCallback(async () => {
     setBusy(true);
@@ -399,7 +404,7 @@ function FilesSection(): JSX.Element {
   return (
     <Section
       title="Files"
-      description="Index local files and folders so you can find them from Root Search. Only metadata (names, paths, sizes) is stored — never file contents — and nothing leaves your device. Orbit never indexes a whole drive automatically."
+      description="Index local files and folders so you can find them from Root Search. By default only metadata (names, paths, sizes) is stored; file contents are indexed only if you turn on content indexing below. Everything stays on your device — nothing is uploaded. Orbit never indexes a whole drive automatically."
     >
       <Row>
         <Toggle
@@ -483,6 +488,21 @@ function FilesSection(): JSX.Element {
           }}
         />
       </Row>
+      <Row>
+        <Toggle
+          label="Index file contents (text files only)"
+          checked={contentIndexing}
+          onChange={(v) => {
+            setContentIndexing(v);
+            void native.setSetting('files.content_indexing', String(v));
+          }}
+        />
+      </Row>
+      <p className="settings-note">
+        Content indexing lets Root Search match words inside text/code files (small
+        files only). The text is stored locally in your index and never uploaded.
+        Rebuild after changing this. Off by default.
+      </p>
       <Field label="Index" hint="Rebuild after changing folders. Both run in the background.">
         <button className="settings-btn-ghost" disabled={busy || !enabled} onClick={() => void rebuild()}>
           Rebuild index now

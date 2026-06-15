@@ -556,14 +556,26 @@ pub fn file_search(
         ext: ext.filter(|e| !e.is_empty()),
         modified_after: None,
     };
+    let limit = limit.unwrap_or(50).clamp(1, 500);
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    orbit_core::files::search(
-        &conn,
-        &query,
-        &filters,
-        limit.unwrap_or(50).clamp(1, 500),
-    )
-    .map_err(|e| e.to_string())
+    // Name/path matches first (always-on metadata index).
+    let mut results = orbit_core::files::search(&conn, &query, &filters, limit).map_err(|e| e.to_string())?;
+    // Then merge in content matches (only non-empty when content indexing is on),
+    // de-duplicated by path and capped at the same limit. Name matches rank above
+    // content-only matches.
+    if !query.trim().is_empty() && (results.len() as i64) < limit {
+        let seen: std::collections::HashSet<String> = results.iter().map(|r| r.path.clone()).collect();
+        let content = orbit_core::files::search_content(&conn, &query, limit).map_err(|e| e.to_string())?;
+        for rec in content {
+            if (results.len() as i64) >= limit {
+                break;
+            }
+            if !seen.contains(&rec.path) {
+                results.push(rec);
+            }
+        }
+    }
+    Ok(results)
 }
 
 #[tauri::command]

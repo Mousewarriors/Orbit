@@ -75,6 +75,9 @@ pub struct Entry {
     pub size: u64,
     pub created_ms: Option<i64>,
     pub modified_ms: i64,
+    /// Optional file text content. The walker never sets this (it stays `None`);
+    /// the indexer fills it in when opt-in content indexing is enabled.
+    pub content: Option<String>,
 }
 
 /// Summary of a completed (or cancelled) walk.
@@ -161,6 +164,7 @@ where
                         .and_then(|m| m.modified().ok())
                         .and_then(to_ms)
                         .unwrap_or(0),
+                    content: None,
                 });
                 stats.dirs += 1;
                 if config.max_depth == 0 || depth + 1 < config.max_depth {
@@ -185,6 +189,7 @@ where
                         .and_then(|m| m.modified().ok())
                         .and_then(to_ms)
                         .unwrap_or(0),
+                    content: None,
                 });
                 stats.files += 1;
             }

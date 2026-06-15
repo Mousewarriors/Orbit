@@ -210,6 +210,22 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > indexing + fs watcher), P6 (Notes/Quicklinks live-GUI reverify), extension
 > uninstall, CI, code-signing + auto-update.
 
+> **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
+> Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
+> (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).
+> `orbit-files::Entry` gained an optional `content` field (walker leaves it `None`);
+> the indexer reads small text/code files (≤256 KiB, allow-listed extensions, ≤200k
+> chars, read **off the DB lock**) only when `files.content_indexing` is enabled
+> (off by default), and `file_search` merges content matches after name/path
+> matches (deduped, capped). New Settings → Files toggle + updated privacy copy
+> (contents stored locally, never uploaded). Tests: `orbit-core`
+> content-search/clear, `orbit-desktop` `is_text_ext`. **123 Rust / 184 JS**, gate
+> green. **Still remaining:** an incremental filesystem watcher (today the index
+> updates on rebuild — the journey's "modify/rename → index updates" needs a manual
+> rebuild) and Priority 6 (Notes/Quicklinks must be re-verified through the live
+> GUI — not runnable in this headless environment; the manual checklist below
+> stands and the underlying commands/providers are unit-covered).
+
 ## How to verify the build yourself (do this first)
 
 ```bash

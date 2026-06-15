@@ -1,5 +1,53 @@
 # Autonomous Session Report
 
+## Session — Priority 2b: file content indexing (opt-in) (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`. Done in-tree (agents were rate-limited).
+
+### Delivered
+
+- **Migration 0007** — a standalone `files_content_fts(path UNINDEXED, content)`
+  FTS5 table, separate from the always-on metadata `files_fts` so the default
+  search is unaffected; cleared wholesale on each rebuild (paths unique per pass →
+  no per-row FTS delete dance). Validated by the existing migration tests.
+- **`orbit-core::files`** — `set_content`, `content_count`, `search_content`
+  (joins the content FTS back to `files` for metadata); `clear` now also wipes the
+  content index. Tested (`content_search_finds_by_body_and_clear_wipes_it`).
+- **`orbit-files::Entry`** — optional `content` field (walker always leaves it
+  `None`; additive, walker tests unaffected).
+- **Indexer (`file_index.rs`)** — when `files.content_indexing` is on (off by
+  default), reads small text/code files (≤256 KiB, allow-listed extensions via
+  `is_text_ext`, bounded to 200k chars) **off the DB lock** in `on_entry`, and
+  `flush` persists the captured content. Tested (`text_extensions_are_recognised`).
+- **`file_search` command** — merges content matches after name/path matches
+  (deduped by path, capped at the same limit). Empty when content indexing is off.
+- **Settings → Files** — "Index file contents (text files only)" toggle (off by
+  default) + a privacy note; the section description now says contents are indexed
+  only if you opt in and are stored locally / never uploaded.
+
+### Verification
+
+- Rust: `orbit-core` 40 (+1), `orbit-files` 10, `orbit-desktop --lib` 15 (+1) →
+  **123 total**; `cargo check --workspace` clean. JS: 184, lint + typecheck clean.
+
+### Honest limitations (remaining Priority 2 work)
+
+- **No incremental filesystem watcher** yet — the index updates on rebuild, so the
+  journey step "modify/rename a file → index updates" requires a manual rebuild. A
+  `ReadDirectoryChangesW`/`notify`-based watcher is the next slice; the data layer
+  already upserts by path, so incremental updates drop in cleanly.
+- Content search quality not GUI-exercised here (verified via unit tests on the
+  data layer + the indexer's text-detection).
+
+### Files
+
+- `crates/orbit-core/src/{migrations,files}.rs`, `crates/orbit-files/src/lib.rs`,
+  `apps/desktop/src-tauri/src/{file_index,commands}.rs`,
+  `apps/desktop/src/settings/Settings.tsx`, `FEATURE_MATRIX.md`, `HANDOFF.md`,
+  `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 10: Windows distribution foundation (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`. Done in-tree (the delegated agent

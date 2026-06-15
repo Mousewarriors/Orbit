@@ -160,6 +160,14 @@ pub const MIGRATIONS: &[&str] = &[
         enabled    INTEGER NOT NULL DEFAULT 1
     );
     "#,
+    // 0007 — OPTIONAL file-content index (off by default). A standalone FTS5
+    // table keyed by path, populated only when the user enables content indexing.
+    // Kept separate from `files_fts` so the always-on metadata search is
+    // unaffected, and cleared wholesale on each rebuild (so no per-row FTS delete
+    // dance is needed — paths are unique within a rebuild).
+    r#"
+    CREATE VIRTUAL TABLE files_content_fts USING fts5(path UNINDEXED, content);
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]

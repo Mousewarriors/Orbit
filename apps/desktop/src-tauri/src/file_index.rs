@@ -133,6 +133,51 @@ fn read_config(app: &AppHandle, conn: &rusqlite::Connection) -> WalkConfig {
     }
 }
 
+/// Files larger than this are never content-indexed (metadata only).
+const MAX_CONTENT_BYTES: u64 = 256 * 1024;
+/// Cap stored content length so a pathological file can't bloat the DB.
+const MAX_CONTENT_CHARS: usize = 200_000;
+
+/// Whether the user has opted in to indexing file *contents* (default false).
+pub fn content_enabled(conn: &rusqlite::Connection) -> bool {
+    orbit_core::get_setting(conn, "files.content_indexing")
+        .ok()
+        .flatten()
+        .as_deref()
+        == Some("true")
+}
+
+/// Extensions whose contents are worth indexing — plain-text / code / config.
+/// Anything else (binaries, media, archives) is skipped.
+pub fn is_text_ext(ext: Option<&str>) -> bool {
+    matches!(
+        ext.unwrap_or(""),
+        "txt" | "md" | "markdown" | "rst" | "log" | "csv" | "tsv" | "json" | "jsonc" | "toml"
+            | "yaml" | "yml" | "ini" | "cfg" | "conf" | "env" | "xml" | "html" | "htm" | "css"
+            | "scss" | "less" | "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" | "rs" | "py" | "rb"
+            | "go" | "java" | "kt" | "c" | "h" | "cpp" | "hpp" | "cs" | "php" | "sh" | "bash"
+            | "ps1" | "sql" | "swift" | "lua" | "vue" | "svelte" | "tex"
+    )
+}
+
+/// Read a text file's content for indexing, bounded by size and length. Returns
+/// `None` for unreadable/oversized files (never errors the rebuild).
+fn read_text_content(path: &str, size: u64) -> Option<String> {
+    if size > MAX_CONTENT_BYTES {
+        return None;
+    }
+    let mut text = std::fs::read_to_string(path).ok()?;
+    if text.len() > MAX_CONTENT_CHARS {
+        // Truncate on a char boundary.
+        let mut end = MAX_CONTENT_CHARS;
+        while end > 0 && !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+    }
+    Some(text)
+}
+
 fn flush(state: &AppState, batch: &[Entry], at: i64) {
     let Ok(mut guard) = state.db.lock() else {
         return;
@@ -152,6 +197,11 @@ fn flush(state: &AppState, batch: &[Entry], at: i64) {
             modified_at: e.modified_ms,
         };
         let _ = orbit_core::files::insert(&tx, &input, at);
+        // Optional content index (opt-in). Read happens off-lock in on_entry; here
+        // we just persist what was captured.
+        if let Some(content) = e.content.as_deref() {
+            let _ = orbit_core::files::set_content(&tx, &e.path, content);
+        }
     }
     let _ = tx.commit();
 }
@@ -165,12 +215,12 @@ pub fn rebuild(app: AppHandle) {
         state.index.running.store(true, Ordering::SeqCst);
         state.index.indexed.store(0, Ordering::SeqCst);
 
-        let cfg = {
+        let (cfg, index_content) = {
             let Ok(conn) = state.db.lock() else {
                 state.index.running.store(false, Ordering::SeqCst);
                 return;
             };
-            read_config(&app, &conn)
+            (read_config(&app, &conn), content_enabled(&conn))
         };
 
         // Record which configured roots are currently unavailable so the user can
@@ -191,6 +241,15 @@ pub fn rebuild(app: AppHandle) {
             let cancel = || state.index.generation.load(Ordering::SeqCst) != my_gen;
             let on_entry = |e: Entry| {
                 state.index.indexed.fetch_add(1, Ordering::Relaxed);
+                let mut e = e;
+                // Read text content off-lock (the DB lock is only taken in flush),
+                // when the user has opted in and the file is a small text file.
+                if index_content
+                    && e.kind == orbit_files::EntryKind::File
+                    && is_text_ext(e.ext.as_deref())
+                {
+                    e.content = read_text_content(&e.path, e.size);
+                }
                 let mut b = buf.borrow_mut();
                 b.push(e);
                 if b.len() >= BATCH {
@@ -283,5 +342,16 @@ mod tests {
         let u = unavailable_roots(&[missing.clone(), temp]);
         assert_eq!(u.len(), 1);
         assert!(u[0].contains("orbit"));
+    }
+
+    #[test]
+    fn text_extensions_are_recognised() {
+        for e in ["txt", "md", "rs", "ts", "json", "toml", "py", "css"] {
+            assert!(is_text_ext(Some(e)), "{e} should be text");
+        }
+        for e in ["png", "exe", "zip", "mp4", "pdf", "dll"] {
+            assert!(!is_text_ext(Some(e)), "{e} should not be text");
+        }
+        assert!(!is_text_ext(None));
     }
 }

@@ -85,7 +85,49 @@ pub fn clear(conn: &Connection) -> Result<(), DbError> {
     conn.execute("DELETE FROM files", [])?;
     // Rebuild the external-content FTS from the (now empty) content table.
     conn.execute("INSERT INTO files_fts(files_fts) VALUES('rebuild')", [])?;
+    // Drop any indexed file *contents* too (the optional content index).
+    conn.execute("DELETE FROM files_content_fts", [])?;
     Ok(())
+}
+
+/// Store a file's text content in the optional content index (opt-in). Assumes a
+/// cleared table or unique paths within a rebuild (we never re-index the same
+/// path twice in one pass), so this is a plain insert — no per-row FTS delete.
+pub fn set_content(conn: &Connection, path: &str, content: &str) -> Result<(), DbError> {
+    conn.execute(
+        "INSERT INTO files_content_fts(path, content) VALUES(?1, ?2)",
+        params![path, content],
+    )?;
+    Ok(())
+}
+
+/// Number of files whose content is indexed (diagnostic / status).
+pub fn content_count(conn: &Connection) -> Result<i64, DbError> {
+    Ok(conn.query_row("SELECT count(*) FROM files_content_fts", [], |r| r.get(0))?)
+}
+
+/// Search the optional content index, returning the matching files' metadata
+/// (joined back to `files`). Empty when content indexing is off / has no rows.
+pub fn search_content(conn: &Connection, query: &str, limit: i64) -> Result<Vec<FileRecord>, DbError> {
+    let Some(expr) = fts_query(query) else {
+        return Ok(Vec::new());
+    };
+    let select = COLS
+        .split(',')
+        .map(|c| format!("f.{}", c.trim()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "SELECT {select} FROM files_content_fts c JOIN files f ON f.path = c.path
+         WHERE files_content_fts MATCH ?1 ORDER BY rank LIMIT ?2"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![expr, limit], row_to_record)?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
 }
 
 /// Insert (or replace) a single entry and keep the FTS mirror in sync. Safe to
@@ -336,5 +378,26 @@ mod tests {
         insert(&conn, &f("/root/wei\"rd.txt", "wei\"rd.txt", Some("txt"), "file", 100), 1).unwrap();
         // Must not error on FTS metacharacters.
         let _ = search(&conn, "wei\"rd", &FileFilters::default(), 50).unwrap();
+    }
+
+    #[test]
+    fn content_search_finds_by_body_and_clear_wipes_it() {
+        let conn = open_in_memory().unwrap();
+        // The file metadata row must exist for the content search to join back.
+        insert(&conn, &f("/root/notes.md", "notes.md", Some("md"), "file", 100), 1).unwrap();
+        set_content(&conn, "/root/notes.md", "the quick brown fox jumps over orbit").unwrap();
+        assert_eq!(content_count(&conn).unwrap(), 1);
+
+        // A word that appears only in the body (not the name/path) is found.
+        let hits = search_content(&conn, "brown", 50).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "notes.md");
+        // A non-matching word returns nothing; an empty query is a no-op.
+        assert!(search_content(&conn, "zzz", 50).unwrap().is_empty());
+        assert!(search_content(&conn, "", 50).unwrap().is_empty());
+
+        clear(&conn).unwrap();
+        assert_eq!(content_count(&conn).unwrap(), 0);
+        assert!(search_content(&conn, "brown", 50).unwrap().is_empty());
     }
 }
