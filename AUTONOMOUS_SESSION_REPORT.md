@@ -1,5 +1,52 @@
 # Autonomous Session Report
 
+## Session — Priority 10: Windows distribution foundation (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`. Done in-tree (the delegated agent
+  hit a rate limit and did nothing), verified with `cargo check` + the npm gate.
+
+### Delivered
+
+- **Single-instance** (`tauri-plugin-single-instance`, registered first): a second
+  launch focuses the existing launcher (`focus_launcher`: show + unminimize +
+  focus) instead of starting a new process.
+- **Launch at login** (`tauri-plugin-autostart`): `get_autostart`/`set_autostart`
+  IPC commands over the plugin's Rust manager (no new frontend capability), and a
+  real **Settings → General → "Launch Orbit at login"** toggle (off by default)
+  replacing the old disabled placeholder.
+- **Diagnostics export**: **Settings → Developer → "Copy diagnostics"** copies a
+  no-secrets JSON blob (version/platform/data paths/timestamp).
+- **Installer + signing docs**: `tauri.conf.json` bundle was already complete
+  (msi/nsis, publisher, icons, descriptions, currentUser install). New
+  `docs/architecture/DISTRIBUTION.md` documents building an unsigned installer,
+  the Authenticode/EV **code-signing** requirements (not configured — no cert in
+  this environment), why **auto-update is deferred** until a signed
+  update-verification model exists, and the dev-only `npm audit` advisories.
+
+### Verification
+
+- `cargo check -p orbit-desktop` clean (plugins fetched + compiled). JS gate: 184
+  tests, lint clean, strict typecheck clean. Rust unchanged at 121 (no new tests —
+  the plugin wiring is config/glue; behaviour is plugin-owned).
+- **`npm audit`**: 5 advisories (2 moderate / 2 high / 1 critical), ALL in the dev
+  vite/esbuild/vitest chain — none ship in the app; not force-fixed (policy).
+
+### Honest limitations
+
+- No `tauri build` was run here (heavy; needs WiX/NSIS). Single-instance focusing
+  and the actual login-entry creation are compiled + wired but **not GUI-verified**
+  in this environment — verify on a real installed build.
+- Code-signing + auto-update are documented, not implemented (no signing creds).
+
+### Files
+
+- Edited: `apps/desktop/src-tauri/Cargo.toml` (2 plugins),
+  `apps/desktop/src-tauri/src/{lib,commands}.rs`, `apps/desktop/src/native.ts`,
+  `apps/desktop/src/settings/Settings.tsx`. New: `docs/architecture/DISTRIBUTION.md`.
+  Docs: `FEATURE_MATRIX.md`, `HANDOFF.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 3 remainder: per-extension reload + recent logs (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`. Delegated to a non-isolated

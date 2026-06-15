@@ -71,12 +71,31 @@ function GeneralSection(): JSX.Element {
   const [hotkey, setHotkey] = useState<string>(DEFAULT_HOTKEY);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [autostart, setAutostartState] = useState(false);
+  const [autostartBusy, setAutostartBusy] = useState(false);
 
   useEffect(() => {
     void native
       .getSetting('general.hotkey')
       .then((v) => setHotkey(v ?? DEFAULT_HOTKEY))
       .catch(() => {});
+    void native
+      .getAutostart()
+      .then(setAutostartState)
+      .catch(() => {});
+  }, []);
+
+  const toggleAutostart = useCallback(async (enabled: boolean) => {
+    setAutostartBusy(true);
+    setError(null);
+    try {
+      await native.setAutostart(enabled);
+      setAutostartState(enabled);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAutostartBusy(false);
+    }
   }, []);
 
   const apply = useCallback(async (accelerator: string) => {
@@ -110,9 +129,14 @@ function GeneralSection(): JSX.Element {
 
       <Field
         label="Startup"
-        hint="Launch at login is coming in a later release; Orbit currently runs while open and lives in the system tray."
+        hint="When enabled, Orbit starts automatically when you sign in and waits in the system tray. A single instance is enforced — launching Orbit again just focuses the existing window."
       >
-        <Toggle checked disabled label="Keep running in the system tray" onChange={() => {}} />
+        <Toggle
+          label="Launch Orbit at login"
+          checked={autostart}
+          disabled={autostartBusy}
+          onChange={(v) => void toggleAutostart(v)}
+        />
       </Field>
     </Section>
   );
@@ -734,6 +758,7 @@ function PrivacySection(): JSX.Element {
 function DeveloperSection(): JSX.Element {
   const [diag, setDiag] = useState<native.Diagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     void native
@@ -741,6 +766,25 @@ function DeveloperSection(): JSX.Element {
       .then(setDiag)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  // Copy a diagnostics JSON blob for bug reports (no secrets — just version,
+  // platform and the local data/db paths the user already sees above).
+  const copyDiagnostics = useCallback(async () => {
+    if (!diag) return;
+    setError(null);
+    try {
+      const blob = JSON.stringify(
+        { ...diag, app: BRANDING.name, exported_at: new Date().toISOString() },
+        null,
+        2,
+      );
+      await native.clipboardSet(blob);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [diag]);
 
   return (
     <Section title="Developer" description="Diagnostics and local data locations.">
@@ -754,9 +798,15 @@ function DeveloperSection(): JSX.Element {
         <dt>Database</dt>
         <dd className="settings-mono">{diag?.db_path ?? '—'}</dd>
       </dl>
-      <button className="settings-btn-ghost" onClick={() => void native.openDataDir()}>
-        Open data folder
-      </button>
+      <Field label="Diagnostics" hint="Local only — version, platform and data paths. No secrets are included.">
+        <button className="settings-btn-ghost" onClick={() => void native.openDataDir()}>
+          Open data folder
+        </button>
+        <button className="settings-btn-ghost" disabled={!diag} onClick={() => void copyDiagnostics()}>
+          Copy diagnostics
+        </button>
+        {copied && <span className="settings-ok"> Copied.</span>}
+      </Field>
       {error && <p className="settings-err">⚠ {error}</p>}
     </Section>
   );

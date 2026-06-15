@@ -194,6 +194,22 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > `extension_reload_one`; +2 host tests, +6 `bound_logs` tests (**121 Rust**, all
 > gates green).
 
+> **Update (session 5g, 2026-06-15) — Priority 10: Windows distribution foundation.**
+> Added `tauri-plugin-single-instance` (registered first; second launch focuses
+> the existing launcher via `focus_launcher`) and `tauri-plugin-autostart` (wired
+> via `get_autostart`/`set_autostart` Rust commands + a real Settings → General
+> "Launch Orbit at login" toggle, off by default — replaces the old disabled
+> placeholder). Added "Copy diagnostics" to Settings → Developer (no secrets).
+> Bundle config in `tauri.conf.json` was already complete (msi/nsis, publisher,
+> icons, currentUser). New `docs/architecture/DISTRIBUTION.md` documents the
+> installer, **code-signing requirements (not configured — no cert here)**,
+> deferred auto-update, and the dev-only `npm audit` advisories. `cargo check
+> -p orbit-desktop` clean; **184 JS / 121 Rust**, lint + typecheck green.
+> **Honest limit:** single-instance focusing + the login entry are compiled/wired
+> but NOT GUI-verified here (no `tauri build`/`dev`). Remaining: P2b (content
+> indexing + fs watcher), P6 (Notes/Quicklinks live-GUI reverify), extension
+> uninstall, CI, code-signing + auto-update.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

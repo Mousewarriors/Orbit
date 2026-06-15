@@ -19,8 +19,10 @@ permissions + error handling + keyboard + tests are all present.
 | Centralised branding | ✅ | `packages/branding` |
 | Original icon + generator | ✅ | `scripts/generate-icon.mjs` + Tauri icon set |
 | CI workflows | ⬜ | documented, not yet added |
-| Packaging/signing config | 🟡 | `tauri.conf.json` targets set; signing not configured |
-| Auto-update | ⬜ | — |
+| Packaging/signing config | 🟡 | `tauri.conf.json` bundle complete (msi/nsis targets, publisher, icons, descriptions, currentUser install); **code-signing not configured** (needs an Authenticode/EV cert — documented in [docs/architecture/DISTRIBUTION.md](docs/architecture/DISTRIBUTION.md)). `tauri build` not run here |
+| Single-instance + launch-at-login | 🟡 | `tauri-plugin-single-instance` (registered first; second launch focuses the existing window via `focus_launcher`) + `tauri-plugin-autostart` wired through `get_autostart`/`set_autostart` commands and a real Settings → General toggle (off by default). Compiles (`cargo check`) and is wired; runtime focusing / login-entry creation not GUI-verified here. See DISTRIBUTION.md |
+| Diagnostics export | ✅ | Settings → Developer "Copy diagnostics" (version/platform/data paths JSON, no secrets) + "Open data folder" |
+| Auto-update | ⬜ | intentionally deferred until a signed update-verification model exists (DISTRIBUTION.md) |
 
 ## Native shell (Tauri 2 / Rust)
 

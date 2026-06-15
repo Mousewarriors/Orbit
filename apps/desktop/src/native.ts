@@ -448,6 +448,16 @@ export async function extensionSetDevPaths(paths: string): Promise<ExtensionInfo
   return invoke<ExtensionInfo[]>('extension_set_dev_paths', { paths });
 }
 
+/** Whether Orbit is registered to launch at login. */
+export async function getAutostart(): Promise<boolean> {
+  return invoke<boolean>('get_autostart');
+}
+
+/** Enable/disable launching Orbit at login. */
+export async function setAutostart(enabled: boolean): Promise<void> {
+  return invoke('set_autostart', { enabled });
+}
+
 export async function quitApp(): Promise<void> {
   return invoke('quit_app');
 }

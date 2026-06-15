@@ -846,6 +846,31 @@ pub fn open_data_dir(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Launch at login (Windows/macOS/Linux via tauri-plugin-autostart)
+// ---------------------------------------------------------------------------
+
+/// Whether Orbit is registered to launch at login.
+#[tauri::command]
+pub fn get_autostart(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Enable or disable launch-at-login. Persists via the OS autostart mechanism
+/// (registry Run key on Windows / LaunchAgent on macOS / autostart desktop entry
+/// on Linux) — no privileged access, no security settings touched.
+#[tauri::command]
+pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let mgr = app.autolaunch();
+    if enabled {
+        mgr.enable().map_err(|e| e.to_string())
+    } else {
+        mgr.disable().map_err(|e| e.to_string())
+    }
+}
+
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
     app.exit(0);

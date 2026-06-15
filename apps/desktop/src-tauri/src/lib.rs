@@ -47,6 +47,17 @@ fn toggle_launcher(app: &AppHandle) {
     }
 }
 
+/// Bring the launcher to the foreground (used when a second instance is launched
+/// — we surface the existing instance rather than starting a new one).
+fn focus_launcher(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(LAUNCHER_LABEL) {
+        position_upper_centre(&win);
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
+}
+
 /// Place the window horizontally centred and ~18% from the top of the active
 /// monitor — the classic launcher position.
 fn position_upper_centre(win: &tauri::WebviewWindow) {
@@ -110,6 +121,20 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Single-instance MUST be the first plugin: if Orbit is already running, a
+        // second launch fires this callback in the existing instance (instead of
+        // starting a new one) and we simply surface the launcher.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_launcher(app);
+        }))
+        // Launch-at-login support; toggled from Settings → General via the
+        // get_autostart/set_autostart commands (the manager API, so no extra
+        // frontend capability is needed). No args; on Windows the macOS launcher
+        // argument is ignored.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_opener::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -296,6 +321,8 @@ pub fn run() {
             commands::file_index_clear,
             commands::reveal_path,
             commands::hide_launcher,
+            commands::get_autostart,
+            commands::set_autostart,
             commands::quit_app,
         ])
         .run(tauri::generate_context!())
