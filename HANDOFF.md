@@ -113,6 +113,19 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > the running launcher GUI (the launch primitive itself is proven); File Search
 > usability (Priority 2) is the next slice.
 
+> **Update (session 5b, 2026-06-15) — Priority 2a: File Search usability.**
+> Surfaced the diagnostics the walker already computes: Settings → Files now shows
+> **last-indexed time**, **unreadable folders skipped** (permission denied), and
+> **unavailable/missing roots** (unplugged drive / deleted folder); added an
+> explicit **Clear index** button and a **first-run** callout with one-click
+> "Index Documents, Desktop & Downloads". `file_index.rs` captures `WalkStats`
+> and persists `files.last_indexed_at`; new `file_index_clear` command. Counts:
+> **148 JS, 112 Rust** (+2), gate green. **Still deferred** (each its own slice):
+> content indexing (off-by-default toggle; needs migration + privacy-model update)
+> and an incremental filesystem watcher (today: rebuild-only). The file provider
+> is already isolated under the orchestrator timeout, so a File Search failure
+> never suppresses other Root Search providers.
+
 ## How to verify the build yourself (do this first)
 
 ```bash

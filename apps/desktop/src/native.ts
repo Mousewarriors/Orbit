@@ -255,6 +255,12 @@ export interface FileIndexStatus {
   indexed: number;
   total: number;
   roots: string[];
+  /** Epoch-ms of the last fully-completed index, or 0 if never. */
+  last_indexed_at: number;
+  /** Unreadable directories from the most-recent run (diagnostic). */
+  errors: number;
+  /** Configured roots that don't currently exist (diagnostic). */
+  unavailable: string[];
 }
 
 export async function fileSearch(
@@ -279,6 +285,11 @@ export async function fileIndexSetEnabled(enabled: boolean): Promise<FileIndexSt
 
 export async function fileIndexRebuild(): Promise<FileIndexStatus> {
   return invoke<FileIndexStatus>('file_index_rebuild');
+}
+
+/** Empty the file index on demand (without disabling indexing). */
+export async function fileIndexClear(): Promise<FileIndexStatus> {
+  return invoke<FileIndexStatus>('file_index_clear');
 }
 
 /** Reveal a path in the OS file manager (selects it on Windows). */

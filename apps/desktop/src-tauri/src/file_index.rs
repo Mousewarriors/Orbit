@@ -11,6 +11,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Manager};
@@ -30,6 +31,12 @@ pub struct IndexState {
     pub running: AtomicBool,
     /// Entries written during the current/most-recent run.
     pub indexed: AtomicUsize,
+    /// Directories that could not be read in the most-recent run (permission
+    /// denied, races) — surfaced so the user understands gaps in their index.
+    pub errors: AtomicUsize,
+    /// Configured roots that don't currently exist (unavailable drive, deleted /
+    /// renamed folder), captured at the start of the most-recent run.
+    pub unavailable: Mutex<Vec<String>>,
 }
 
 /// Status surfaced to the Settings → Files section.
@@ -40,6 +47,22 @@ pub struct IndexStatus {
     pub indexed: usize,
     pub total: i64,
     pub roots: Vec<String>,
+    /// Epoch-ms of the last fully-completed index, or 0 if never.
+    pub last_indexed_at: i64,
+    /// Unreadable directories from the most-recent run (diagnostic).
+    pub errors: usize,
+    /// Configured roots that don't currently exist (diagnostic).
+    pub unavailable: Vec<String>,
+}
+
+/// Configured roots that are not currently readable directories (e.g. an
+/// unplugged drive or a deleted folder). Pure so it is unit-tested.
+pub fn unavailable_roots(roots: &[PathBuf]) -> Vec<String> {
+    roots
+        .iter()
+        .filter(|r| !r.is_dir())
+        .map(|r| r.to_string_lossy().to_string())
+        .collect()
 }
 
 fn now_ms() -> i64 {
@@ -150,6 +173,13 @@ pub fn rebuild(app: AppHandle) {
             read_config(&app, &conn)
         };
 
+        // Record which configured roots are currently unavailable so the user can
+        // see why some folders produced nothing (unplugged drive, deleted folder).
+        if let Ok(mut u) = state.index.unavailable.lock() {
+            *u = unavailable_roots(&cfg.roots);
+        }
+        state.index.errors.store(0, Ordering::SeqCst);
+
         // Fresh start: clear the previous index.
         if let Ok(conn) = state.db.lock() {
             let _ = orbit_core::files::clear(&conn);
@@ -157,7 +187,7 @@ pub fn rebuild(app: AppHandle) {
 
         let at = now_ms();
         let buf: RefCell<Vec<Entry>> = RefCell::new(Vec::with_capacity(BATCH));
-        {
+        let stats = {
             let cancel = || state.index.generation.load(Ordering::SeqCst) != my_gen;
             let on_entry = |e: Entry| {
                 state.index.indexed.fetch_add(1, Ordering::Relaxed);
@@ -169,15 +199,22 @@ pub fn rebuild(app: AppHandle) {
                     flush(&state, &batch, at);
                 }
             };
-            walk(&cfg, on_entry, &cancel);
-        }
+            walk(&cfg, on_entry, &cancel)
+        };
         let rest = buf.into_inner();
         if !rest.is_empty() {
             flush(&state, &rest, at);
         }
 
-        // Only the latest run owns the running flag.
+        // Only the latest run owns the running flag and records completion. A
+        // superseded (cancelled) run leaves the newer run's state untouched.
         if state.index.generation.load(Ordering::SeqCst) == my_gen {
+            state.index.errors.store(stats.errors, Ordering::SeqCst);
+            if !stats.cancelled {
+                if let Ok(conn) = state.db.lock() {
+                    let _ = orbit_core::set_setting(&conn, "files.last_indexed_at", &at.to_string());
+                }
+            }
             state.index.running.store(false, Ordering::SeqCst);
         }
     });
@@ -191,6 +228,11 @@ pub fn status(app: &AppHandle, state: &AppState) -> IndexStatus {
         .and_then(|c| orbit_core::files::count(c).ok())
         .unwrap_or(0);
     let enabled = conn.as_ref().map(|c| is_enabled(c)).unwrap_or(false);
+    let last_indexed_at = conn
+        .as_ref()
+        .and_then(|c| orbit_core::get_setting(c, "files.last_indexed_at").ok().flatten())
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(0);
     let roots = conn
         .as_ref()
         .map(|c| {
@@ -200,11 +242,46 @@ pub fn status(app: &AppHandle, state: &AppState) -> IndexStatus {
                 .collect()
         })
         .unwrap_or_default();
+    let unavailable = state.index.unavailable.lock().map(|u| u.clone()).unwrap_or_default();
     IndexStatus {
         enabled,
         running: state.index.running.load(Ordering::SeqCst),
         indexed: state.index.indexed.load(Ordering::SeqCst),
         total,
         roots,
+        last_indexed_at,
+        errors: state.index.errors.load(Ordering::SeqCst),
+        unavailable,
+    }
+}
+
+/// Clear the file index and forget the last-indexed time. Used by the explicit
+/// "Clear index" control (distinct from disabling, which also clears).
+pub fn clear(state: &AppState) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::files::clear(&conn).map_err(|e| e.to_string())?;
+    let _ = orbit_core::set_setting(&conn, "files.last_indexed_at", "0");
+    state.index.indexed.store(0, Ordering::SeqCst);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_lines_trims_and_drops_blanks() {
+        let v = split_lines("  a \n\n b \n   \nc");
+        assert_eq!(v, vec!["a", "b", "c"]);
+        assert!(split_lines("   \n  ").is_empty());
+    }
+
+    #[test]
+    fn unavailable_roots_flags_missing_dirs() {
+        let missing = PathBuf::from(r"Z:\definitely\not\here\orbit");
+        let temp = std::env::temp_dir();
+        let u = unavailable_roots(&[missing.clone(), temp]);
+        assert_eq!(u.len(), 1);
+        assert!(u[0].contains("orbit"));
     }
 }

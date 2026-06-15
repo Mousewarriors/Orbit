@@ -196,6 +196,42 @@
 .settings-btn-danger:hover {
   background: rgba(255, 92, 112, 0.12);
 }
+/* Primary (accent) button — used for first-run / recommended actions. */
+.settings-btn {
+  border: 1px solid var(--accent, #5b8cff);
+  background: var(--accent, #5b8cff);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.settings-btn:hover {
+  filter: brightness(1.08);
+}
+.settings-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* First-run / guidance callout */
+.settings-callout {
+  border: 1px solid var(--separator);
+  background: var(--kbd-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.settings-callout p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
 
 /* Shortcut recorder */
 .settings-recorder {

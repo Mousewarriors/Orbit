@@ -292,6 +292,7 @@ pub fn run() {
             commands::file_index_status,
             commands::file_index_set_enabled,
             commands::file_index_rebuild,
+            commands::file_index_clear,
             commands::reveal_path,
             commands::hide_launcher,
             commands::quit_app,

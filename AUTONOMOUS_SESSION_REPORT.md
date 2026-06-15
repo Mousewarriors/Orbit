@@ -1,5 +1,63 @@
 # Autonomous Session Report
 
+## Session — Priority 2a: File Search usability & diagnostics (2026-06-15)
+
+- **Branch:** `claude/autonomous-orbit-build`
+- **Mandate:** make File Search a real, usable end-to-end feature (Priority 2).
+  This first slice covers usability + diagnostics + robustness; content indexing
+  and an incremental fs watcher are deferred to their own slices (below).
+
+### What changed
+
+- **Visible diagnostics (the walker already computed them; we now surface them).**
+  `WalkStats` from `orbit-files::walk` is captured in `file_index.rs`:
+  unreadable directories (permission denied) and configured roots that don't
+  exist (unavailable drive / deleted folder) are stored on `IndexState` and
+  returned in `IndexStatus`. Settings → Files shows "N folders could not be read"
+  and lists unavailable roots.
+- **Last successful index time** persisted (`files.last_indexed_at`) and shown.
+- **Explicit "Clear index"** control (`file_index_clear` command +
+  `file_index::clear`) distinct from disabling.
+- **First-run UX.** When indexing is enabled but nothing is indexed, Settings
+  shows a callout explaining why Root Search returns no files and a one-click
+  **"Index Documents, Desktop & Downloads"** (writes empty roots → native
+  defaults, enables, rebuilds). When disabled, a note explains files won't appear.
+- **Robustness confirmed:** missing roots / unavailable drives are skipped and
+  reported (not fatal); permission-denied dirs are skipped and counted; symlinks
+  are not followed (loop-safe); the file provider runs under the orchestrator's
+  per-provider timeout/cancellation so one File Search failure never suppresses
+  other providers.
+
+### Verification gate (all green)
+
+- JS/Vitest 148 passed; lint clean; strict typecheck clean.
+- Rust `cargo test --workspace --lib` → 112 passed (+2: `split_lines`,
+  `unavailable_roots`) + 1 ignored; `cargo check --workspace` clean.
+- `vite build` clean.
+- Not GUI-clicked this slice; the new logic is unit-tested and the Settings tree
+  still server-renders (render smoke test passes).
+
+### Deferred (honest) — remaining Priority 2 work, each its own slice
+
+- **Content indexing** (off-by-default toggle): needs a migration + FTS for
+  contents + size/binary caps + a privacy/security-model update (today the index
+  is deliberately metadata-only). Not shipped as a dead toggle.
+- **Incremental filesystem watcher**: today the index updates on rebuild, not
+  automatically on file change. A `ReadDirectoryChangesW`/notify-based watcher is
+  the next slice; the data layer already upserts by path so incremental updates
+  will drop in.
+
+### Files changed
+
+- `apps/desktop/src-tauri/src/file_index.rs` (diagnostics, last-indexed, clear,
+  tests), `apps/desktop/src-tauri/src/commands.rs` (`file_index_clear`),
+  `apps/desktop/src-tauri/src/lib.rs` (register), `apps/desktop/src/native.ts`
+  (status fields + `fileIndexClear`), `apps/desktop/src/settings/Settings.tsx`
+  (diagnostics, clear, first-run), `apps/desktop/src/settings/settings.css`,
+  `HANDOFF.md`, `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`.
+
+---
+
 ## Session — Priority 1: application launching (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`

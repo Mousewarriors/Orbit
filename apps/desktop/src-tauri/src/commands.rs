@@ -600,6 +600,17 @@ pub fn file_index_set_enabled(
     Ok(crate::file_index::status(&app, &state))
 }
 
+/// Clear the file index now (and forget the last-indexed time). Distinct from
+/// disabling indexing — this just empties the current index on demand.
+#[tauri::command]
+pub fn file_index_clear(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<crate::file_index::IndexStatus, String> {
+    crate::file_index::clear(state.inner())?;
+    Ok(crate::file_index::status(&app, &state))
+}
+
 /// Rebuild the file index now (no-op effect if indexing is disabled).
 #[tauri::command]
 pub fn file_index_rebuild(

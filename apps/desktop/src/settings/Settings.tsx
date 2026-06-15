@@ -338,12 +338,44 @@ function FilesSection(): JSX.Element {
     }
   }, [roots, excludes, includeHidden]);
 
+  const clearIndex = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setStatus(await native.fileIndexClear());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  // First-run helper: enable indexing for the sensible default user folders
+  // (Desktop / Documents / Downloads, as resolved natively) and rebuild.
+  const useDefaults = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await native.setSetting('files.roots', ''); // empty → native defaults
+      setRoots('');
+      await native.fileIndexSetEnabled(true);
+      setStatus(await native.fileIndexRebuild());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const enabled = status?.enabled ?? false;
+  const total = status?.total ?? 0;
+  const lastAt = status?.last_indexed_at ?? 0;
+  const isFirstRun = enabled && !status?.running && total === 0;
 
   return (
     <Section
       title="Files"
-      description="Index local files and folders so you can find them from Root Search. Only metadata (names, paths, sizes) is stored — never file contents — and nothing leaves your device."
+      description="Index local files and folders so you can find them from Root Search. Only metadata (names, paths, sizes) is stored — never file contents — and nothing leaves your device. Orbit never indexes a whole drive automatically."
     >
       <Row>
         <Toggle
@@ -353,12 +385,47 @@ function FilesSection(): JSX.Element {
           onChange={(v) => void setEnabled(v)}
         />
       </Row>
+
+      {!enabled && (
+        <p className="settings-note">
+          File search is off, so typing a filename in Root Search won&apos;t return files. Turn it on
+          to index the folders below.
+        </p>
+      )}
+
+      {isFirstRun && (
+        <div className="settings-callout">
+          <p>
+            <strong>No files indexed yet.</strong> Add folders below and rebuild, or index the usual
+            user folders to get started.
+          </p>
+          <button className="settings-btn" disabled={busy} onClick={() => void useDefaults()}>
+            Index Documents, Desktop &amp; Downloads
+          </button>
+        </div>
+      )}
+
       <div className="settings-status">
         <span className={`settings-dot${status?.running ? ' is-on' : ''}`} aria-hidden />
         {status?.running
           ? `Indexing… ${status.indexed.toLocaleString()} items so far`
-          : `${(status?.total ?? 0).toLocaleString()} items indexed`}
+          : `${total.toLocaleString()} items indexed${
+              lastAt > 0 ? ` · last indexed ${new Date(lastAt).toLocaleString()}` : ''
+            }`}
       </div>
+
+      {status && status.unavailable.length > 0 && (
+        <p className="settings-err">
+          ⚠ {status.unavailable.length} folder{status.unavailable.length === 1 ? '' : 's'} could not
+          be found (unavailable drive or deleted folder): {status.unavailable.join(', ')}
+        </p>
+      )}
+      {status && status.errors > 0 && (
+        <p className="settings-note">
+          {status.errors.toLocaleString()} folder{status.errors === 1 ? '' : 's'} could not be read
+          (permission denied) and were skipped.
+        </p>
+      )}
 
       <Field
         label="Indexed folders"
@@ -392,9 +459,12 @@ function FilesSection(): JSX.Element {
           }}
         />
       </Row>
-      <Field label="Index" hint="Rebuild after changing folders. Runs in the background.">
+      <Field label="Index" hint="Rebuild after changing folders. Both run in the background.">
         <button className="settings-btn-ghost" disabled={busy || !enabled} onClick={() => void rebuild()}>
           Rebuild index now
+        </button>
+        <button className="settings-btn-ghost" disabled={busy || total === 0} onClick={() => void clearIndex()}>
+          Clear index
         </button>
       </Field>
       {error && <p className="settings-err">⚠ {error}</p>}
