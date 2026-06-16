@@ -23,6 +23,7 @@ import type { ExtCommandInfo } from './native.js';
 // builtins.ts → native.ts imports the Tauri API; stub it so the module graph
 // loads under Node. The providers exercised here never call invoke().
 vi.mock('@tauri-apps/api/core', () => ({ invoke: async () => undefined }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: async () => () => undefined }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ label: 'launcher' }) }));
 
 // The extension provider is gated to the Tauri shell; pretend we're inside it so
@@ -217,6 +218,10 @@ describe('Root Search discoverability', () => {
     expect((await search('Browse Commands')).map((i) => i.id)).toContain(
       'builtin.commands.browse',
     );
+  });
+
+  it('finds the Agent Control Center for Relay-driven launches', async () => {
+    expect((await search('relay')).map((i) => i.id)).toContain('builtin.agents.center');
   });
 });
 

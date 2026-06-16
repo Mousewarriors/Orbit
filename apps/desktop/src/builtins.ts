@@ -116,6 +116,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'notes' }),
   },
   {
+    definition: def('builtin.agents.center', 'Agent Control Center', 'Agents', 'agentos', {
+      keywords: ['agent', 'agents', 'ai', 'codex', 'claude', 'relay', 'project', 'session', 'launch'],
+      subtitle: 'Launch and track local agent sessions',
+    }),
+    effect: (): EffectResult => ({ pushView: 'agent-center' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',

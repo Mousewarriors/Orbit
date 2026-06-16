@@ -26,8 +26,17 @@ import { QuicklinksView } from './components/QuicklinksView.js';
 import { NotesView } from './components/NotesView.js';
 import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
+import { AgentCenterView } from './components/AgentCenterView.js';
 
-type View = 'root' | 'clipboard' | 'snippets' | 'quicklinks' | 'notes' | 'extension-list' | 'all-commands';
+type View =
+  | 'root'
+  | 'clipboard'
+  | 'snippets'
+  | 'quicklinks'
+  | 'notes'
+  | 'extension-list'
+  | 'all-commands'
+  | 'agent-center';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -268,7 +277,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'quicklinks' ||
           outcome.pushView === 'notes' ||
           outcome.pushView === 'extension-list' ||
-          outcome.pushView === 'all-commands'
+          outcome.pushView === 'all-commands' ||
+          outcome.pushView === 'agent-center'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -332,7 +342,8 @@ export function App(): JSX.Element {
           pushTarget === 'quicklinks' ||
           pushTarget === 'notes' ||
           pushTarget === 'extension-list' ||
-          pushTarget === 'all-commands'
+          pushTarget === 'all-commands' ||
+          pushTarget === 'agent-center'
         ) {
           setViewArg(null);
           setView(pushTarget);
@@ -395,6 +406,10 @@ export function App(): JSX.Element {
         onRunExtension={runExtFromBrowse}
       />
     );
+  }
+
+  if (view === 'agent-center') {
+    return <AgentCenterView onPop={() => setView('root')} />;
   }
 
   return (

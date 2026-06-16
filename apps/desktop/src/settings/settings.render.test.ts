@@ -13,6 +13,7 @@ import { renderToString } from 'react-dom/server';
 import { Settings } from './Settings.js';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: async () => undefined }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: async () => () => undefined }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ label: 'settings' }) }));
 
 const SECTIONS = [

@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code, unused_imports))]
+
 //! Orbit desktop shell — the native Tauri application.
 //!
 //! Responsibilities kept in Rust (never in the renderer):
@@ -13,6 +15,9 @@ mod commands;
 mod extension_host;
 mod file_index;
 mod launcher;
+mod relay_manifest;
+mod relay_protocol;
+mod relay_supervisor;
 mod snippet_watcher;
 mod window_mgmt;
 
@@ -55,6 +60,12 @@ fn focus_launcher(app: &AppHandle) {
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
+    }
+}
+
+fn shutdown_relay(app: &AppHandle) {
+    if let Some(state) = app.try_state::<AppState>() {
+        let _ = state.relay.shutdown(app.clone());
     }
 }
 
@@ -102,7 +113,10 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             "settings" => {
                 let _ = commands::open_settings(app.clone());
             }
-            "quit" => app.exit(0),
+            "quit" => {
+                shutdown_relay(app);
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -118,6 +132,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(not(test))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -200,6 +215,7 @@ pub fn run() {
                 active_shortcut: Mutex::new(shortcut),
                 index: file_index::IndexState::default(),
                 ext_host: extension_host::ExtensionHost::default(),
+                relay: relay_supervisor::RelaySupervisor::default(),
             });
 
             // First run only: install the bundled sample extensions (Developer
@@ -255,6 +271,14 @@ pub fn run() {
             }
 
             build_tray(&handle)?;
+
+            // Start the certified Relay sidecar in the background. Orbit startup
+            // must remain usable even if Relay is missing, slow or degraded.
+            if let Some(state) = app.try_state::<AppState>() {
+                if let Err(error) = state.relay.start(handle.clone()) {
+                    eprintln!("[orbit] relay startup failed: {error}");
+                }
+            }
 
             // Start watching the clipboard for history.
             clipboard_monitor::spawn(handle.clone());
@@ -369,10 +393,31 @@ pub fn run() {
             commands::hide_launcher,
             commands::get_autostart,
             commands::set_autostart,
+            commands::relay_status,
+            commands::relay_health,
+            commands::relay_capabilities,
+            commands::relay_list_agents,
+            commands::relay_get_agent,
+            commands::relay_scan_projects,
+            commands::relay_inspect_project,
+            commands::relay_create_launch_plan,
+            commands::relay_execute_launch,
+            commands::relay_list_sessions,
+            commands::relay_get_session,
+            commands::relay_stop_session,
+            commands::relay_create_handoff,
+            commands::relay_validate_handoff,
+            commands::relay_list_events,
+            commands::relay_restart,
             commands::quit_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Orbit");
+        .build(tauri::generate_context!())
+        .expect("error while building Orbit")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                shutdown_relay(app);
+            }
+        });
 }
 
 #[cfg(test)]
@@ -391,6 +436,7 @@ mod tests {
             active_shortcut: Mutex::new(None),
             index: file_index::IndexState::default(),
             ext_host: extension_host::ExtensionHost::default(),
+            relay: relay_supervisor::RelaySupervisor::default(),
         }
     }
 
@@ -467,6 +513,7 @@ mod tests {
             active_shortcut: Mutex::new(None),
             index: file_index::IndexState::default(),
             ext_host: extension_host::ExtensionHost::default(),
+            relay: relay_supervisor::RelaySupervisor::default(),
         };
 
         // Phase 3: write flag via state (mirrors post-manage() code path)

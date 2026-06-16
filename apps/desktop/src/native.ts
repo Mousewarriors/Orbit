@@ -4,6 +4,7 @@
  * so the boundary stays auditable and mockable in tests.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export interface NativeApp {
@@ -469,4 +470,157 @@ export async function setAutostart(enabled: boolean): Promise<void> {
 
 export async function quitApp(): Promise<void> {
   return invoke('quit_app');
+}
+
+// --- Orbit Relay ---
+
+export type RelaySupervisorState =
+  | 'stopped'
+  | 'starting'
+  | 'awaiting-ready'
+  | 'ready'
+  | 'degraded'
+  | 'restarting'
+  | 'incompatible'
+  | 'failed'
+  | 'shutting-down';
+
+export interface RelayReadyPayload {
+  implementationVersion: string;
+  protocolVersion: string;
+  minimumClientProtocolVersion: string;
+  protocolCompatibilityRange: string | null;
+  maxRequestLineBytes: number | null;
+  methods: string[];
+  notifications: string[];
+  capabilities: string[];
+}
+
+export interface RelayExpectedMetadata {
+  relayVersion: string;
+  protocolVersion: string;
+  minimumClientProtocolVersion: string;
+  protocolCompatibilityRange: string;
+  targetTriple: string;
+  sidecarName: string;
+  sidecarFileName: string;
+  certifiedCommit: string;
+  expectedSha256: string;
+}
+
+export interface RelayStatus {
+  state: RelaySupervisorState;
+  expected: RelayExpectedMetadata;
+  userMessage: string;
+  technicalDetail: string | null;
+  diagnostics: string[];
+  ready: RelayReadyPayload | null;
+  health: unknown | null;
+  capabilities: unknown | null;
+  missingMethods: string[];
+  pid: number | null;
+  sidecarPath: string | null;
+  sidecarSha256: string | null;
+  pendingRequests: number;
+  lastExitCode: number | null;
+  lastStateChangeMs: number;
+}
+
+export type RelayRecord = Record<string, unknown>;
+
+export async function relayStatus(): Promise<RelayStatus> {
+  return invoke<RelayStatus>('relay_status');
+}
+
+export async function relayHealth(): Promise<unknown> {
+  return invoke<unknown>('relay_health');
+}
+
+export async function relayCapabilities(): Promise<unknown> {
+  return invoke<unknown>('relay_capabilities');
+}
+
+export async function relayListAgents(): Promise<unknown> {
+  return invoke<unknown>('relay_list_agents');
+}
+
+export async function relayGetAgent(agentId: string): Promise<unknown> {
+  return invoke<unknown>('relay_get_agent', { agentId });
+}
+
+export async function relayScanProjects(root: string | null): Promise<unknown> {
+  return invoke<unknown>('relay_scan_projects', { root });
+}
+
+export async function relayInspectProject(path: string): Promise<unknown> {
+  return invoke<unknown>('relay_inspect_project', { path });
+}
+
+export async function relayCreateLaunchPlan(
+  agentId: string,
+  projectPath: string,
+): Promise<unknown> {
+  return invoke<unknown>('relay_create_launch_plan', { agentId, projectPath });
+}
+
+export async function relayExecuteLaunch(planId: string, confirm: boolean): Promise<unknown> {
+  return invoke<unknown>('relay_execute_launch', { planId, confirm });
+}
+
+export async function relayListSessions(): Promise<unknown> {
+  return invoke<unknown>('relay_list_sessions');
+}
+
+export async function relayGetSession(sessionId: string): Promise<unknown> {
+  return invoke<unknown>('relay_get_session', { sessionId });
+}
+
+export async function relayStopSession(sessionId: string): Promise<unknown> {
+  return invoke<unknown>('relay_stop_session', { sessionId });
+}
+
+export async function relayCreateHandoff(input: {
+  projectPath: string;
+  fromAgentId: string;
+  toAgentId: string;
+  objective: string | null;
+}): Promise<unknown> {
+  return invoke<unknown>('relay_create_handoff', input);
+}
+
+export async function relayValidateHandoff(path: string): Promise<unknown> {
+  return invoke<unknown>('relay_validate_handoff', { path });
+}
+
+export async function relayListEvents(): Promise<unknown> {
+  return invoke<unknown>('relay_list_events');
+}
+
+export async function relayRestart(): Promise<RelayStatus> {
+  return invoke<RelayStatus>('relay_restart');
+}
+
+export async function onRelayStateChanged(
+  handler: (status: RelayStatus) => void,
+): Promise<UnlistenFn> {
+  return listen<RelayStatus>('relay-state-changed', (event) => handler(event.payload));
+}
+
+export async function onRelayDiagnosticsUpdated(
+  handler: (status: RelayStatus) => void,
+): Promise<UnlistenFn> {
+  return listen<RelayStatus>('relay-diagnostics-updated', (event) => handler(event.payload));
+}
+
+export async function onRelaySessionEvent(
+  handler: (payload: unknown) => void,
+): Promise<UnlistenFn[]> {
+  const names = [
+    'relay-session-started',
+    'relay-session-changed',
+    'relay-session-completed',
+    'relay-session-failed',
+    'relay-session-stopped',
+  ];
+  return Promise.all(names.map((name) => listen<unknown>(name, (event) => handler(event.payload))));
 }

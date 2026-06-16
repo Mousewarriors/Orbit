@@ -37,6 +37,8 @@ pub struct AppState {
     pub index: crate::file_index::IndexState,
     /// Extension host (discovery, isolated child processes, brokering).
     pub ext_host: crate::extension_host::ExtensionHost,
+    /// Certified Orbit Relay sidecar supervisor.
+    pub relay: crate::relay_supervisor::RelaySupervisor,
 }
 
 fn now_ms() -> i64 {
@@ -897,7 +899,206 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Orbit Relay
+// ---------------------------------------------------------------------------
+
+fn validate_relay_id(label: &str, value: &str) -> Result<(), String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.len() > 200 {
+        return Err(format!("invalid {label}"));
+    }
+    Ok(())
+}
+
+fn validate_relay_path(label: &str, value: &str) -> Result<(), String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.len() > 4096 {
+        return Err(format!("invalid {label}"));
+    }
+    Ok(())
+}
+
+fn relay_request(
+    state: State<'_, AppState>,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    state
+        .relay
+        .request(method, params)
+        .map_err(|error| error.display_message())
+}
+
 #[tauri::command]
-pub fn quit_app(app: AppHandle) {
+pub fn relay_status(
+    state: State<'_, AppState>,
+) -> crate::relay_supervisor::RelayStatusSnapshot {
+    state.relay.status()
+}
+
+#[tauri::command]
+pub fn relay_health(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    relay_request(state, "relay.health", serde_json::Value::Null)
+}
+
+#[tauri::command]
+pub fn relay_capabilities(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    relay_request(state, "relay.capabilities", serde_json::Value::Null)
+}
+
+#[tauri::command]
+pub fn relay_list_agents(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    relay_request(state, "agents.list", serde_json::Value::Null)
+}
+
+#[tauri::command]
+pub fn relay_get_agent(
+    state: State<'_, AppState>,
+    agent_id: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_id("agent id", &agent_id)?;
+    relay_request(state, "agents.get", serde_json::json!({ "agentId": agent_id }))
+}
+
+#[tauri::command]
+pub fn relay_scan_projects(
+    state: State<'_, AppState>,
+    root: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let params = if let Some(root) = root {
+        validate_relay_path("project scan root", &root)?;
+        serde_json::json!({ "root": root })
+    } else {
+        serde_json::json!({})
+    };
+    relay_request(state, "projects.scan", params)
+}
+
+#[tauri::command]
+pub fn relay_inspect_project(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_path("project path", &path)?;
+    relay_request(state, "projects.inspect", serde_json::json!({ "path": path }))
+}
+
+#[tauri::command]
+pub fn relay_create_launch_plan(
+    state: State<'_, AppState>,
+    agent_id: String,
+    project_path: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_id("agent id", &agent_id)?;
+    validate_relay_path("project path", &project_path)?;
+    relay_request(
+        state,
+        "launch.plan",
+        serde_json::json!({ "agentId": agent_id, "project": project_path }),
+    )
+}
+
+#[tauri::command]
+pub fn relay_execute_launch(
+    state: State<'_, AppState>,
+    plan_id: String,
+    confirm: bool,
+) -> Result<serde_json::Value, String> {
+    validate_relay_id("plan id", &plan_id)?;
+    if !confirm {
+        return Err("launch execution requires explicit confirmation".into());
+    }
+    relay_request(
+        state,
+        "launch.execute",
+        serde_json::json!({ "planId": plan_id, "confirm": true }),
+    )
+}
+
+#[tauri::command]
+pub fn relay_list_sessions(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    relay_request(state, "sessions.list", serde_json::Value::Null)
+}
+
+#[tauri::command]
+pub fn relay_get_session(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_id("session id", &session_id)?;
+    relay_request(
+        state,
+        "sessions.get",
+        serde_json::json!({ "sessionId": session_id }),
+    )
+}
+
+#[tauri::command]
+pub fn relay_stop_session(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_id("session id", &session_id)?;
+    relay_request(
+        state,
+        "sessions.stop",
+        serde_json::json!({ "sessionId": session_id }),
+    )
+}
+
+#[tauri::command]
+pub fn relay_create_handoff(
+    state: State<'_, AppState>,
+    project_path: String,
+    from_agent_id: String,
+    to_agent_id: String,
+    objective: Option<String>,
+) -> Result<serde_json::Value, String> {
+    validate_relay_path("project path", &project_path)?;
+    validate_relay_id("source agent id", &from_agent_id)?;
+    validate_relay_id("target agent id", &to_agent_id)?;
+    if let Some(objective) = objective.as_ref() {
+        if objective.len() > 4000 {
+            return Err("handoff objective is too long".into());
+        }
+    }
+    relay_request(
+        state,
+        "handoffs.create",
+        serde_json::json!({
+            "project": project_path,
+            "fromAgentId": from_agent_id,
+            "toAgentId": to_agent_id,
+            "objective": objective
+        }),
+    )
+}
+
+#[tauri::command]
+pub fn relay_validate_handoff(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<serde_json::Value, String> {
+    validate_relay_path("handoff path", &path)?;
+    relay_request(state, "handoffs.validate", serde_json::json!({ "path": path }))
+}
+
+#[tauri::command]
+pub fn relay_list_events(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    relay_request(state, "events.list", serde_json::Value::Null)
+}
+
+#[tauri::command]
+pub fn relay_restart(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<crate::relay_supervisor::RelayStatusSnapshot, String> {
+    state.relay.restart(app)
+}
+
+#[tauri::command]
+pub fn quit_app(app: AppHandle, state: State<'_, AppState>) {
+    let _ = state.relay.shutdown(app.clone());
     app.exit(0);
 }
