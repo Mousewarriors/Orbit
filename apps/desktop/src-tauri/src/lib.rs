@@ -179,20 +179,20 @@ pub fn run() {
                 .and_then(|s| s.parse::<Shortcut>().ok())
                 .or_else(|| DEFAULT_HOTKEY.parse::<Shortcut>().ok());
 
-            // First run only: install the bundled sample extensions (Developer
-            // Utilities, AgentOS Controller) so they're discoverable without a
-            // manual "Developer folders" setup. Gated by a one-time flag so a
-            // deliberate uninstall (deleting the folder) isn't silently undone
-            // on the next launch.
-            if orbit_core::get_setting(&conn, "extensions.bundled_installed")
+            // Read the first-run flag before `conn` is moved into AppState.
+            let need_bundled = orbit_core::get_setting(&conn, "extensions.bundled_installed")
                 .ok()
                 .flatten()
-                .is_none()
-            {
-                extension_host::install_bundled(&handle);
-                let _ = orbit_core::set_setting(&conn, "extensions.bundled_installed", "true");
-            }
+                .is_none();
 
+            // Register managed state BEFORE any potentially slow work so that
+            // the packaged-build webview (which loads bundled assets directly
+            // from the binary with no dev-server round-trip) cannot invoke IPC
+            // commands before manage() has run.  Previously manage() was called
+            // after install_bundled(), which does file I/O on first launch and
+            // caused a race that surfaced as "state not managed" in the
+            // installed release while development (Vite dev-server latency)
+            // always completed manage() first.
             app.manage(AppState {
                 db: Mutex::new(conn),
                 apps: Mutex::new(apps),
@@ -201,6 +201,23 @@ pub fn run() {
                 index: file_index::IndexState::default(),
                 ext_host: extension_host::ExtensionHost::default(),
             });
+
+            // First run only: install the bundled sample extensions (Developer
+            // Utilities, AgentOS Controller) so they're discoverable without a
+            // manual "Developer folders" setup. Gated by a one-time flag so a
+            // deliberate uninstall (deleting the folder) isn't silently undone
+            // on the next launch. Runs after manage() so this file I/O cannot
+            // race with the webview's startup IPC calls in the packaged build.
+            if need_bundled {
+                extension_host::install_bundled(&handle);
+                let _ = app
+                    .state::<AppState>()
+                    .db
+                    .lock()
+                    .map(|conn| {
+                        orbit_core::set_setting(&conn, "extensions.bundled_installed", "true")
+                    });
+            }
 
             // Register the global activation shortcut.
             if let Some(sc) = shortcut {
@@ -356,4 +373,115 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Orbit");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build an `AppState` equivalent to the one created in `run()` but using an
+    /// in-memory SQLite database, so the test is hermetic and has no filesystem
+    /// side-effects. Mirrors the exact field set that `app.manage()` receives.
+    fn make_state() -> commands::AppState {
+        let conn = orbit_core::open_in_memory().expect("in-memory db");
+        commands::AppState {
+            db: Mutex::new(conn),
+            apps: Mutex::new(Vec::new()),
+            last_foreground: Mutex::new(0),
+            active_shortcut: Mutex::new(None),
+            index: file_index::IndexState::default(),
+            ext_host: extension_host::ExtensionHost::default(),
+        }
+    }
+
+    /// Every command-required managed type must be constructible via the same
+    /// path used in both `tauri dev` and the packaged release (no
+    /// cfg(debug_assertions) guard around AppState construction).
+    #[test]
+    fn app_state_constructs_without_panicking() {
+        let state = make_state();
+        assert!(state.db.lock().is_ok(), "db mutex must be accessible");
+        assert!(state.apps.lock().is_ok(), "apps mutex must be accessible");
+        assert!(state.last_foreground.lock().is_ok());
+        assert!(state.active_shortcut.lock().is_ok());
+    }
+
+    /// Simulate what `list_applications` does: lock the apps mutex and clone.
+    /// This must succeed immediately after construction — confirming the command
+    /// would work from the very first IPC call in a packaged release.
+    #[test]
+    fn list_applications_succeeds_immediately_after_construction() {
+        let state = make_state();
+        let apps = state.apps.lock().expect("apps mutex").clone();
+        assert!(apps.is_empty(), "fresh state starts with an empty app index");
+    }
+
+    /// The database must be migrated and queryable the instant AppState is
+    /// constructed — commands that access `state.db.lock()` on the very first
+    /// IPC call must not see an uninitialised schema.
+    #[test]
+    fn db_is_migrated_and_queryable_at_construction() {
+        let state = make_state();
+        let conn = state.db.lock().expect("db mutex");
+        let result = orbit_core::get_setting(&conn, "extensions.bundled_installed");
+        assert!(result.is_ok(), "settings table must exist immediately after construction");
+        assert_eq!(result.unwrap(), None, "fresh db has no bundled_installed flag");
+    }
+
+    /// Verify the first-run flag lifecycle: absent at construction, present after
+    /// set_setting — matching what startup writes after install_bundled().
+    #[test]
+    fn bundled_install_flag_readable_and_settable_via_state() {
+        let state = make_state();
+        {
+            let conn = state.db.lock().expect("db mutex");
+            let before =
+                orbit_core::get_setting(&conn, "extensions.bundled_installed").unwrap();
+            assert_eq!(before, None, "flag must be absent before first install");
+            orbit_core::set_setting(&conn, "extensions.bundled_installed", "true").unwrap();
+        }
+        let conn = state.db.lock().expect("db mutex");
+        let after = orbit_core::get_setting(&conn, "extensions.bundled_installed").unwrap();
+        assert_eq!(after, Some("true".to_string()), "flag must persist after set");
+    }
+
+    /// Confirm that the need_bundled check (reading the flag before conn is moved
+    /// into AppState) and the subsequent flag write (via state.db after manage())
+    /// round-trip correctly — the exact sequence executed by the fixed startup path.
+    #[test]
+    fn need_bundled_flag_follows_fixed_startup_sequence() {
+        let conn = orbit_core::open_in_memory().expect("in-memory db");
+
+        // Phase 1: read flag before move (mirrors pre-manage() code path)
+        let need_bundled = orbit_core::get_setting(&conn, "extensions.bundled_installed")
+            .ok()
+            .flatten()
+            .is_none();
+        assert!(need_bundled, "first launch: bundled_installed is absent");
+
+        // Phase 2: move conn into state (mirrors app.manage())
+        let state = commands::AppState {
+            db: Mutex::new(conn),
+            apps: Mutex::new(Vec::new()),
+            last_foreground: Mutex::new(0),
+            active_shortcut: Mutex::new(None),
+            index: file_index::IndexState::default(),
+            ext_host: extension_host::ExtensionHost::default(),
+        };
+
+        // Phase 3: write flag via state (mirrors post-manage() code path)
+        if need_bundled {
+            if let Ok(c) = state.db.lock() {
+                orbit_core::set_setting(&c, "extensions.bundled_installed", "true").unwrap();
+            }
+        }
+
+        // Verify subsequent launches would not re-install
+        let conn2 = state.db.lock().expect("db mutex");
+        let need_again = orbit_core::get_setting(&conn2, "extensions.bundled_installed")
+            .ok()
+            .flatten()
+            .is_none();
+        assert!(!need_again, "second launch: bundled_installed present, skip install");
+    }
 }

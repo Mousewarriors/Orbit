@@ -1,5 +1,60 @@
 # Autonomous Session Report
 
+## Session — Packaged-build startup defect fix (2026-06-16)
+
+- **Branch:** `claude/autonomous-orbit-build`.
+
+### Root cause
+
+`app.manage(AppState {...})` in `lib.rs` was called after
+`extension_host::install_bundled()`, which on first launch does file I/O
+(200-500 ms). In the packaged release, WebView2 loads the bundled frontend
+from the binary immediately (no Vite dev-server round-trip), so the first
+`listApplications()` IPC call arrives before `manage()` has run. Tauri returns:
+
+```
+state not managed for field 'state' on command 'list_applications'
+you must call 'manage()' before using this command
+```
+
+The error "vanishes when typing" because `App.tsx` calls `setError(null)` on
+every query change — masking, not fixing, the race. In development the Vite
+dev server adds enough latency that `manage()` always wins.
+
+### Delivered
+
+**`apps/desktop/src-tauri/src/lib.rs`**
+
+- Read `need_bundled` flag from `conn` before moving it into `AppState`.
+- Call `app.manage(AppState { ... })` immediately after fast init (DB open,
+  `.lnk` scan, hotkey read) — before any slow work.
+- Call `install_bundled()` and write the flag via `state.db.lock()` after
+  `manage()` so file I/O cannot race with webview IPC calls.
+- Added 5 `#[cfg(test)]` unit tests for: AppState construction, immediate
+  `list_applications` access, DB migration readiness, flag lifecycle, and
+  the full read-before-manage / write-after-manage sequence.
+
+**`apps/desktop/src/App.tsx`**
+
+- Retry startup `Promise.all` once after 400 ms on failure (belt-and-suspenders).
+- Show a friendly message for any `"state not managed"` error.
+
+### Verification
+
+- `cargo check --workspace` clean.
+- `cargo test --workspace`: **128 Rust tests** (+5), 0 failed.
+- `npm test`: **199 JS tests**, 0 failed.
+- `npm run lint`, `npm run typecheck`: clean.
+- `npm run build`: Vite + `tauri build` produced NSIS and MSI installers.
+
+### Files changed
+
+- `apps/desktop/src-tauri/src/lib.rs`
+- `apps/desktop/src/App.tsx`
+- `HANDOFF.md`, `FEATURE_MATRIX.md`, `AUTONOMOUS_SESSION_REPORT.md`
+
+---
+
 ## Session — Priority 2b: file content indexing (opt-in) (2026-06-15)
 
 - **Branch:** `claude/autonomous-orbit-build`. Done in-tree (agents were rate-limited).

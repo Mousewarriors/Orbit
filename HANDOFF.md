@@ -210,6 +210,34 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > indexing + fs watcher), P6 (Notes/Quicklinks live-GUI reverify), extension
 > uninstall, CI, code-signing + auto-update.
 
+> **Update (session 6, 2026-06-16) — Packaged-build startup defect (managed-state
+> race condition).**
+> **Root cause:** `app.manage(AppState {...})` in `lib.rs` was called *after*
+> `extension_host::install_bundled()`, which on first launch copies bundled
+> extension files (file I/O, potentially 200–500 ms). In the packaged release,
+> WebView2 loads the bundled frontend directly from the binary with no Vite
+> dev-server round-trip, so the renderer's first `listApplications()` IPC call
+> arrives before `manage()` has run.  Tauri returns the raw error
+> `"state not managed for field 'state' on command 'list_applications'"`.
+> In development the Vite dev server adds enough latency that `manage()` always
+> completes first — the bug was invisible there.
+> **Why it "disappears" when typing:** `App.tsx` clears any `error` state on every
+> query change via `setError(null)`, masking the startup error without resolving it.
+> **Fix:** read the `need_bundled` flag from `conn` before moving it into
+> `AppState`, call `app.manage()` immediately (before `install_bundled`), then
+> install extensions and update the flag via `state.db.lock()` after manage.
+> **Belt-and-suspenders front-end:** `App.tsx` startup load retries once after
+> 400 ms if the initial `listApplications()` / `usageSnapshot()` call fails, and
+> surfaces a friendly message for any residual `"state not managed"` error instead
+> of the raw Tauri internal string.
+> **Tests added** (`lib.rs` `#[cfg(test)]`): 5 new Rust tests covering AppState
+> construction, `list_applications` access immediately after construction, DB
+> migration-readiness, flag lifecycle, and the complete need_bundled→manage→set
+> sequence.
+> **Counts: 199 JS tests / 128 Rust tests** (+5); `cargo check --workspace`,
+> lint, strict typecheck, `vite build`, and `tauri build` (NSIS + MSI) all green.
+> `target\release\bundle\nsis\Orbit_0.1.0_x64-setup.exe` produced.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

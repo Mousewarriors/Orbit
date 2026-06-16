@@ -94,18 +94,39 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!native.isTauri()) return;
     void (async () => {
-      try {
-        const [apps, snapshot, extCommands] = await Promise.all([
+      const loadAll = () =>
+        Promise.all([
           native.listApplications(),
           native.usageSnapshot(),
-          native.extensionCommands().catch(() => []),
+          native.extensionCommands().catch((): native.ExtCommandInfo[] => []),
         ]);
+      try {
+        // On a packaged release the bundled frontend loads directly from the
+        // binary with no dev-server round-trip, so it can fire IPC before
+        // Tauri finishes registering managed state.  The root fix moves
+        // manage() earlier in lib.rs; this retry is belt-and-suspenders for
+        // any residual timing gap and for future regressions.
+        let result: Awaited<ReturnType<typeof loadAll>>;
+        try {
+          result = await loadAll();
+        } catch {
+          await new Promise<void>((r) => setTimeout(r, 400));
+          result = await loadAll();
+        }
+        const [apps, snapshot, extCommands] = result;
         appsRef.current = apps;
         extCommandsRef.current = extCommands;
         signalsRef.current = buildSignals(snapshot);
         void doSearch(query);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        const raw = e instanceof Error ? e.message : String(e);
+        // Avoid surfacing raw Tauri internals (e.g. "state not managed for
+        // field 'state' on command 'list_applications'").
+        setError(
+          raw.includes('state not managed')
+            ? 'Orbit is still starting up — please close and reopen the launcher.'
+            : raw,
+        );
       }
     })();
     // The fast startup scan (Start Menu `.lnk` only) is replaced a moment later
