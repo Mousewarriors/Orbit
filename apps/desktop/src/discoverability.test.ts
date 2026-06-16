@@ -169,6 +169,55 @@ describe('Root Search discoverability', () => {
     const calc = (await search(query)).find((i) => i.id === 'calc.result');
     expect(calc?.title).toBe(expected);
   });
+
+  it('generates a UUID via command name "Generate UUID"', async () => {
+    const uuid = (await search('Generate UUID')).find((i) => i.id === 'tool.uuid');
+    expect(uuid).toBeDefined();
+    expect(uuid?.title).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it('generates a password via command name "Generate Password"', async () => {
+    const pw = (await search('Generate Password')).find((i) => i.id === 'tool.password');
+    expect(pw).toBeDefined();
+    expect(pw?.title.length).toBeGreaterThan(8);
+  });
+
+  it('converts colour via command-name prefix "Convert Colour #00ff00"', async () => {
+    const ids = (await search('Convert Colour #00ff00')).map((i) => i.id);
+    expect(ids).toContain('tool.color.hex');
+  });
+
+  it('formats JSON via command name "Format JSON"', async () => {
+    const ids = (await search('Format JSON {"x":1}')).map((i) => i.id);
+    expect(ids).toContain('tool.json');
+  });
+
+  it('validates JSON via command name "Validate JSON"', async () => {
+    const item = (await search('Validate JSON {"x":1}')).find((i) => i.id === 'tool.json.valid');
+    expect(item).toBeDefined();
+    expect(item?.title).toBe('Valid JSON');
+  });
+
+  it('shows Developer Utilities browse when typing "Developer Utilities"', async () => {
+    const items = await search('Developer Utilities');
+    const titles = items.map((i) => i.title);
+    expect(titles).toContain('Generate UUID');
+    expect(titles).toContain('Generate Password');
+    expect(titles).toContain('Format JSON');
+    expect(titles).toContain('Validate JSON');
+    expect(titles).toContain('Convert Colour');
+  });
+
+  it('shows Developer Utilities browse when typing "dev utilities"', async () => {
+    const items = await search('dev utilities');
+    expect(items.map((i) => i.title)).toContain('Generate UUID');
+  });
+
+  it('finds "Browse Commands" builtin', async () => {
+    expect((await search('Browse Commands')).map((i) => i.id)).toContain(
+      'builtin.commands.browse',
+    );
+  });
 });
 
 describe('Root Search resilience', () => {

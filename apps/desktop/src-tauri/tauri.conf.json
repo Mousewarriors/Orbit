@@ -61,7 +61,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../../extensions/examples": "extensions/examples"
+      "../../../extensions/examples": "extensions/examples",
+      "../../../packages/extension-sdk": "extensions/sdk"
     },
     "publisher": "Orbit Labs",
     "copyright": "© Orbit Labs",

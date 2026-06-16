@@ -412,7 +412,7 @@ export function createToolsProvider(): SearchProvider {
       const lower = q.toLowerCase();
       const items: SearchItem[] = [];
 
-      if (/^(developer\s+utilities|dev\s*(utilities|utils|tools)?)$/.test(lower)) {
+      if (/^(developer\s+utilities|dev\s*(utilities|utils))$/.test(lower)) {
         return developerUtilityItems();
       }
 

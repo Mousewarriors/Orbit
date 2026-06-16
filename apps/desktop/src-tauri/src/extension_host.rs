@@ -199,6 +199,31 @@ fn bundled_extensions_dir(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
+/// Locate the `@orbit/extension-sdk` package to copy into the shared
+/// `node_modules` directory next to installed extensions, so extensions can
+/// import it via bare-specifier ESM without bundling it themselves.
+///
+/// In a packaged build the SDK is bundled as a resource at `extensions/sdk`;
+/// in development it's read from the workspace at `packages/extension-sdk`.
+fn extension_sdk_dir(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(res) = app.path().resource_dir() {
+        let p = res.join("extensions").join("sdk");
+        if p.join("index.mjs").exists() {
+            return Some(p);
+        }
+    }
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("packages")
+        .join("extension-sdk");
+    if dev.join("index.mjs").exists() {
+        return Some(dev);
+    }
+    None
+}
+
 /// Recursively copy a directory tree (std-only; small extension folders).
 fn copy_dir(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dest)?;
@@ -241,6 +266,17 @@ pub fn install_bundled(app: &AppHandle) -> Vec<String> {
         let src = src_root.join(name);
         if src.join("manifest.json").exists() && copy_dir(&src, &dest).is_ok() {
             installed.push((*name).to_string());
+        }
+    }
+    // Install the shared SDK so extensions can `import from '@orbit/extension-sdk'`
+    // via ESM directory-tree resolution without bundling it themselves.
+    let sdk_dest = dest_root
+        .join("node_modules")
+        .join("@orbit")
+        .join("extension-sdk");
+    if !sdk_dest.exists() {
+        if let Some(sdk_src) = extension_sdk_dir(app) {
+            let _ = copy_dir(&sdk_src, &sdk_dest);
         }
     }
     installed
