@@ -36,9 +36,18 @@ import {
 export interface ControlCenterViewProps {
   readonly onPop: () => void;
   readonly initialTab?: ControlCenterTab | undefined;
+  /** A resolved project path to pre-select (and continue, on the Launch tab). */
+  readonly initialProject?: string | undefined;
+  /** A status substring to pre-filter the Sessions list (e.g. 'failed'). */
+  readonly initialSessionStatus?: string | undefined;
 }
 
-export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps): JSX.Element {
+export function ControlCenterView({
+  onPop,
+  initialTab,
+  initialProject,
+  initialSessionStatus,
+}: ControlCenterViewProps): JSX.Element {
   const [tab, setTab] = useState<ControlCenterTab>(initialTab ?? 'projects');
   const [status, setStatus] = useState<native.RelayStatus | null>(null);
   const [agents, setAgents] = useState<RelayObject[]>([]);
@@ -46,7 +55,7 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
   const [sessions, setSessions] = useState<RelayObject[]>([]);
   const [events, setEvents] = useState<RelayObject[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedProject, setSelectedProject] = useState<string>(initialProject ?? '');
   const [projectRoot, setProjectRoot] = useState('');
   const [rootHydrated, setRootHydrated] = useState(false);
   const [inspection, setInspection] = useState<RelayObject | null>(null);
@@ -55,7 +64,9 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tabErrors, setTabErrors] = useState<Partial<Record<ControlCenterTab, string>>>({});
-  const [continuationProject, setContinuationProject] = useState<string | null>(null);
+  const [continuationProject, setContinuationProject] = useState<string | null>(
+    initialTab === 'launch' && initialProject ? initialProject : null,
+  );
   const mountedRef = useRef(true);
   const eventPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -271,6 +282,14 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
     void loadInitialRelayData();
   }, [loadInitialRelayData]);
 
+  // Record recency for a project reached via a natural-language deep-link
+  // ("Continue Orbit", "Open the Orbit project") so it surfaces in Recent next time.
+  useEffect(() => {
+    if (initialProject && native.isTauri()) {
+      void native.projectMetaTouch(initialProject).catch(() => {});
+    }
+  }, [initialProject]);
+
   useEffect(() => {
     if (!native.isTauri()) return;
     let cancelled = false;
@@ -465,6 +484,7 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
           busy={busy}
           stopSession={stopSession}
           tabError={tabErrors['sessions'] ?? null}
+          initialStatusFilter={initialSessionStatus}
         />
       </TabPanel>
 
@@ -574,10 +594,15 @@ function ProjectsPanel({
     void native.projectMetaGet(selectedProject).then(setSelectedMeta).catch(() => setSelectedMeta(null));
   }, [selectedProject]);
 
-  const selected = useMemo(
-    () => projects.find((p) => projectPath(p) === selectedProject) ?? null,
-    [projects, selectedProject],
-  );
+  const selected = useMemo(() => {
+    const found = projects.find((p) => projectPath(p) === selectedProject) ?? null;
+    if (found || !selectedProject) return found;
+    // Synthesize a minimal record so a project chosen from Recent/Favourites or
+    // reached via a natural-language deep-link ("Open the Orbit project") shows
+    // its detail and actions without first requiring a scan.
+    const meta = [...recentMeta, ...favMeta].find((m) => m.path === selectedProject);
+    return { path: selectedProject, name: meta?.name ?? null } as RelayObject;
+  }, [projects, selectedProject, recentMeta, favMeta]);
 
   const filteredProjects = useMemo(() => {
     if (!filter.trim()) return projects;
@@ -1091,19 +1116,40 @@ function SessionsPanel({
   busy,
   stopSession,
   tabError,
+  initialStatusFilter,
 }: {
   readonly sessions: RelayObject[];
   readonly busy: string | null;
   readonly stopSession: (id: string) => Promise<void>;
   readonly tabError: string | null;
+  readonly initialStatusFilter?: string | undefined;
 }): JSX.Element {
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? '');
+
+  const filtered = useMemo(() => {
+    const f = statusFilter.trim().toLowerCase();
+    if (!f) return sessions;
+    return sessions.filter((s) => (recordString(s, 'status') ?? '').toLowerCase().includes(f));
+  }, [sessions, statusFilter]);
+
   return (
     <div className="relay-session-list">
       {tabError && <div className="relay-tab-error">{tabError}</div>}
-      {sessions.length === 0 ? (
-        <div className="relay-empty">No sessions</div>
+      <input
+        className="relay-input"
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        placeholder="Filter by status (e.g. running, failed)…"
+        aria-label="Filter sessions by status"
+      />
+      {filtered.length === 0 ? (
+        <div className="relay-empty">
+          {sessions.length === 0
+            ? 'No sessions'
+            : `No sessions match "${statusFilter}"`}
+        </div>
       ) : (
-        sessions.map((session) => {
+        filtered.map((session) => {
           const id = sessionId(session);
           const stoppable = canStopSession(session);
           return (

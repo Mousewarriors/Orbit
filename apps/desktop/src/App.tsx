@@ -15,6 +15,7 @@ import {
   createSnippetProvider,
   createToolsProvider,
 } from './providers.js';
+import { createIntentProvider } from './intentProvider.js';
 import { executeAction, type EffectResult } from './execute.js';
 import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
@@ -28,7 +29,7 @@ import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
-import type { ControlCenterTab } from './controlCenterState.js';
+import { decodeControlCenterArg } from './controlCenterState.js';
 
 type View =
   | 'root'
@@ -69,6 +70,7 @@ export function App(): JSX.Element {
   const { notifications, dismiss: dismissNotification } = useNotifications();
 
   const appsRef = useRef<native.NativeApp[]>([]);
+  const projectsRef = useRef<Array<{ path: string; name: string | null }>>([]);
   const extCommandsRef = useRef<native.ExtCommandInfo[]>([]);
   const signalsRef = useRef<RankingSignals>(buildSignals([]));
   const searchAbort = useRef<AbortController | null>(null);
@@ -86,10 +88,38 @@ export function App(): JSX.Element {
       createFileProvider(),
       createToolsProvider(),
       createExtensionProvider(() => extCommandsRef.current),
+      createIntentProvider({
+        getApps: () => appsRef.current,
+        getProjects: () => projectsRef.current,
+        fileSearch: async (q, limit) =>
+          native.isTauri() ? native.fileSearch(q, { limit }) : [],
+        noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
+        webSearchUrl: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+      }),
       createCalculatorProvider(),
     ],
     [registry],
   );
+
+  // Keep a cached recent ∪ favourite project list for natural-language project
+  // resolution ("Continue Orbit", "Open the Orbit project"). Favourites first,
+  // then recents, deduped by path.
+  const refreshProjects = useCallback(async () => {
+    if (!native.isTauri()) return;
+    try {
+      const [favourites, recent] = await Promise.all([
+        native.projectMetaListFavourites().catch((): native.ProjectMeta[] => []),
+        native.projectMetaListRecent(30).catch((): native.ProjectMeta[] => []),
+      ]);
+      const byPath = new Map<string, { path: string; name: string | null }>();
+      for (const p of [...favourites, ...recent]) {
+        if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, name: p.name });
+      }
+      projectsRef.current = [...byPath.values()];
+    } catch {
+      // Keep the previous cache on failure.
+    }
+  }, []);
 
   // Refresh the cached application list from native (picks up the background
   // UWP/Store scan — `list_applications` returns whatever the native app index
@@ -145,6 +175,7 @@ export function App(): JSX.Element {
     // The fast startup scan (Start Menu `.lnk` only) is replaced a moment later
     // by a background scan that also enumerates UWP/Store apps (e.g. Calculator)
     // via `Get-StartApps`; re-fetch once that's had time to finish.
+    void refreshProjects();
     const timer = setTimeout(() => void refreshApps(), 2000);
     return () => clearTimeout(timer);
     // Intentionally run once on mount; doSearch/query are stable enough here.
@@ -245,11 +276,12 @@ export function App(): JSX.Element {
       inputRef.current?.focus();
       void initAppearance();
       void refreshApps();
+      void refreshProjects();
     };
     window.addEventListener('focus', onFocus);
     inputRef.current?.focus();
     return () => window.removeEventListener('focus', onFocus);
-  }, [refreshApps]);
+  }, [refreshApps, refreshProjects]);
 
   // Restore focus to the search input whenever we return to Root Search from a
   // subview (Clipboard/Snippets/Settings) — the input is freshly mounted, so the
@@ -424,8 +456,18 @@ export function App(): JSX.Element {
   }
 
   if (view === 'control-center') {
-    const ccTab = (viewArg ?? 'projects') as ControlCenterTab;
-    return <><ControlCenterView onPop={() => setView('root')} initialTab={ccTab} />{toast}</>;
+    const ccArg = decodeControlCenterArg(viewArg);
+    return (
+      <>
+        <ControlCenterView
+          onPop={() => setView('root')}
+          initialTab={ccArg.tab}
+          initialProject={ccArg.project}
+          initialSessionStatus={ccArg.sessionStatus}
+        />
+        {toast}
+      </>
+    );
   }
 
   return (

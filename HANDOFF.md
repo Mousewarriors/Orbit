@@ -238,6 +238,44 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > lint, strict typecheck, `vite build`, and `tauri build` (NSIS + MSI) all green.
 > `target\release\bundle\nsis\Orbit_0.1.0_x64-setup.exe` produced.
 
+> **Update (session 7, 2026-06-17, branch `claude/orbit-ai-runtime`) — Natural-language
+> command bar (deterministic-first intent routing).** The headline product direction:
+> make the existing Alt+Space bar understand ordinary requests and route them to
+> Orbit's **existing safe actions** — no separate chatbot page, no AI call for
+> known local requests.
+> (1) **New pure `@orbit/intent` package** (GUI-free, 51 tests): `recogniseIntent()`
+> — an ordered, conservative deterministic pattern matcher mapping plain language
+> to a structured `{ intent, slots, confidence, requiresConfirmation }` (e.g.
+> "Continue Orbit with the best coding agent" → `continue_project` + projectQuery
+> "orbit" + agentPreference "best"); `rankProjects`/`rankApps`/`bestProject` — pure
+> entity resolution reusing the proven fuzzy matcher; `proposeIntent()` — maps a
+> recognised intent to a safe **action plan** (Control Center deep-link, open-path,
+> reveal-folder, file/note search, the narrow Restart-Relay command, or an honest
+> `unsupported-ai`). All routing decisions live here, unit-tested.
+> (2) **`intentProvider.ts`** (11 tests) — a thin Root Search provider that
+> recognises → resolves (cached apps/projects + native file/note search) → emits a
+> `SearchItem` whose `primaryAction` is an **existing audited ActionToken**. Carries
+> the raw query as a keyword (like the calculator) so the NL item leads the ranker;
+> returns `[]` for non-requests so exact-match providers and the calculator are
+> untouched. Wired into `App.tsx` (new cached recent∪favourite project list).
+> (3) **Control Center deep-links** — `encode/decodeControlCenterArg` carry an
+> optional resolved project (pre-selects + enters continuation on Launch) and a
+> session-status filter; `SessionsPanel` gained a status filter input (so "show
+> failed sessions" is *truthful*, not just a tab switch); the Projects detail pane
+> now synthesises a record for a deep-linked/recent project so it shows without a
+> scan.
+> **Honesty:** AI-assisted intents (explain/summarise/quick-AI) are recognised but
+> return a "Quick AI not available yet" item with a real web-search fallback — never
+> a fake answer (AI runtime is the next slice). Agent *preference* is captured/shown
+> but not auto-selected (Hermes / Model Gateway own that decision). Consequential
+> intents route to the Launch composer's existing confirm step.
+> **Counts: 328 JS tests** (+129; intent 51, provider 11, CC encode/decode +5, and a
+> larger discoverability suite) **/ 123 Rust** (unchanged — no Rust touched); lint,
+> strict typecheck (`exactOptionalPropertyTypes`), `vite build`, `cargo check
+> --workspace` all green. **Not GUI-run here** (headless) — the recogniser→action
+> mapping is fully unit-covered; live click-through of the NL journeys is the first
+> thing to confirm on the next `tauri dev`.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

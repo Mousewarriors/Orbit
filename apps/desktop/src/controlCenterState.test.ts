@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_TABS,
   TAB_LABELS,
+  decodeControlCenterArg,
+  encodeControlCenterArg,
   initialState,
   isRelayReady,
   relayState,
@@ -49,6 +51,28 @@ describe('Control Center state model', () => {
     expect(isRelayReady(ready)).toBe(true);
     const degraded = { state: 'degraded' } as Parameters<typeof isRelayReady>[0];
     expect(isRelayReady(degraded)).toBe(false);
+  });
+
+  it('encodes a bare tab as a plain string (back-compatible)', () => {
+    expect(encodeControlCenterArg({ tab: 'sessions' })).toBe('sessions');
+  });
+
+  it('encodes a richer target as JSON', () => {
+    const encoded = encodeControlCenterArg({ tab: 'launch', project: 'C:\\proj' });
+    expect(encoded).not.toBe('launch');
+    expect(decodeControlCenterArg(encoded)).toEqual({ tab: 'launch', project: 'C:\\proj' });
+  });
+
+  it('round-trips a session-status filter', () => {
+    const encoded = encodeControlCenterArg({ tab: 'sessions', sessionStatus: 'failed' });
+    expect(decodeControlCenterArg(encoded)).toEqual({ tab: 'sessions', sessionStatus: 'failed' });
+  });
+
+  it('decodes a bare tab name and tolerates junk', () => {
+    expect(decodeControlCenterArg('activity')).toEqual({ tab: 'activity' });
+    expect(decodeControlCenterArg(null)).toEqual({ tab: 'projects' });
+    expect(decodeControlCenterArg('not json {')).toEqual({ tab: 'projects' });
+    expect(decodeControlCenterArg('{"tab":"bogus"}')).toEqual({ tab: 'projects' });
   });
 
   it('tab failure isolation — each tab can have its own error', () => {
