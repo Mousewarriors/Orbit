@@ -255,6 +255,26 @@ describe('Root Search discoverability', () => {
   it('finds Continue Project via the Control Center command', async () => {
     expect((await search('Continue Project')).map((i) => i.id)).toContain('builtin.cc.continue');
   });
+
+  it('finds Restart Relay via Root Search', async () => {
+    expect((await search('Restart Relay')).map((i) => i.id)).toContain('builtin.cc.restart');
+  });
+
+  it('finds Launch Agent via Root Search', async () => {
+    expect((await search('Launch Agent')).map((i) => i.id)).toContain('builtin.cc.launch');
+  });
+
+  it('finds Create Handoff via Root Search', async () => {
+    expect((await search('Create Handoff')).map((i) => i.id)).toContain('builtin.cc.create.handoff');
+  });
+
+  it('finds Validate Handoff via Root Search', async () => {
+    expect((await search('Validate Handoff')).map((i) => i.id)).toContain('builtin.cc.validate.handoff');
+  });
+
+  it('finds Scan Projects via Root Search', async () => {
+    expect((await search('Scan Projects')).map((i) => i.id)).toContain('builtin.cc.scan');
+  });
 });
 
 describe('Root Search resilience', () => {

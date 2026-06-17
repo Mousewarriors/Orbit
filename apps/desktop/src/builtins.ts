@@ -179,6 +179,44 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'diagnostics' }),
   },
   {
+    definition: def('builtin.cc.restart', 'Restart Relay', 'Control Center', 'agentos', {
+      keywords: ['restart', 'relay', 'sidecar', 'reset', 'reconnect'],
+      subtitle: 'Restart the Relay sidecar process',
+    }),
+    effect: async (): Promise<EffectResult> => {
+      await native.relayRestart();
+      return { keepOpen: true };
+    },
+  },
+  {
+    definition: def('builtin.cc.scan', 'Scan Projects', 'Control Center', 'agentos', {
+      keywords: ['scan', 'projects', 'discover', 'find', 'repos'],
+      subtitle: 'Scan for projects and open Projects tab',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'projects' }),
+  },
+  {
+    definition: def('builtin.cc.create.handoff', 'Create Handoff', 'Control Center', 'agentos', {
+      keywords: ['handoff', 'create', 'transfer', 'agent', 'continuation'],
+      subtitle: 'Create an agent-to-agent handoff',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'handoffs' }),
+  },
+  {
+    definition: def('builtin.cc.validate.handoff', 'Validate Handoff', 'Control Center', 'agentos', {
+      keywords: ['validate', 'handoff', 'check', 'verify'],
+      subtitle: 'Validate an existing handoff file',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'handoffs' }),
+  },
+  {
+    definition: def('builtin.cc.launch', 'Launch Agent', 'Control Center', 'agentos', {
+      keywords: ['launch', 'start', 'agent', 'run', 'begin', 'session'],
+      subtitle: 'Launch a new agent session on a project',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'launch' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',
