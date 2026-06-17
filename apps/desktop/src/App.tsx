@@ -21,6 +21,7 @@ import {
   createToolsProvider,
 } from './providers.js';
 import { createIntentProvider } from './intentProvider.js';
+import { createAiCommandProvider } from './ai/aiCommands.js';
 import { executeAction, type EffectResult } from './execute.js';
 import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
@@ -109,6 +110,7 @@ export function App(): JSX.Element {
           native.isTauri() ? native.fileSearch(q, { limit }) : [],
         noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
       }),
+      createAiCommandProvider(),
       createCalculatorProvider(),
     ],
     [registry],
@@ -503,7 +505,7 @@ export function App(): JSX.Element {
   }
 
   if (view === 'quick-ai') {
-    return <><QuickAiView initialPrompt={viewArg ?? undefined} onPop={() => setView('root')} />{toast}</>;
+    return <><QuickAiView initialArg={viewArg ?? undefined} onPop={() => setView('root')} />{toast}</>;
   }
 
   return (

@@ -10,6 +10,7 @@ import {
 import {
   addRecentPrompt,
   buildMessages,
+  decodeQuickAiArg,
   parseRecentPrompts,
   type QuickAiContext,
 } from '../ai/quickAi.js';
@@ -26,16 +27,18 @@ type Status = 'idle' | 'streaming' | 'done' | 'error' | 'cancelled';
  * consequential action). Honest when no real provider is configured.
  */
 export function QuickAiView({
-  initialPrompt,
+  initialArg,
   onPop,
 }: {
-  initialPrompt?: string | undefined;
+  initialArg?: string | undefined;
   onPop: () => void;
 }): JSX.Element {
-  const [prompt, setPrompt] = useState(initialPrompt ?? '');
+  const launch = useMemo(() => decodeQuickAiArg(initialArg), [initialArg]);
+  const [prompt, setPrompt] = useState(launch.prompt);
   const [info, setInfo] = useState<ProviderInfo | null>(null);
   const [clipboard, setClipboard] = useState<string>('');
-  const [useClipboard, setUseClipboard] = useState(false);
+  const [useClipboard, setUseClipboard] = useState(launch.useClipboard ?? false);
+  const didAutoRun = useRef(false);
   const [output, setOutput] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +120,14 @@ export function QuickAiView({
   }, [info, prompt, status, recent, contexts]);
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
+
+  // AI Commands open Quick AI with autoRun — fire once the provider is ready.
+  useEffect(() => {
+    if (!didAutoRun.current && launch.autoRun && info?.configured && prompt.trim()) {
+      didAutoRun.current = true;
+      void run();
+    }
+  }, [launch.autoRun, info, prompt, run]);
 
   const copyOutput = useCallback(async () => {
     if (!output) return;

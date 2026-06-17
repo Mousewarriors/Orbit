@@ -330,6 +330,21 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > `cargo check --workspace` all green. Quick AI is not GUI-run here — the controller +
 > provider factory are unit-covered; live streaming/paste want a `tauri dev` pass.
 
+> **Update (session 7d, 2026-06-17, branch `claude/orbit-ai-runtime`) — Phase 7: AI
+> Commands.** Reusable, named AI behaviours surfaced in Root Search and run through
+> Quick AI. New pure `ai/aiCommands.ts`: a 9-command starter library (Improve Writing,
+> Fix Spelling & Grammar, Make Shorter, Make Professional, Summarise, Explain, Translate
+> to English, Write Commit Message, Create JSON), `renderAiCommand` (`{input}`
+> substitution), and a Root Search provider — 6 tests. Selecting a command opens Quick
+> AI **pre-filled and auto-running**, with the clipboard pre-attached where the command
+> uses it (carried via a new `encode/decodeQuickAiArg` launch codec on the quick-ai
+> push-view arg; `QuickAiView` now decodes prompt + useClipboard + autoRun). **Honest
+> scope:** a user-editable command store/editor, richer placeholders ({selection},
+> {browser}, …), per-command hotkeys and import/export are later; answers are only as
+> real as the configured provider (offline Mock today). **Counts: 370 JS tests** (+6) **/
+> 123 Rust** (unchanged); lint, strict typecheck, `vite build`, `cargo check
+> --workspace` all green. Not GUI-run here.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

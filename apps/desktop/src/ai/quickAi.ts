@@ -48,6 +48,41 @@ export function addRecentPrompt(history: readonly string[], prompt: string): str
   return next.slice(0, MAX_RECENT_PROMPTS);
 }
 
+/**
+ * How Quick AI is opened: a free-text prompt plus optional flags to pre-include
+ * the clipboard as context and to run immediately (used by AI Commands).
+ */
+export interface QuickAiLaunch {
+  readonly prompt: string;
+  readonly useClipboard?: boolean;
+  readonly autoRun?: boolean;
+}
+
+/** Encode a launch as the push-view argument string (plain prompt when simple). */
+export function encodeQuickAiArg(launch: QuickAiLaunch): string {
+  if (!launch.useClipboard && !launch.autoRun) return launch.prompt;
+  return JSON.stringify(launch);
+}
+
+/** Decode the push-view argument back into a launch (bare string = just a prompt). */
+export function decodeQuickAiArg(raw: string | null | undefined): QuickAiLaunch {
+  if (!raw) return { prompt: '' };
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && typeof (parsed as Record<string, unknown>)['prompt'] === 'string') {
+      const o = parsed as Record<string, unknown>;
+      return {
+        prompt: o['prompt'] as string,
+        ...(o['useClipboard'] === true ? { useClipboard: true } : {}),
+        ...(o['autoRun'] === true ? { autoRun: true } : {}),
+      };
+    }
+  } catch {
+    // not JSON — treat as a bare prompt
+  }
+  return { prompt: raw };
+}
+
 /** Parse persisted recent-prompt JSON, tolerating anything malformed. */
 export function parseRecentPrompts(raw: string | null): string[] {
   if (!raw) return [];
