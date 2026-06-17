@@ -26,7 +26,8 @@ import { QuicklinksView } from './components/QuicklinksView.js';
 import { NotesView } from './components/NotesView.js';
 import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
-import { AgentCenterView } from './components/AgentCenterView.js';
+import { ControlCenterView } from './components/ControlCenterView.js';
+import type { ControlCenterTab } from './controlCenterState.js';
 
 type View =
   | 'root'
@@ -36,7 +37,8 @@ type View =
   | 'notes'
   | 'extension-list'
   | 'all-commands'
-  | 'agent-center';
+  | 'agent-center'
+  | 'control-center';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -278,7 +280,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'notes' ||
           outcome.pushView === 'extension-list' ||
           outcome.pushView === 'all-commands' ||
-          outcome.pushView === 'agent-center'
+          outcome.pushView === 'agent-center' ||
+          outcome.pushView === 'control-center'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -335,7 +338,8 @@ export function App(): JSX.Element {
       }
       try {
         const outcome = (await effect('')) ?? {};
-        const pushTarget = 'pushView' in outcome ? (outcome as EffectResult).pushView : undefined;
+        const ef = outcome as EffectResult;
+        const pushTarget = 'pushView' in outcome ? ef.pushView : undefined;
         if (
           pushTarget === 'clipboard' ||
           pushTarget === 'snippets' ||
@@ -343,9 +347,10 @@ export function App(): JSX.Element {
           pushTarget === 'notes' ||
           pushTarget === 'extension-list' ||
           pushTarget === 'all-commands' ||
-          pushTarget === 'agent-center'
+          pushTarget === 'agent-center' ||
+          pushTarget === 'control-center'
         ) {
-          setViewArg(null);
+          setViewArg(ef.pushViewArg ?? null);
           setView(pushTarget);
         } else {
           closeToRoot();
@@ -409,7 +414,12 @@ export function App(): JSX.Element {
   }
 
   if (view === 'agent-center') {
-    return <AgentCenterView onPop={() => setView('root')} />;
+    return <ControlCenterView onPop={() => setView('root')} initialTab="launch" />;
+  }
+
+  if (view === 'control-center') {
+    const ccTab = (viewArg ?? 'projects') as ControlCenterTab;
+    return <ControlCenterView onPop={() => setView('root')} initialTab={ccTab} />;
   }
 
   return (

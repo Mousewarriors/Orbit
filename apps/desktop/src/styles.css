@@ -811,3 +811,36 @@ kbd {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* Control Center V2 — additional styles */
+.relay-tab-error {
+  padding: 6px 10px;
+  margin: 4px 8px;
+  color: var(--destructive);
+  font-size: 12px;
+  border-radius: 6px;
+  background: rgba(255, 92, 112, 0.08);
+}
+
+.cc-projects-workspace {
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) !important;
+}
+
+.cc-project-detail {
+  border-right: none;
+}
+
+.cc-project-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cc-event-row {
+  grid-template-columns: minmax(0, 1fr) 74px;
+}
+
+.cc-activity,
+.cc-handoffs,
+.cc-approvals {
+  padding: 10px;
+}

@@ -10,6 +10,8 @@ import * as native from './native.js';
 export interface EffectResult {
   /** Push a named view onto the navigation stack instead of closing. */
   readonly pushView?: string;
+  /** Optional argument passed to the pushed view (e.g. tab name or note id). */
+  readonly pushViewArg?: string;
   /** Keep the launcher open (default is to hide after a successful action). */
   readonly keepOpen?: boolean;
 }
@@ -83,7 +85,12 @@ export async function executeAction(
           const fx = ctx.effects.get(id);
           if (fx) {
             const result = await fx(ctx.query);
-            if (result?.pushView) return { hide: false, pushView: result.pushView };
+            if (result?.pushView) {
+              const out: ExecuteOutcome = result.pushViewArg
+                ? { hide: false, pushView: result.pushView, pushViewArg: result.pushViewArg }
+                : { hide: false, pushView: result.pushView };
+              return out;
+            }
             if (result?.keepOpen) return { hide: false };
           }
         }

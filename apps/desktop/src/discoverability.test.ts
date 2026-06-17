@@ -223,6 +223,34 @@ describe('Root Search discoverability', () => {
   it('finds the Agent Control Center for Relay-driven launches', async () => {
     expect((await search('relay')).map((i) => i.id)).toContain('builtin.agents.center');
   });
+
+  it('finds the unified Control Center', async () => {
+    expect((await search('Control Center')).map((i) => i.id)).toContain('builtin.control.center');
+  });
+
+  it('finds Projects via the Control Center command', async () => {
+    expect((await search('Projects')).map((i) => i.id)).toContain('builtin.cc.projects');
+  });
+
+  it('finds Active Sessions via the Control Center command', async () => {
+    expect((await search('Active Sessions')).map((i) => i.id)).toContain('builtin.cc.sessions');
+  });
+
+  it('finds Activity via the Control Center command', async () => {
+    expect((await search('Activity')).map((i) => i.id)).toContain('builtin.cc.activity');
+  });
+
+  it('finds Handoffs via the Control Center command', async () => {
+    expect((await search('Handoffs')).map((i) => i.id)).toContain('builtin.cc.handoffs');
+  });
+
+  it('finds Approvals via the Control Center command', async () => {
+    expect((await search('Approvals')).map((i) => i.id)).toContain('builtin.cc.approvals');
+  });
+
+  it('finds Relay Diagnostics via the Control Center command', async () => {
+    expect((await search('Relay Diagnostics')).map((i) => i.id)).toContain('builtin.cc.diagnostics');
+  });
 });
 
 describe('Root Search resilience', () => {

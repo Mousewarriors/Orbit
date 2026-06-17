@@ -116,11 +116,60 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'notes' }),
   },
   {
+    definition: def('builtin.control.center', 'Control Center', 'Agents', 'agentos', {
+      keywords: ['agent', 'agents', 'ai', 'codex', 'claude', 'relay', 'project', 'session', 'launch', 'control', 'center'],
+      subtitle: 'Projects, agents, sessions, activity and handoffs',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center' }),
+  },
+  {
     definition: def('builtin.agents.center', 'Agent Control Center', 'Agents', 'agentos', {
-      keywords: ['agent', 'agents', 'ai', 'codex', 'claude', 'relay', 'project', 'session', 'launch'],
+      keywords: ['agent', 'agents', 'ai', 'codex', 'claude', 'relay', 'launch'],
       subtitle: 'Launch and track local agent sessions',
     }),
     effect: (): EffectResult => ({ pushView: 'agent-center' }),
+  },
+  {
+    definition: def('builtin.cc.projects', 'Projects', 'Control Center', 'agentos', {
+      keywords: ['project', 'projects', 'repos', 'code', 'workspace'],
+      subtitle: 'Browse and manage scanned projects',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'projects' }),
+  },
+  {
+    definition: def('builtin.cc.sessions', 'Active Sessions', 'Control Center', 'agentos', {
+      keywords: ['session', 'sessions', 'running', 'agent'],
+      subtitle: 'View running agent sessions',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'sessions' }),
+  },
+  {
+    definition: def('builtin.cc.activity', 'Activity', 'Control Center', 'agentos', {
+      keywords: ['activity', 'events', 'relay', 'log', 'timeline'],
+      subtitle: 'Live Relay event timeline',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'activity' }),
+  },
+  {
+    definition: def('builtin.cc.handoffs', 'Handoffs', 'Control Center', 'agentos', {
+      keywords: ['handoff', 'handoffs', 'continuation', 'transfer'],
+      subtitle: 'Agent-to-agent handoff workspace',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'handoffs' }),
+  },
+  {
+    definition: def('builtin.cc.approvals', 'Approvals', 'Control Center', 'agentos', {
+      keywords: ['approval', 'approvals', 'approve', 'deny', 'confirm'],
+      subtitle: 'Observational approval tracking',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'approvals' }),
+  },
+  {
+    definition: def('builtin.cc.diagnostics', 'Relay Diagnostics', 'Control Center', 'agentos', {
+      keywords: ['diagnostics', 'relay', 'health', 'debug', 'sidecar'],
+      subtitle: 'Relay process diagnostics and status',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'diagnostics' }),
   },
   {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
