@@ -197,7 +197,10 @@ pub struct RelaySupervisor {
 
 impl RelaySupervisor {
     pub fn status(&self) -> RelayStatusSnapshot {
-        let inner = self.inner.lock().expect("relay supervisor mutex");
+        let inner = match self.inner.lock() {
+            Ok(inner) => inner,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let pending_requests = self.pending.lock().map(|p| p.len()).unwrap_or_default();
         RelayStatusSnapshot {
             state: inner.state,
@@ -274,6 +277,7 @@ impl RelaySupervisor {
         self.start_command(command, None, "<test-command>".into(), "<test>".into())
     }
 
+    #[allow(clippy::clone_on_copy)]
     fn start_command(
         &self,
         mut command: Command,
@@ -987,7 +991,6 @@ impl RelaySupervisor {
         #[cfg(test)]
         {
             let _ = (method, params, app);
-            return;
         }
         #[cfg(not(test))]
         {
@@ -1137,5 +1140,95 @@ mod tests {
 
         let _ = supervisor.shutdown_with_timeout(Duration::from_millis(500), None);
         let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn status_survives_poisoned_mutex() {
+        let supervisor = RelaySupervisor::default();
+        let inner = supervisor.inner.clone();
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = inner.lock().unwrap();
+            panic!("intentional poison");
+        });
+        assert!(inner.lock().is_err(), "mutex must be poisoned");
+        let status = supervisor.status();
+        assert_eq!(status.state, RelaySupervisorState::Stopped);
+    }
+
+    #[test]
+    fn clear_pending_rejects_all_waiters() {
+        let supervisor = RelaySupervisor::default();
+        let (tx1, rx1) = mpsc::channel();
+        let (tx2, rx2) = mpsc::channel();
+        {
+            let mut pending = supervisor.pending.lock().unwrap();
+            pending.insert(
+                "a".into(),
+                PendingRequest {
+                    method: "relay.health".into(),
+                    tx: tx1,
+                },
+            );
+            pending.insert(
+                "b".into(),
+                PendingRequest {
+                    method: "agents.list".into(),
+                    tx: tx2,
+                },
+            );
+        }
+        supervisor.clear_pending(RelayClientError::plain("test exit"));
+        assert!(rx1.try_recv().unwrap().is_err());
+        assert!(rx2.try_recv().unwrap().is_err());
+        assert_eq!(supervisor.pending.lock().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn transition_updates_state_atomically() {
+        let supervisor = RelaySupervisor::default();
+        supervisor.transition(
+            RelaySupervisorState::Degraded,
+            "test degraded",
+            Some("detail".into()),
+            None,
+        );
+        let status = supervisor.status();
+        assert_eq!(status.state, RelaySupervisorState::Degraded);
+        assert_eq!(status.user_message, "test degraded");
+        assert_eq!(status.technical_detail.as_deref(), Some("detail"));
+    }
+
+    #[test]
+    fn mark_exit_clears_ready_and_rejects_pending() {
+        let supervisor = RelaySupervisor::default();
+        let (tx, rx) = mpsc::channel();
+        {
+            let mut inner = supervisor.inner.lock().unwrap();
+            inner.pid = Some(42);
+            inner.state = RelaySupervisorState::Ready;
+            inner.ready = Some(RelayReady {
+                implementation_version: "0.1.0".into(),
+                protocol_version: "1.1.0".into(),
+                minimum_client_protocol_version: "1.0.0".into(),
+                protocol_compatibility_range: None,
+                max_request_line_bytes: None,
+                methods: Vec::new(),
+                notifications: Vec::new(),
+                capabilities: Vec::new(),
+            });
+        }
+        supervisor.pending.lock().unwrap().insert(
+            "orbit-1".into(),
+            PendingRequest {
+                method: "relay.health".into(),
+                tx,
+            },
+        );
+        supervisor.mark_exit(42, Some(1), None);
+        let status = supervisor.status();
+        assert_eq!(status.state, RelaySupervisorState::Degraded);
+        assert!(status.ready.is_none(), "ready must be cleared after exit");
+        assert!(status.pid.is_none(), "pid must be cleared after exit");
+        assert!(rx.try_recv().unwrap().is_err(), "pending must be rejected");
     }
 }
