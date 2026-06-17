@@ -165,6 +165,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'approvals' }),
   },
   {
+    definition: def('builtin.cc.continue', 'Continue Project', 'Control Center', 'agentos', {
+      keywords: ['continue', 'resume', 'project', 'agent', 'launch', 'pick up'],
+      subtitle: 'Pick up where you left off on a project',
+    }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'launch' }),
+  },
+  {
     definition: def('builtin.cc.diagnostics', 'Relay Diagnostics', 'Control Center', 'agentos', {
       keywords: ['diagnostics', 'relay', 'health', 'debug', 'sidecar'],
       subtitle: 'Relay process diagnostics and status',

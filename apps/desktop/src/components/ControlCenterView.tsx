@@ -55,6 +55,7 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tabErrors, setTabErrors] = useState<Partial<Record<ControlCenterTab, string>>>({});
+  const [continuationProject, setContinuationProject] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const eventPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -419,6 +420,7 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
           sessions={sessions}
           onNavigateToLaunch={(path: string) => {
             setSelectedProject(path);
+            setContinuationProject(path);
             setTab('launch');
           }}
         />
@@ -451,6 +453,9 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
           refreshAgents={refreshAgents}
           createPlan={createPlan}
           executePlan={executePlan}
+          sessions={sessions}
+          continuationProject={continuationProject}
+          onClearContinuation={() => setContinuationProject(null)}
         />
       </TabPanel>
 
@@ -806,6 +811,9 @@ function LaunchPanel({
   refreshAgents,
   createPlan,
   executePlan,
+  sessions,
+  continuationProject,
+  onClearContinuation,
 }: {
   readonly agents: RelayObject[];
   readonly selectedAgent: string;
@@ -832,9 +840,49 @@ function LaunchPanel({
   readonly refreshAgents: () => Promise<void>;
   readonly createPlan: () => Promise<void>;
   readonly executePlan: () => Promise<void>;
+  readonly sessions: readonly RelayObject[];
+  readonly continuationProject: string | null;
+  readonly onClearContinuation: () => void;
 }): JSX.Element {
+  const isContinuation = continuationProject !== null && continuationProject === selectedProject;
+  const [projectMeta, setProjectMeta] = useState<native.ProjectMeta | null>(null);
+
+  useEffect(() => {
+    if (!isContinuation || !native.isTauri()) {
+      setProjectMeta(null);
+      return;
+    }
+    void native.projectMetaGet(continuationProject).then(setProjectMeta).catch(() => setProjectMeta(null));
+  }, [isContinuation, continuationProject]);
+
+  // Auto-select preferred agent when entering continuation mode
+  useEffect(() => {
+    if (!isContinuation || !projectMeta?.preferred_agent) return;
+    const preferred = projectMeta.preferred_agent;
+    if (agents.some((a) => agentId(a) === preferred)) {
+      setSelectedAgent(preferred);
+    }
+  }, [isContinuation, projectMeta, agents, setSelectedAgent]);
+
+  const projectSessions = useMemo(() => {
+    if (!isContinuation) return [];
+    return sessions.filter(
+      (s) => recordString(s, 'projectPath') === continuationProject,
+    );
+  }, [sessions, continuationProject, isContinuation]);
+
   return (
     <div className="relay-workspace">
+      {/* Continuation header */}
+      {isContinuation && (
+        <div className="cc-continuation-header">
+          <span>Continue Project</span>
+          <button className="relay-icon-button" onClick={onClearContinuation}>
+            Switch to full launch
+          </button>
+        </div>
+      )}
+
       <section className="relay-column" aria-label="Agents">
         <div className="relay-section-head">
           <span>Agent</span>
@@ -863,42 +911,96 @@ function LaunchPanel({
         </div>
       </section>
 
-      <section className="relay-column" aria-label="Projects">
-        <div className="relay-section-head">
-          <span>Project</span>
-          <button
-            onClick={() => void scanProjects()}
-            disabled={isScanDisabled({ rootHydrated, root: projectRoot, relayReady, scanning })}
-          >
-            Scan
-          </button>
-        </div>
-        <input
-          className="relay-input"
-          value={projectRoot}
-          onChange={(e) => setProjectRoot(e.target.value)}
-          placeholder="Project root path"
-        />
-        <div className="relay-list">
-          {projects.length === 0 ? (
-            <div className="relay-empty">No projects</div>
-          ) : (
-            projects.map((project) => {
-              const path = projectPath(project);
-              return (
-                <button
-                  key={path}
-                  className={selectedProject === path ? 'relay-row is-selected' : 'relay-row'}
-                  onClick={() => setSelectedProject(path)}
-                >
-                  <span>{projectTitle(project)}</span>
-                  <small>{path}</small>
-                </button>
-              );
-            })
+      {/* In continuation mode, show project context instead of project list */}
+      {isContinuation ? (
+        <section className="relay-column" aria-label="Project Context">
+          <div className="relay-section-head">
+            <span>Project Context</span>
+          </div>
+          <div className="relay-detail-block">
+            <strong>{projectTitle(inspection ?? selectedProjectRecord)}</strong>
+            <span>{projectPath(inspection ?? selectedProjectRecord) || selectedProject}</span>
+            {asObject(inspection?.git) && (
+              <span>
+                Branch: {recordString(asObject(inspection?.git), 'branch') ?? 'unknown'} |{' '}
+                {boolOf(asObject(inspection?.git)?.dirty) ? 'dirty' : 'clean'}
+              </span>
+            )}
+            {recordArray(inspection, 'contextFiles').length > 0 && (
+              <span>
+                Context:{' '}
+                {recordArray(inspection, 'contextFiles')
+                  .filter((item): item is string => typeof item === 'string')
+                  .join(', ')}
+              </span>
+            )}
+            {projectMeta?.preferred_agent && (
+              <span>Preferred agent: {projectMeta.preferred_agent}</span>
+            )}
+            {projectMeta?.build_brief && (
+              <span>Build brief: {projectMeta.build_brief}</span>
+            )}
+          </div>
+          {projectSessions.length > 0 && (
+            <div className="cc-continuation-sessions">
+              <div className="relay-section-head">
+                <span>Recent Sessions ({projectSessions.length})</span>
+              </div>
+              {projectSessions.slice(0, 5).map((session) => {
+                const id = sessionId(session);
+                return (
+                  <div key={id} className="relay-session-row">
+                    <div>
+                      <strong>{recordString(session, 'agentId') ?? 'Unknown agent'}</strong>
+                      <small>
+                        {recordString(session, 'status') ?? 'unknown'} |{' '}
+                        {displayTime(session.startedAtMs)}
+                      </small>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="relay-column" aria-label="Projects">
+          <div className="relay-section-head">
+            <span>Project</span>
+            <button
+              onClick={() => void scanProjects()}
+              disabled={isScanDisabled({ rootHydrated, root: projectRoot, relayReady, scanning })}
+            >
+              Scan
+            </button>
+          </div>
+          <input
+            className="relay-input"
+            value={projectRoot}
+            onChange={(e) => setProjectRoot(e.target.value)}
+            placeholder="Project root path"
+          />
+          <div className="relay-list">
+            {projects.length === 0 ? (
+              <div className="relay-empty">No projects</div>
+            ) : (
+              projects.map((project) => {
+                const path = projectPath(project);
+                return (
+                  <button
+                    key={path}
+                    className={selectedProject === path ? 'relay-row is-selected' : 'relay-row'}
+                    onClick={() => setSelectedProject(path)}
+                  >
+                    <span>{projectTitle(project)}</span>
+                    <small>{path}</small>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="relay-detail" aria-label="Launch">
         <div className="relay-detail-block">
@@ -924,12 +1026,12 @@ function LaunchPanel({
         </div>
 
         <button className="relay-primary" onClick={() => void createPlan()} disabled={launchDisabled}>
-          {busy === 'plan' ? 'Planning...' : 'Create Launch Plan'}
+          {busy === 'plan' ? 'Planning...' : isContinuation ? 'Continue with Agent' : 'Create Launch Plan'}
         </button>
 
         {plan && (
           <div className="relay-preview">
-            <strong>Launch Preview</strong>
+            <strong>{isContinuation ? 'Continuation Preview' : 'Launch Preview'}</strong>
             <code>{recordString(plan, 'preview') ?? 'No preview returned'}</code>
             <span>Agent {agentTitle(selectedAgentRecord)}</span>
             <span>Project {recordString(plan, 'projectPath') ?? selectedProject}</span>
@@ -947,11 +1049,11 @@ function LaunchPanel({
                 checked={confirmed}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              Confirm launch
+              {isContinuation ? 'Confirm continuation' : 'Confirm launch'}
             </label>
             <div className="relay-actions">
               <button onClick={() => void executePlan()} disabled={executeDisabled}>
-                {busy === 'execute' ? 'Launching...' : 'Launch'}
+                {busy === 'execute' ? 'Launching...' : isContinuation ? 'Continue' : 'Launch'}
               </button>
               <button
                 onClick={() => {

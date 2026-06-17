@@ -844,3 +844,21 @@ kbd {
 .cc-approvals {
   padding: 10px;
 }
+
+.cc-continuation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--orbit-accent-bg, rgba(64, 156, 255, 0.08));
+  border-bottom: 1px solid var(--orbit-border);
+  font-weight: 600;
+  font-size: 13px;
+  grid-column: 1 / -1;
+}
+
+.cc-continuation-sessions {
+  margin-top: 8px;
+  border-top: 1px solid var(--orbit-border);
+  padding-top: 6px;
+}

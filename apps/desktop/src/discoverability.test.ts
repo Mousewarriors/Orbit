@@ -251,6 +251,10 @@ describe('Root Search discoverability', () => {
   it('finds Relay Diagnostics via the Control Center command', async () => {
     expect((await search('Relay Diagnostics')).map((i) => i.id)).toContain('builtin.cc.diagnostics');
   });
+
+  it('finds Continue Project via the Control Center command', async () => {
+    expect((await search('Continue Project')).map((i) => i.id)).toContain('builtin.cc.continue');
+  });
 });
 
 describe('Root Search resilience', () => {
