@@ -261,6 +261,16 @@
   font-size: 14px;
   padding: 7px 10px;
 }
+.settings-input {
+  width: 100%;
+  background: var(--kbd-bg);
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 7px 10px;
+}
 .settings-textarea {
   width: 100%;
   resize: vertical;

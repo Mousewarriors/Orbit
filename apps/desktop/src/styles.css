@@ -459,6 +459,157 @@ kbd {
   font-weight: 600;
 }
 
+/* Quick AI surface */
+.quick-ai {
+  padding-bottom: 12px;
+  overflow: auto;
+}
+.quick-ai-badge {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--separator);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.quick-ai-badge.is-local {
+  color: var(--text-primary);
+}
+.quick-ai-badge.is-remote {
+  color: var(--destructive);
+  border-color: var(--destructive);
+}
+.quick-ai-input {
+  margin: 10px 14px 0;
+  width: calc(100% - 28px);
+  resize: vertical;
+  background: var(--kbd-bg);
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 12px;
+}
+.quick-ai-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+}
+.quick-ai-chip {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--separator);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+.quick-ai-chip.is-on {
+  color: var(--text-primary);
+  background: var(--row-selected);
+  border-color: transparent;
+}
+.quick-ai-chip:disabled {
+  opacity: 0.45;
+}
+.quick-ai-run {
+  margin-left: auto;
+}
+.quick-ai-go,
+.quick-ai-stop {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--row-selected);
+  color: var(--text-primary);
+  cursor: default;
+}
+.quick-ai-stop {
+  background: transparent;
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+.quick-ai-go:disabled {
+  opacity: 0.45;
+}
+.quick-ai-output {
+  margin: 12px 14px 0;
+  padding: 12px 14px;
+  background: var(--kbd-bg);
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+.quick-ai-caret {
+  opacity: 0.6;
+  animation: quick-ai-blink 1s steps(2, start) infinite;
+}
+@keyframes quick-ai-blink {
+  to {
+    visibility: hidden;
+  }
+}
+.quick-ai-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 0;
+}
+.quick-ai-actions button {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--separator);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: default;
+}
+.quick-ai-empty {
+  padding: 24px 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.quick-ai-note {
+  font-size: 12px;
+  margin: 8px 0 14px;
+}
+.quick-ai-recent {
+  padding: 14px 14px 0;
+}
+.quick-ai-recent-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.quick-ai-recent-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: default;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-ai-recent-item:hover {
+  background: var(--row-selected);
+  color: var(--text-primary);
+}
+
 /* Error boundary fallback. Solid (non-transparent) surface so a renderer crash
  * is always legible, in both the launcher and the Settings window. */
 .orbit-error-boundary {

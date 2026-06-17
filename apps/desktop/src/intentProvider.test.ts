@@ -18,7 +18,6 @@ function makeDeps(over: Partial<IntentProviderDeps> = {}): IntentProviderDeps {
     getProjects: () => PROJECTS,
     fileSearch: async () => [],
     noteSearch: async () => [],
-    webSearchUrl: (q) => `https://example.test/?q=${encodeURIComponent(q)}`,
     ...over,
   };
 }
@@ -131,10 +130,22 @@ describe('intent provider — direct + find', () => {
   });
 });
 
-describe('intent provider — AI intents are honest', () => {
-  it('summarise clipboard offers a web fallback, not a fake answer', async () => {
+describe('intent provider — AI intents route into Quick AI', () => {
+  it('summarise clipboard opens Quick AI (which shows honest provider status)', async () => {
     const items = await run('summarise the clipboard');
-    expect(items[0]!.subtitle).toMatch(/not available yet/i);
-    expect(items[0]!.primaryAction.run.kind).toBe('open-url');
+    const run0 = items[0]!.primaryAction.run;
+    expect(run0.kind).toBe('push-view');
+    if (run0.kind === 'push-view') expect(run0.viewId).toBe('quick-ai');
+  });
+
+  it('ask ai carries the question into Quick AI', async () => {
+    const items = await run('ask ai what is a monad');
+    const run0 = items[0]!.primaryAction.run;
+    if (run0.kind === 'push-view') {
+      expect(run0.viewId).toBe('quick-ai');
+      expect(run0.args!['id']).toBe('what is a monad');
+    } else {
+      throw new Error('expected push-view');
+    }
   });
 });

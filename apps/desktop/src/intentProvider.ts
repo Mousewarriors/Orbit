@@ -67,8 +67,6 @@ export interface IntentProviderDeps {
   readonly fileSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentFile>>;
   /** Search notes (only called for find-notes intents). */
   readonly noteSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentNote>>;
-  /** Default-browser web search URL builder for the AI fallback. */
-  readonly webSearchUrl: (q: string) => string;
 }
 
 const SOURCE = 'agentos' as const;
@@ -373,23 +371,24 @@ async function buildItems(
     }
 
     case 'unsupported-ai': {
-      // Honest: Quick AI isn't wired yet. Offer a real web-search fallback for
-      // the captured question rather than pretending the model ran.
+      // Route AI-shaped requests into the Quick AI surface, pre-filled with the
+      // captured question. Quick AI itself shows the honest provider status
+      // (offline Mock / no provider configured) — we never fake a model answer.
       const question = (slots.question ?? query).trim();
       return [
         {
           ...baseItem(`intent.${recognised.intent}`, query, {
             title: display.title,
-            subtitle: display.subtitle,
+            subtitle: 'Open Quick AI with this request',
             category: 'Quick AI',
             source: 'ai',
             icon: icon('ai'),
             confidence: 0.85,
           }),
           primaryAction: {
-            id: `intent.${recognised.intent}.web`,
-            title: 'Search the web',
-            run: { kind: 'open-url', url: deps.webSearchUrl(question) },
+            id: `intent.${recognised.intent}.quickai`,
+            title: 'Open Quick AI',
+            run: { kind: 'push-view', viewId: 'quick-ai', args: { id: question } },
           },
         },
       ];

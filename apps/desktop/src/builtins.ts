@@ -217,6 +217,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'launch' }),
   },
   {
+    definition: def('builtin.ai.quick', 'Quick AI', 'AI', 'ai', {
+      keywords: ['ai', 'ask', 'chat', 'gpt', 'llm', 'assistant', 'quick ai'],
+      subtitle: 'Ask a one-shot question, with optional clipboard context',
+    }),
+    effect: (): EffectResult => ({ pushView: 'quick-ai' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',

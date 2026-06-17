@@ -4,12 +4,19 @@ import type { Appearance, ThemeChoice } from '@orbit/appearance';
 import { DEFAULT_APPEARANCE } from '@orbit/appearance';
 import * as native from '../native.js';
 import { initAppearance, saveAppearance } from '../appearance.js';
+import {
+  AI_SETTING_KEYS,
+  DEFAULT_AI_SETTINGS,
+  parseAiSettings,
+  type ConfiguredProviderId,
+} from '../ai/providerConfig.js';
 import { Toggle, Field, Section, Row } from './controls.js';
 import { ShortcutRecorder } from './ShortcutRecorder.js';
 
 type SectionId =
   | 'general'
   | 'appearance'
+  | 'ai'
   | 'snippets'
   | 'files'
   | 'extensions'
@@ -19,6 +26,7 @@ type SectionId =
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; icon: string }> = [
   { id: 'general', label: 'General', icon: '⚙' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
+  { id: 'ai', label: 'AI', icon: '🤖' },
   { id: 'snippets', label: 'Snippets', icon: '⌨' },
   { id: 'files', label: 'Files', icon: '📁' },
   { id: 'extensions', label: 'Extensions', icon: '🧩' },
@@ -55,6 +63,7 @@ export function Settings(): JSX.Element {
       <main className="settings-content">
         {active === 'general' && <GeneralSection />}
         {active === 'appearance' && <AppearanceSection />}
+        {active === 'ai' && <AiSection />}
         {active === 'snippets' && <SnippetsSection />}
         {active === 'files' && <FilesSection />}
         {active === 'extensions' && <ExtensionsSection />}
@@ -208,6 +217,82 @@ function AppearanceSection(): JSX.Element {
           onChange={(v) => update({ reducedMotion: v })}
         />
       </Row>
+    </Section>
+  );
+}
+
+function AiSection(): JSX.Element {
+  const [provider, setProvider] = useState<ConfiguredProviderId>(DEFAULT_AI_SETTINGS.provider);
+  const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.ollamaEndpoint);
+  const [model, setModel] = useState(DEFAULT_AI_SETTINGS.ollamaModel);
+
+  useEffect(() => {
+    void (async () => {
+      const [p, e, m] = await Promise.all([
+        native.getSetting(AI_SETTING_KEYS.provider),
+        native.getSetting(AI_SETTING_KEYS.endpoint),
+        native.getSetting(AI_SETTING_KEYS.model),
+      ]);
+      const s = parseAiSettings({ provider: p, endpoint: e, model: m });
+      setProvider(s.provider);
+      setEndpoint(s.ollamaEndpoint);
+      setModel(s.ollamaModel);
+    })();
+  }, []);
+
+  const choose = useCallback((p: ConfiguredProviderId) => {
+    setProvider(p);
+    void native.setSetting(AI_SETTING_KEYS.provider, p);
+  }, []);
+
+  return (
+    <Section
+      title="AI"
+      description="Quick AI uses these settings. Orbit keeps API keys out of plaintext and never uploads context without your action."
+    >
+      <Field label="Provider" hint="Which engine Quick AI talks to.">
+        <div className="settings-segment" role="radiogroup" aria-label="AI provider">
+          {([
+            ['none', 'None'],
+            ['mock', 'Mock (offline)'],
+          ] as ReadonlyArray<[ConfiguredProviderId, string]>).map(([id, label]) => (
+            <button
+              key={id}
+              role="radio"
+              aria-checked={provider === id}
+              className={`settings-segment-btn${provider === id ? ' is-active' : ''}`}
+              onClick={() => choose(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <p className="settings-note">
+        <strong>Mock</strong> is a fully-offline placeholder that proves the Quick AI surface works
+        end-to-end — it does not produce real answers. <strong>Local Ollama</strong> and cloud
+        providers (OpenAI-compatible, Anthropic) and AgentOS Auto routing arrive with the native AI
+        bridge; their connection details below are saved now so they are ready to switch on.
+      </p>
+
+      <Field label="Local Ollama endpoint" hint="Saved for when the native bridge ships; not reachable from the launcher yet.">
+        <input
+          className="settings-input"
+          value={endpoint}
+          onChange={(e) => setEndpoint(e.target.value)}
+          onBlur={() => void native.setSetting(AI_SETTING_KEYS.endpoint, endpoint)}
+          placeholder="http://127.0.0.1:11434"
+        />
+      </Field>
+      <Field label="Local Ollama model">
+        <input
+          className="settings-input-narrow"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          onBlur={() => void native.setSetting(AI_SETTING_KEYS.model, model)}
+          placeholder="llama3.1"
+        />
+      </Field>
     </Section>
   );
 }

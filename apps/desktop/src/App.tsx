@@ -33,6 +33,7 @@ import { NotesView } from './components/NotesView.js';
 import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
+import { QuickAiView } from './components/QuickAiView.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
 import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { describeConfirmation, needsConfirmation } from './confirm.js';
@@ -46,7 +47,8 @@ type View =
   | 'notes'
   | 'extension-list'
   | 'all-commands'
-  | 'control-center';
+  | 'control-center'
+  | 'quick-ai';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -106,7 +108,6 @@ export function App(): JSX.Element {
         fileSearch: async (q, limit) =>
           native.isTauri() ? native.fileSearch(q, { limit }) : [],
         noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
-        webSearchUrl: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
       }),
       createCalculatorProvider(),
     ],
@@ -320,7 +321,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'notes' ||
           outcome.pushView === 'extension-list' ||
           outcome.pushView === 'all-commands' ||
-          outcome.pushView === 'control-center'
+          outcome.pushView === 'control-center' ||
+          outcome.pushView === 'quick-ai'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -409,7 +411,8 @@ export function App(): JSX.Element {
           pushTarget === 'notes' ||
           pushTarget === 'extension-list' ||
           pushTarget === 'all-commands' ||
-          pushTarget === 'control-center'
+          pushTarget === 'control-center' ||
+          pushTarget === 'quick-ai'
         ) {
           setViewArg(ef.pushViewArg ?? null);
           setView(pushTarget);
@@ -497,6 +500,10 @@ export function App(): JSX.Element {
         {toast}
       </>
     );
+  }
+
+  if (view === 'quick-ai') {
+    return <><QuickAiView initialPrompt={viewArg ?? undefined} onPop={() => setView('root')} />{toast}</>;
   }
 
   return (

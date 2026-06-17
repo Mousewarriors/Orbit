@@ -307,6 +307,29 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > (unchanged); lint, strict typecheck, `vite build`, `cargo check --workspace` green.
 > Confirmation dialog + NL journeys remain to be GUI-verified on the next `tauri dev`.
 
+> **Update (session 7c, 2026-06-17, branch `claude/orbit-ai-runtime`) — Phase 4: Quick AI.**
+> The first AI surface, built end-to-end on the `@orbit/ai-runtime` foundation.
+> `QuickAiView` (new `quick-ai` launcher view): prompt input, optional **Clipboard
+> context chip**, streaming output with **Stop**, **Copy** and **Paste-into-active-app**
+> (paste reuses the confirmation dialog from slice 2), an explicit **on-device /
+> leaves-device privacy badge**, and bounded **recent prompts**. Reachable via a new
+> "Quick AI" Root Search command and from any AI-shaped natural-language request — the
+> intent provider's `unsupported-ai` items now **open Quick AI pre-filled** instead of
+> a web-search fallback (`ask ai …`, `summarise the clipboard`, `explain this error`).
+> Pure logic is unit-tested: `ai/providerConfig.ts` (settings→provider factory; Mock /
+> None reachable now, Ollama constructed faithfully but gated) and `ai/quickAi.ts`
+> (`buildMessages` with a prompt-injection guard treating context as data, bounded
+> recent-prompt list) — 12 tests. New **Settings → AI** section picks the provider and
+> saves the Ollama endpoint/model.
+> **Honest status:** the active provider is the **offline Mock** (clearly labelled — it
+> returns a synthetic placeholder, not real answers) or **None**. Real local **Ollama**
+> and cloud providers need a **native AI HTTP bridge** (the renderer can't reach
+> localhost under the Tauri CSP, and no Rust HTTP client exists yet — deliberately not
+> added blind this session); the OllamaProvider + Settings are ready for it. **Counts:
+> 364 JS tests** (+13) **/ 123 Rust** (unchanged); lint, strict typecheck, `vite build`,
+> `cargo check --workspace` all green. Quick AI is not GUI-run here — the controller +
+> provider factory are unit-covered; live streaming/paste want a `tauri dev` pass.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).
