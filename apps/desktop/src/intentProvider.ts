@@ -138,7 +138,12 @@ async function buildItems(
             source: 'command',
             icon: icon(display.icon),
           }),
-          primaryAction: { id: 'intent.restart-relay.run', title: 'Restart Relay', run: action },
+          primaryAction: {
+            id: 'intent.restart-relay.run',
+            title: 'Restart Relay',
+            run: action,
+            dangerous: true,
+          },
         },
       ];
     }

@@ -99,13 +99,15 @@ describe('intent provider — control center navigation', () => {
 });
 
 describe('intent provider — direct + find', () => {
-  it('"restart relay" runs the existing narrow Relay command', async () => {
+  it('"restart relay" runs the existing narrow Relay command, flagged dangerous', async () => {
     const items = await run('restart relay');
     expect(items[0]!.primaryAction.run).toEqual({
       kind: 'builtin',
       handler: 'run-command',
       args: { commandId: 'builtin.cc.restart' },
     });
+    // Consequential → must be confirmed before it runs.
+    expect(items[0]!.primaryAction.dangerous).toBe(true);
   });
 
   it('"find the document that mentioned Leonard" searches files for "leonard"', async () => {

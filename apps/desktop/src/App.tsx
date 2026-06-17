@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { RankedItem, RankingSignals, SearchProvider } from '@orbit/shared-types';
+import type {
+  ActionDescriptor,
+  RankedItem,
+  RankingSignals,
+  SearchProvider,
+} from '@orbit/shared-types';
 import { runSearch } from '@orbit/search-engine';
 import { createCommandProvider } from '@orbit/command-model';
 import { BRANDING } from '@orbit/branding';
@@ -29,6 +34,8 @@ import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
+import { ConfirmDialog } from './components/ConfirmDialog.js';
+import { describeConfirmation, needsConfirmation } from './confirm.js';
 import { decodeControlCenterArg } from './controlCenterState.js';
 
 type View =
@@ -56,6 +63,11 @@ export function App(): JSX.Element {
   const [results, setResults] = useState<RankedItem[]>([]);
   const [selected, setSelected] = useState(0);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  // A consequential action awaiting explicit confirmation (preview shown).
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    itemId: string;
+    action: ActionDescriptor;
+  } | null>(null);
   const [view, setView] = useState<View>('root');
   const [viewArg, setViewArg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -290,22 +302,16 @@ export function App(): JSX.Element {
     if (view === 'root') inputRef.current?.focus();
   }, [view]);
 
-  const runItem = useCallback(
-    async (ranked: RankedItem | undefined, actionIndex = -1) => {
-      if (!ranked) return;
-      const { item } = ranked;
-      const action =
-        actionIndex < 0
-          ? item.primaryAction
-          : [item.primaryAction, ...(item.secondaryActions ?? [])][actionIndex];
-      if (!action) return;
+  // Run an already-resolved action (past any confirmation gate).
+  const executeResolved = useCallback(
+    async (itemId: string, action: ActionDescriptor) => {
       try {
         setError(null);
         const outcome = await executeAction(action, { query, effects });
         // Learn from usage for ranking (keyed by item id). Only reached when the
         // action resolved successfully — a failed launch throws and is caught
         // below, so we never record usage for something that didn't happen.
-        if (native.isTauri()) void native.recordCommandUsage(item.id).catch(() => {});
+        if (native.isTauri()) void native.recordCommandUsage(itemId).catch(() => {});
         setActionMenuOpen(false);
         if (
           outcome.pushView === 'clipboard' ||
@@ -329,9 +335,30 @@ export function App(): JSX.Element {
     [query, effects],
   );
 
+  const runItem = useCallback(
+    async (ranked: RankedItem | undefined, actionIndex = -1) => {
+      if (!ranked) return;
+      const { item } = ranked;
+      const action =
+        actionIndex < 0
+          ? item.primaryAction
+          : [item.primaryAction, ...(item.secondaryActions ?? [])][actionIndex];
+      if (!action) return;
+      // Consequential actions are previewed and must be explicitly approved
+      // before they run (e.g. "Restart Relay" from the natural-language bar).
+      if (needsConfirmation(action)) {
+        setActionMenuOpen(false);
+        setPendingConfirm({ itemId: item.id, action });
+        return;
+      }
+      await executeResolved(item.id, action);
+    },
+    [executeResolved],
+  );
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (actionMenuOpen) return; // ActionMenu handles its own keys
+      if (actionMenuOpen || pendingConfirm) return; // dialogs handle their own keys
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -351,8 +378,10 @@ export function App(): JSX.Element {
         else if (native.isTauri()) void native.hideLauncher().catch(() => {});
       }
     },
-    [actionMenuOpen, results, selected, query, runItem],
+    [actionMenuOpen, pendingConfirm, results, selected, query, runItem],
   );
+
+  const confirmPrompt = pendingConfirm ? describeConfirmation(pendingConfirm.action) : null;
 
   const current = results[selected];
 
@@ -528,6 +557,17 @@ export function App(): JSX.Element {
           item={current.item}
           onClose={() => setActionMenuOpen(false)}
           onRun={(idx) => void runItem(current, idx)}
+        />
+      )}
+      {pendingConfirm && confirmPrompt && (
+        <ConfirmDialog
+          prompt={confirmPrompt}
+          onConfirm={() => {
+            const { itemId, action } = pendingConfirm;
+            setPendingConfirm(null);
+            void executeResolved(itemId, action);
+          }}
+          onCancel={() => setPendingConfirm(null)}
         />
       )}
       {toast}

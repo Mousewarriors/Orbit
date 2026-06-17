@@ -412,6 +412,53 @@ kbd {
   color: var(--destructive);
 }
 
+/* Confirmation/preview dialog for consequential actions. Centred, solid surface
+ * so the preview is always legible over the (blurred) results. */
+.orbit-confirm {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 86vw);
+  background: var(--elevated-bg);
+  border: 1px solid var(--separator);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  backdrop-filter: blur(30px);
+}
+.orbit-confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.orbit-confirm-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.orbit-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.orbit-confirm-actions button {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid var(--separator);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: default;
+}
+.orbit-confirm-ok {
+  background: var(--row-selected);
+  border-color: transparent;
+  font-weight: 600;
+}
+
 /* Error boundary fallback. Solid (non-transparent) surface so a renderer crash
  * is always legible, in both the launcher and the Settings window. */
 .orbit-error-boundary {
