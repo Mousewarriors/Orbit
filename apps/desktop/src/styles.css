@@ -1037,3 +1037,65 @@ kbd {
   overflow-y: auto;
   max-height: 480px;
 }
+
+/* Ambient Notifications */
+
+.orbit-notifications {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  max-width: 320px;
+}
+
+.orbit-notification {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--orbit-card-bg, #2a2a2a);
+  border: 1px solid var(--orbit-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: orbit-notify-in 0.2s ease-out;
+}
+
+.orbit-notification span {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.orbit-notification-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--orbit-secondary-text, #888);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.orbit-notification-info {
+  border-left: 3px solid var(--orbit-accent, #409cff);
+}
+
+.orbit-notification-warning {
+  border-left: 3px solid var(--orbit-warning, #eb5);
+}
+
+.orbit-notification-error {
+  border-left: 3px solid var(--orbit-error, #e55);
+}
+
+@keyframes orbit-notify-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}

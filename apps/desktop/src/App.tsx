@@ -27,6 +27,7 @@ import { NotesView } from './components/NotesView.js';
 import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
+import { NotificationToast, useNotifications } from './components/NotificationToast.js';
 import type { ControlCenterTab } from './controlCenterState.js';
 
 type View =
@@ -65,6 +66,8 @@ export function App(): JSX.Element {
   // "Rebuild File Index"), so the launcher gives visible feedback instead of
   // silently closing.
   const [status, setStatus] = useState<string | null>(null);
+
+  const { notifications, dismiss: dismissNotification } = useNotifications();
 
   const appsRef = useRef<native.NativeApp[]>([]);
   const extCommandsRef = useRef<native.ExtCommandInfo[]>([]);
@@ -375,51 +378,61 @@ export function App(): JSX.Element {
     [closeToRoot],
   );
 
+  const toast = (
+    <NotificationToast notifications={notifications} onDismiss={dismissNotification} />
+  );
+
   if (view === 'clipboard') {
-    return <ClipboardView onPop={() => setView('root')} onCopied={closeToRoot} />;
+    return <><ClipboardView onPop={() => setView('root')} onCopied={closeToRoot} />{toast}</>;
   }
 
   if (view === 'snippets') {
-    return <SnippetsView onPop={() => setView('root')} onPasted={closeToRoot} />;
+    return <><SnippetsView onPop={() => setView('root')} onPasted={closeToRoot} />{toast}</>;
   }
 
   if (view === 'quicklinks') {
-    return <QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />;
+    return <><QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />{toast}</>;
   }
 
   if (view === 'notes') {
-    return <NotesView initialNoteId={viewArg} onPop={() => setView('root')} />;
+    return <><NotesView initialNoteId={viewArg} onPop={() => setView('root')} />{toast}</>;
   }
 
   if (view === 'extension-list') {
     return (
-      <ExtensionListView
-        target={viewArg ?? ''}
-        onPop={() => setView('root')}
-        onDone={closeToRoot}
-      />
+      <>
+        <ExtensionListView
+          target={viewArg ?? ''}
+          onPop={() => setView('root')}
+          onDone={closeToRoot}
+        />
+        {toast}
+      </>
     );
   }
 
   if (view === 'all-commands') {
     return (
-      <AllCommandsView
-        definitions={registry.listEnabled()}
-        extCommands={extCommandsRef.current}
-        onPop={() => setView('root')}
-        onRunBuiltin={runCommandById}
-        onRunExtension={runExtFromBrowse}
-      />
+      <>
+        <AllCommandsView
+          definitions={registry.listEnabled()}
+          extCommands={extCommandsRef.current}
+          onPop={() => setView('root')}
+          onRunBuiltin={runCommandById}
+          onRunExtension={runExtFromBrowse}
+        />
+        {toast}
+      </>
     );
   }
 
   if (view === 'agent-center') {
-    return <ControlCenterView onPop={() => setView('root')} initialTab="launch" />;
+    return <><ControlCenterView onPop={() => setView('root')} initialTab="launch" />{toast}</>;
   }
 
   if (view === 'control-center') {
     const ccTab = (viewArg ?? 'projects') as ControlCenterTab;
-    return <ControlCenterView onPop={() => setView('root')} initialTab={ccTab} />;
+    return <><ControlCenterView onPop={() => setView('root')} initialTab={ccTab} />{toast}</>;
   }
 
   return (
@@ -482,6 +495,7 @@ export function App(): JSX.Element {
           onRun={(idx) => void runItem(current, idx)}
         />
       )}
+      {toast}
     </div>
   );
 }
