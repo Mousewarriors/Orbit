@@ -937,3 +937,66 @@ kbd {
   flex-direction: column;
   gap: 2px;
 }
+
+.cc-handoffs-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--orbit-border);
+}
+
+.cc-handoffs-toolbar button {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.cc-handoffs-toolbar button.is-active {
+  background: var(--orbit-accent-bg, rgba(64, 156, 255, 0.15));
+  font-weight: 600;
+}
+
+.cc-handoff-form {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cc-handoff-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cc-handoff-form select {
+  background: var(--orbit-input-bg, #1e1e1e);
+  color: inherit;
+  border: 1px solid var(--orbit-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.cc-handoff-result {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--orbit-accent-bg, rgba(64, 156, 255, 0.08));
+  border-bottom: 1px solid var(--orbit-border);
+}
+
+.cc-handoff-validation {
+  padding: 8px;
+  background: var(--orbit-input-bg, rgba(255, 255, 255, 0.04));
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.cc-handoff-list {
+  padding: 4px 0;
+}

@@ -478,7 +478,13 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
       </TabPanel>
 
       <TabPanel active={tab === 'handoffs'}>
-        <HandoffsPanel relayReady={relayReady} tabError={tabErrors['handoffs'] ?? null} />
+        <HandoffsPanel
+          relayReady={relayReady}
+          tabError={tabErrors['handoffs'] ?? null}
+          agents={agents}
+          projects={projects}
+          onNavigate={(t) => setTab(t)}
+        />
       </TabPanel>
 
       <TabPanel active={tab === 'approvals'}>
@@ -1264,23 +1270,251 @@ function ActivityPanel({
 function HandoffsPanel({
   relayReady,
   tabError,
+  agents,
+  projects,
+  onNavigate,
 }: {
   readonly relayReady: boolean;
   readonly tabError: string | null;
+  readonly agents: readonly RelayObject[];
+  readonly projects: readonly RelayObject[];
+  readonly onNavigate: (tab: ControlCenterTab) => void;
 }): JSX.Element {
+  const [mode, setMode] = useState<'list' | 'create' | 'validate'>('list');
+  const [handoffHistory, setHandoffHistory] = useState<RelayObject[]>([]);
+  const [fromAgent, setFromAgent] = useState('');
+  const [toAgent, setToAgent] = useState('');
+  const [handoffProject, setHandoffProject] = useState('');
+  const [objective, setObjective] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [validationPath, setValidationPath] = useState('');
+  const [validation, setValidation] = useState<RelayObject | null>(null);
+
+  const handleCreate = useCallback(async () => {
+    if (!native.isTauri() || !fromAgent || !toAgent || !handoffProject) return;
+    setBusy(true);
+    setResult(null);
+    try {
+      const payload = await native.relayCreateHandoff({
+        projectPath: handoffProject,
+        fromAgentId: fromAgent,
+        toAgentId: toAgent,
+        objective: objective.trim() || null,
+      });
+      const created = asObject(payload);
+      if (created) {
+        setHandoffHistory((prev) => [created, ...prev].slice(0, 50));
+      }
+      setResult('Handoff created successfully');
+      setMode('list');
+      setObjective('');
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [fromAgent, toAgent, handoffProject, objective]);
+
+  const handleValidate = useCallback(async () => {
+    if (!native.isTauri() || !validationPath.trim()) return;
+    setBusy(true);
+    setResult(null);
+    setValidation(null);
+    try {
+      const payload = await native.relayValidateHandoff(validationPath.trim());
+      setValidation(asObject(payload));
+      setResult('Validation complete');
+    } catch (e) {
+      setResult(`Validation error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [validationPath]);
+
   return (
-    <div className="relay-session-list cc-handoffs">
+    <div className="cc-handoffs">
       {!relayReady && (
         <div className="relay-tab-error">Relay is not ready — handoff operations unavailable</div>
       )}
       {tabError && <div className="relay-tab-error">{tabError}</div>}
-      <div className="relay-empty">
-        <div>Handoff workspace</div>
-        <small style={{ display: 'block', marginTop: 6 }}>
-          Create, validate and continue agent-to-agent handoffs from the Launch tab or project
-          details. Handoff history will appear here.
-        </small>
+
+      <div className="cc-handoffs-toolbar">
+        <button
+          className={mode === 'list' ? 'is-active' : ''}
+          onClick={() => setMode('list')}
+        >
+          History
+        </button>
+        <button
+          className={mode === 'create' ? 'is-active' : ''}
+          onClick={() => setMode('create')}
+          disabled={!relayReady}
+        >
+          Create
+        </button>
+        <button
+          className={mode === 'validate' ? 'is-active' : ''}
+          onClick={() => setMode('validate')}
+          disabled={!relayReady}
+        >
+          Validate
+        </button>
       </div>
+
+      {result && <div className="cc-handoff-result">{result}</div>}
+
+      {mode === 'create' && (
+        <div className="cc-handoff-form">
+          <label>
+            From Agent
+            <select value={fromAgent} onChange={(e) => setFromAgent(e.target.value)}>
+              <option value="">Select agent...</option>
+              {agents.map((a) => {
+                const id = agentId(a);
+                return (
+                  <option key={id} value={id}>
+                    {agentTitle(a)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <label>
+            To Agent
+            <select value={toAgent} onChange={(e) => setToAgent(e.target.value)}>
+              <option value="">Select agent...</option>
+              {agents.map((a) => {
+                const id = agentId(a);
+                return (
+                  <option key={id} value={id}>
+                    {agentTitle(a)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <label>
+            Project
+            <select value={handoffProject} onChange={(e) => setHandoffProject(e.target.value)}>
+              <option value="">Select project...</option>
+              {projects.map((p) => {
+                const path = projectPath(p);
+                return (
+                  <option key={path} value={path}>
+                    {projectTitle(p)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <label>
+            Objective (optional)
+            <input
+              className="relay-input"
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
+              placeholder="What should the receiving agent accomplish?"
+            />
+          </label>
+          <button
+            className="relay-primary"
+            onClick={() => void handleCreate()}
+            disabled={busy || !fromAgent || !toAgent || !handoffProject || fromAgent === toAgent}
+          >
+            {busy ? 'Creating...' : 'Create Handoff'}
+          </button>
+          {fromAgent === toAgent && fromAgent !== '' && (
+            <div className="relay-warning">From and To agents must be different</div>
+          )}
+        </div>
+      )}
+
+      {mode === 'validate' && (
+        <div className="cc-handoff-form">
+          <label>
+            Handoff file path
+            <input
+              className="relay-input"
+              value={validationPath}
+              onChange={(e) => setValidationPath(e.target.value)}
+              placeholder="Path to handoff file..."
+            />
+          </label>
+          <button
+            className="relay-primary"
+            onClick={() => void handleValidate()}
+            disabled={busy || !validationPath.trim()}
+          >
+            {busy ? 'Validating...' : 'Validate Handoff'}
+          </button>
+          {validation && (
+            <div className="cc-handoff-validation">
+              <strong>Validation Result</strong>
+              <span>Valid: {recordString(validation, 'valid') ?? String(boolOf(validation.valid))}</span>
+              {recordString(validation, 'fromAgentId') && (
+                <span>From: {recordString(validation, 'fromAgentId')}</span>
+              )}
+              {recordString(validation, 'toAgentId') && (
+                <span>To: {recordString(validation, 'toAgentId')}</span>
+              )}
+              {recordString(validation, 'objective') && (
+                <span>Objective: {recordString(validation, 'objective')}</span>
+              )}
+              {recordArray(validation, 'errors').length > 0 && (
+                <div className="relay-warning">
+                  {recordArray(validation, 'errors')
+                    .filter((e): e is string => typeof e === 'string')
+                    .map((e, idx) => (
+                      <span key={idx}>{e}</span>
+                    ))}
+                </div>
+              )}
+              {boolOf(validation.valid) && (
+                <button
+                  className="relay-primary"
+                  onClick={() => onNavigate('launch')}
+                  style={{ marginTop: 8 }}
+                >
+                  Continue with Launch
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === 'list' && (
+        <div className="cc-handoff-list">
+          {handoffHistory.length === 0 ? (
+            <div className="relay-empty">
+              <div>No handoffs yet this session</div>
+              <small style={{ display: 'block', marginTop: 6 }}>
+                Use Create to set up an agent-to-agent handoff, or Validate to check an existing
+                handoff file.
+              </small>
+            </div>
+          ) : (
+            handoffHistory.map((handoff, i) => {
+              const from = recordString(handoff, 'fromAgentId') ?? 'unknown';
+              const to = recordString(handoff, 'toAgentId') ?? 'unknown';
+              const proj = recordString(handoff, 'projectPath') ?? '';
+              const obj = recordString(handoff, 'objective') ?? '';
+              return (
+                <div key={i} className="relay-session-row">
+                  <div>
+                    <strong>
+                      {from} → {to}
+                    </strong>
+                    {proj && <span>{proj.split(/[\\/]/).pop()}</span>}
+                    {obj && <small>{obj}</small>}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
