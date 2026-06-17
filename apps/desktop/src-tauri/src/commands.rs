@@ -839,6 +839,16 @@ pub fn set_activation_shortcut(
     orbit_core::set_setting(&conn, "general.hotkey", &accelerator).map_err(|e| e.to_string())
 }
 
+/// Return the current user's home directory via Tauri's trusted path resolver.
+/// Never hard-codes a username — delegates entirely to the OS/Tauri.
+#[tauri::command]
+pub fn get_home_dir(app: AppHandle) -> Result<String, String> {
+    app.path()
+        .home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
 /// Read-only diagnostics for the Developer settings section.
 #[derive(serde::Serialize)]
 pub struct Diagnostics {

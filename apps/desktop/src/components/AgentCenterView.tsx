@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as native from '../native.js';
 import {
+  EMPTY_ROOT_MESSAGE,
+  SCAN_ROOT_SETTING_KEY,
   agentId,
   agentTitle,
   asObject,
@@ -9,14 +11,17 @@ import {
   canExecuteLaunch,
   canStopSession,
   displayTime,
+  isScanDisabled,
   planId,
   projectPath,
   projectTitle,
   recordArray,
   recordString,
   recordsFrom,
+  resolveInitialScanRoot,
   sessionId,
   statusTone,
+  validateScanRoot,
   warningList,
   type RelayObject,
 } from '../relayViewModel.js';
@@ -36,6 +41,7 @@ export function AgentCenterView({ onPop }: AgentCenterViewProps): JSX.Element {
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [projectRoot, setProjectRoot] = useState('');
+  const [rootHydrated, setRootHydrated] = useState(false);
   const [inspection, setInspection] = useState<RelayObject | null>(null);
   const [plan, setPlan] = useState<RelayObject | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -76,10 +82,15 @@ export function AgentCenterView({ onPop }: AgentCenterViewProps): JSX.Element {
 
   const scanProjects = useCallback(async () => {
     if (!native.isTauri()) return;
+    const trimmedRoot = validateScanRoot(projectRoot);
+    if (!trimmedRoot) {
+      setError(EMPTY_ROOT_MESSAGE);
+      return;
+    }
     setBusy('projects');
     setError(null);
     try {
-      const payload = await native.relayScanProjects(projectRoot.trim() || null);
+      const payload = await native.relayScanProjects(trimmedRoot);
       const next = recordsFrom(payload, 'projects');
       setProjects(next);
       setSelectedProject((current) =>
@@ -87,6 +98,7 @@ export function AgentCenterView({ onPop }: AgentCenterViewProps): JSX.Element {
           ? current
           : projectPath(next[0] ?? null),
       );
+      await native.setSetting(SCAN_ROOT_SETTING_KEY, trimmedRoot);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -179,17 +191,17 @@ export function AgentCenterView({ onPop }: AgentCenterViewProps): JSX.Element {
     try {
       await refreshStatus();
       await refreshAgents();
-      const payload = await native.relayScanProjects(null);
-      const next = recordsFrom(payload, 'projects');
-      setProjects(next);
-      setSelectedProject((current) =>
-        current && next.some((project) => projectPath(project) === current)
-          ? current
-          : projectPath(next[0] ?? null),
-      );
       await refreshSessions();
+      // Hydrate the scan root: persisted setting first, then user home dir.
+      // Hydration always finishes (finally) so the Scan button is never
+      // permanently blocked by a failed getHomeDir call.
+      const persisted = await native.getSetting(SCAN_ROOT_SETTING_KEY);
+      const homeDir = await native.getHomeDir();
+      setProjectRoot(resolveInitialScanRoot(persisted, homeDir));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRootHydrated(true);
     }
   }, [refreshAgents, refreshSessions, refreshStatus]);
 
@@ -297,7 +309,15 @@ export function AgentCenterView({ onPop }: AgentCenterViewProps): JSX.Element {
           <section className="relay-column" aria-label="Projects">
             <div className="relay-section-head">
               <span>Project</span>
-              <button onClick={() => void scanProjects()} disabled={!relayReady || busy === 'projects'}>
+              <button
+                onClick={() => void scanProjects()}
+                disabled={isScanDisabled({
+                  rootHydrated,
+                  root: projectRoot,
+                  relayReady,
+                  scanning: busy === 'projects',
+                })}
+              >
                 Scan
               </button>
             </div>

@@ -1,5 +1,39 @@
 export type RelayObject = Record<string, unknown>;
 
+/** Setting key used to persist the last successfully scanned project root. */
+export const SCAN_ROOT_SETTING_KEY = 'relay.scan.root';
+
+/** Friendly message shown when the user tries to scan without a valid root. */
+export const EMPTY_ROOT_MESSAGE = 'Choose a project folder before scanning.';
+
+/**
+ * Returns the trimmed root if non-empty, otherwise null.
+ * Preserves internal spaces and Unicode — only surrounding whitespace is removed.
+ */
+export function validateScanRoot(raw: string): string | null {
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Picks the initial scan root: persisted value first, then the user's home directory.
+ */
+export function resolveInitialScanRoot(persisted: string | null, homeDir: string): string {
+  return persisted ?? homeDir;
+}
+
+/**
+ * Returns true when the Scan Projects button should be disabled.
+ */
+export function isScanDisabled(opts: {
+  rootHydrated: boolean;
+  root: string;
+  relayReady: boolean;
+  scanning: boolean;
+}): boolean {
+  return !opts.relayReady || !opts.rootHydrated || !validateScanRoot(opts.root) || opts.scanning;
+}
+
 export function asObject(value: unknown): RelayObject | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as RelayObject)

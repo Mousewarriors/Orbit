@@ -349,6 +349,11 @@ export async function diagnostics(): Promise<Diagnostics> {
   return invoke<Diagnostics>('diagnostics');
 }
 
+/** Returns the current user's home directory via Tauri's trusted path resolver. */
+export async function getHomeDir(): Promise<string> {
+  return invoke<string>('get_home_dir');
+}
+
 /** Reveal the application data directory in the OS file manager. */
 export async function openDataDir(): Promise<void> {
   return invoke('open_data_dir');

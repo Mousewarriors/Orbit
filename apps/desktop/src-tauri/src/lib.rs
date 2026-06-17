@@ -363,6 +363,7 @@ pub fn run() {
             commands::paste_text,
             commands::open_settings,
             commands::set_activation_shortcut,
+            commands::get_home_dir,
             commands::diagnostics,
             commands::open_data_dir,
             commands::note_list,

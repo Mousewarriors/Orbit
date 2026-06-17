@@ -72,6 +72,26 @@ npm test
 The Relay Rust test set includes a certified sidecar smoke test that reaches
 `relay.ready` and answers `relay.health` through Orbit's supervisor.
 
+## Project Scan Root
+
+`projects.scan` always requires an explicit root — Relay does not accept a
+rootless call and returns `Invalid_params (-32602)` if one is attempted.
+
+Orbit enforces the root requirement locally:
+
+1. On first mount, the Agent Control Center hydrates the scan root from the
+   `relay.scan.root` setting key. If no persisted value exists the user's home
+   directory (resolved by Tauri's trusted path resolver) is used as the default.
+2. The Scan Projects button is disabled until hydration completes, Relay reaches
+   `ready`, and the root field contains a non-empty path.
+3. Before invoking `projects.scan` the root is trimmed. An empty result shows
+   "Choose a project folder before scanning." locally — the raw Relay error is
+   never exposed for this preventable case.
+4. After a successful scan the trimmed root is persisted to `relay.scan.root`
+   via the existing `set_setting` command. The value is restored on every
+   subsequent launch, including after a Windows restart.
+5. No automatic scan occurs on mount. The user must press **Scan** explicitly.
+
 ## Upgrade Procedure
 
 1. Copy the new certified Relay executable into `apps/desktop/src-tauri/binaries`.
