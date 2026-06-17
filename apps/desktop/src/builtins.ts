@@ -127,7 +127,7 @@ export const BUILTINS: BuiltinCommand[] = [
       keywords: ['agent', 'agents', 'ai', 'codex', 'claude', 'relay', 'launch'],
       subtitle: 'Launch and track local agent sessions',
     }),
-    effect: (): EffectResult => ({ pushView: 'agent-center' }),
+    effect: (): EffectResult => ({ pushView: 'control-center', pushViewArg: 'launch' }),
   },
   {
     definition: def('builtin.cc.projects', 'Projects', 'Control Center', 'agentos', {

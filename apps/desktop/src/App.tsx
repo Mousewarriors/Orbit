@@ -38,7 +38,6 @@ type View =
   | 'notes'
   | 'extension-list'
   | 'all-commands'
-  | 'agent-center'
   | 'control-center';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
@@ -283,7 +282,6 @@ export function App(): JSX.Element {
           outcome.pushView === 'notes' ||
           outcome.pushView === 'extension-list' ||
           outcome.pushView === 'all-commands' ||
-          outcome.pushView === 'agent-center' ||
           outcome.pushView === 'control-center'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
@@ -350,7 +348,6 @@ export function App(): JSX.Element {
           pushTarget === 'notes' ||
           pushTarget === 'extension-list' ||
           pushTarget === 'all-commands' ||
-          pushTarget === 'agent-center' ||
           pushTarget === 'control-center'
         ) {
           setViewArg(ef.pushViewArg ?? null);
@@ -424,10 +421,6 @@ export function App(): JSX.Element {
         {toast}
       </>
     );
-  }
-
-  if (view === 'agent-center') {
-    return <><ControlCenterView onPop={() => setView('root')} initialTab="launch" />{toast}</>;
   }
 
   if (view === 'control-center') {
