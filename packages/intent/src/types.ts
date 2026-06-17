@@ -73,6 +73,58 @@ export interface RecognisedIntent {
   readonly matchedRule: string;
 }
 
+/** Every intent name as a runtime list — used to validate AI-classified output. */
+export const ALL_INTENTS: readonly IntentName[] = [
+  'open_application',
+  'open_project',
+  'open_project_folder',
+  'open_latest_project',
+  'continue_project',
+  'launch_agent_on_project',
+  'show_active_sessions',
+  'show_failed_sessions',
+  'show_recent_activity',
+  'show_approvals',
+  'show_handoffs',
+  'validate_handoff',
+  'restart_relay',
+  'scan_projects',
+  'find_file',
+  'find_notes',
+  'explain_selection',
+  'explain_error',
+  'summarise_selection',
+  'summarise_clipboard',
+  'ask_quick_ai',
+];
+
+/** Narrowing guard for an untrusted string (e.g. AI output) → IntentName. */
+export function isIntentName(value: unknown): value is IntentName {
+  return typeof value === 'string' && (ALL_INTENTS as readonly string[]).includes(value);
+}
+
+/** Allowed agent preferences as a runtime list (validates AI output). */
+export const ALL_AGENT_PREFERENCES: readonly AgentPreference[] = [
+  'best',
+  'codex',
+  'claude',
+  'antigravity',
+  'openclaw',
+];
+
+/**
+ * Whether dispatching the effect of an intent is consequential (launches an
+ * agent, restarts a process). Shared by deterministic recognition and AI
+ * classification so both gate the same operations behind confirmation.
+ */
+export function intentRequiresConfirmation(intent: IntentName): boolean {
+  return (
+    intent === 'continue_project' ||
+    intent === 'launch_agent_on_project' ||
+    intent === 'restart_relay'
+  );
+}
+
 /** Whether an intent needs an AI runtime that is not yet available. */
 export function isAiIntent(intent: IntentName): boolean {
   return (

@@ -276,6 +276,37 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > mapping is fully unit-covered; live click-through of the NL journeys is the first
 > thing to confirm on the next `tauri dev`.
 
+> **Update (session 7b, 2026-06-17, branch `claude/orbit-ai-runtime`) — Slices 2 & 3:
+> confirmation/preview + AI runtime foundation.**
+> **Slice 2 — Action preview & confirmation (priority 6).** Pure `confirm.ts`
+> (`needsConfirmation` = action.dangerous; `describeConfirmation` → title/body/labels,
+> tested) + a modal `ConfirmDialog` (Enter=confirm, Esc/scrim=cancel) wired into the
+> launcher's single action choke-point: `App.runItem` now refactors execution into
+> `executeResolved` and, for any `dangerous` action, shows the preview first and only
+> runs on approval. The natural-language **Restart Relay** intent is marked dangerous
+> and is the first consumer (it actually restarts a process, so it must confirm).
+> **Slice 3 — AI runtime foundation (priority 7), `@orbit/ai-runtime`** (new pure
+> package, 34 tests; NOT yet wired to a user surface, per Phase 3 "no AI UI before the
+> runtime is reliable"): `AiProvider` contracts (health/listModels/complete/stream,
+> `AbortSignal` cancellation, `local` flag, typed `AiError`); **MockProvider**
+> (deterministic/offline/scriptable, streams) and **OllamaProvider** (local models
+> over an *injected* fetch — `/api/tags`, `/api/chat` NDJSON streaming, `format:json`,
+> usage mapping, never auto-pulls, typed unreachable/cancel). **Validated AI intent
+> classification** (`classify.ts`) — the deterministic-first fallback: the model is
+> constrained to a single known intent + whitelisted slots and the output is
+> hard-validated (unknown intents/fields/agents dropped, strings clamped), so AI can
+> only point at an existing safe intent and never widen Orbit's action surface.
+> **Deliberately does not duplicate the Model Intelligence Gateway** (Auto routing
+> stays server-side). Added `intentRequiresConfirmation`/`ALL_INTENTS`/`isIntentName`
+> to `@orbit/intent` (shared validation). Docs: `docs/architecture/AI_RUNTIME.md`.
+> **Honest scope:** no AI button is wired into Root Search yet — there's no configured
+> live model/credential, and a mock-backed "AI" result would fake a capability; the
+> AI-classification fallback + Quick AI surface land once a provider is configured
+> (`agentos-auto` is blocked on the Gateway HTTP adapter; direct providers need OS
+> secure-storage credentials). **Counts: 351 JS tests** (+23) **/ 123 Rust**
+> (unchanged); lint, strict typecheck, `vite build`, `cargo check --workspace` green.
+> Confirmation dialog + NL journeys remain to be GUI-verified on the next `tauri dev`.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).
