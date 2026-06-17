@@ -416,6 +416,11 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
           inspectSelectedProject={inspectSelectedProject}
           busy={busy}
           tabError={tabErrors['projects'] ?? null}
+          sessions={sessions}
+          onNavigateToLaunch={(path: string) => {
+            setSelectedProject(path);
+            setTab('launch');
+          }}
         />
       </TabPanel>
 
@@ -515,6 +520,8 @@ function ProjectsPanel({
   inspectSelectedProject,
   busy,
   tabError,
+  sessions,
+  onNavigateToLaunch,
 }: {
   readonly projects: RelayObject[];
   readonly selectedProject: string;
@@ -529,11 +536,89 @@ function ProjectsPanel({
   readonly inspectSelectedProject: () => Promise<void>;
   readonly busy: string | null;
   readonly tabError: string | null;
+  readonly sessions: readonly RelayObject[];
+  readonly onNavigateToLaunch: (projectPath: string) => void;
 }): JSX.Element {
+  const [filter, setFilter] = useState('');
+  const [recentMeta, setRecentMeta] = useState<native.ProjectMeta[]>([]);
+  const [favMeta, setFavMeta] = useState<native.ProjectMeta[]>([]);
+  const [selectedMeta, setSelectedMeta] = useState<native.ProjectMeta | null>(null);
+
+  useEffect(() => {
+    if (!native.isTauri()) return;
+    void native.projectMetaListRecent(20).then(setRecentMeta).catch(() => {});
+    void native.projectMetaListFavourites().then(setFavMeta).catch(() => {});
+  }, [projects]);
+
+  useEffect(() => {
+    if (!native.isTauri() || !selectedProject) {
+      setSelectedMeta(null);
+      return;
+    }
+    void native.projectMetaGet(selectedProject).then(setSelectedMeta).catch(() => setSelectedMeta(null));
+  }, [selectedProject]);
+
   const selected = useMemo(
     () => projects.find((p) => projectPath(p) === selectedProject) ?? null,
     [projects, selectedProject],
   );
+
+  const filteredProjects = useMemo(() => {
+    if (!filter.trim()) return projects;
+    const lower = filter.toLowerCase();
+    return projects.filter((p) => {
+      const name = projectTitle(p).toLowerCase();
+      const path = projectPath(p).toLowerCase();
+      return name.includes(lower) || path.includes(lower);
+    });
+  }, [projects, filter]);
+
+  const activeSessionsForProject = useMemo(() => {
+    if (!selectedProject) return 0;
+    return sessions.filter(
+      (s) => recordString(s, 'projectPath') === selectedProject,
+    ).length;
+  }, [sessions, selectedProject]);
+
+  const handleFavourite = useCallback(async () => {
+    if (!selectedProject) return;
+    const newFav = !selectedMeta?.favourite;
+    try {
+      await native.projectMetaSetFavourite(selectedProject, newFav);
+      setSelectedMeta((prev) => prev ? { ...prev, favourite: newFav } : prev);
+      const [r, f] = await Promise.all([
+        native.projectMetaListRecent(20),
+        native.projectMetaListFavourites(),
+      ]);
+      setRecentMeta(r);
+      setFavMeta(f);
+    } catch { /* non-fatal */ }
+  }, [selectedProject, selectedMeta]);
+
+  const handleOpenFolder = useCallback(async () => {
+    if (!selectedProject || !native.isTauri()) return;
+    try {
+      await native.revealPath(selectedProject);
+    } catch { /* non-fatal */ }
+  }, [selectedProject]);
+
+  const handleCopyPath = useCallback(async () => {
+    if (!selectedProject) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(selectedProject);
+      }
+    } catch { /* non-fatal */ }
+  }, [selectedProject]);
+
+  const handleSelectAndTouch = useCallback(async (path: string) => {
+    setSelectedProject(path);
+    if (native.isTauri()) {
+      void native.projectMetaTouch(path).catch(() => {});
+    }
+  }, [setSelectedProject]);
+
+  const favouritePaths = useMemo(() => new Set(favMeta.map((m) => m.path)), [favMeta]);
 
   return (
     <div className="relay-workspace cc-projects-workspace">
@@ -553,26 +638,78 @@ function ProjectsPanel({
           onChange={(e) => setProjectRoot(e.target.value)}
           placeholder="Project scan root"
         />
+        <input
+          className="relay-input"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter projects..."
+        />
         {tabError && <div className="relay-tab-error">{tabError}</div>}
         <div className="relay-list">
-          {projects.length === 0 ? (
+          {/* Favourites section */}
+          {!filter.trim() && favMeta.length > 0 && (
+            <>
+              <div className="orbit-category-header">Favourites</div>
+              {favMeta.map((meta) => (
+                <button
+                  key={`fav-${meta.path}`}
+                  className={selectedProject === meta.path ? 'relay-row is-selected' : 'relay-row'}
+                  onClick={() => void handleSelectAndTouch(meta.path)}
+                >
+                  <span>{meta.name ?? meta.path.split(/[\\/]/).pop() ?? meta.path}</span>
+                  <small>{meta.path}</small>
+                </button>
+              ))}
+            </>
+          )}
+          {/* Recent section (when no filter and no scan results yet) */}
+          {!filter.trim() && projects.length === 0 && recentMeta.length > 0 && (
+            <>
+              <div className="orbit-category-header">Recent</div>
+              {recentMeta.map((meta) => (
+                <button
+                  key={`recent-${meta.path}`}
+                  className={selectedProject === meta.path ? 'relay-row is-selected' : 'relay-row'}
+                  onClick={() => void handleSelectAndTouch(meta.path)}
+                >
+                  <span>{meta.name ?? meta.path.split(/[\\/]/).pop() ?? meta.path}</span>
+                  <small>{meta.path}</small>
+                </button>
+              ))}
+            </>
+          )}
+          {/* Scanned projects */}
+          {filteredProjects.length === 0 && projects.length === 0 && recentMeta.length === 0 ? (
             <div className="relay-empty">
               {rootHydrated ? 'No projects scanned yet' : 'Loading...'}
             </div>
+          ) : filteredProjects.length === 0 && filter.trim() ? (
+            <div className="relay-empty">No projects match "{filter}"</div>
           ) : (
-            projects.map((project) => {
-              const path = projectPath(project);
-              return (
-                <button
-                  key={path}
-                  className={selectedProject === path ? 'relay-row is-selected' : 'relay-row'}
-                  onClick={() => setSelectedProject(path)}
-                >
-                  <span>{projectTitle(project)}</span>
-                  <small>{path}</small>
-                </button>
-              );
-            })
+            <>
+              {filteredProjects.length > 0 && (
+                <div className="orbit-category-header">
+                  {filter.trim() ? 'Matching' : 'All Projects'}
+                </div>
+              )}
+              {filteredProjects.map((project) => {
+                const path = projectPath(project);
+                const isFav = favouritePaths.has(path);
+                return (
+                  <button
+                    key={path}
+                    className={selectedProject === path ? 'relay-row is-selected' : 'relay-row'}
+                    onClick={() => void handleSelectAndTouch(path)}
+                  >
+                    <span>
+                      {isFav ? '* ' : ''}
+                      {projectTitle(project)}
+                    </span>
+                    <small>{path}</small>
+                  </button>
+                );
+              })}
+            </>
           )}
         </div>
       </section>
@@ -598,14 +735,36 @@ function ProjectsPanel({
                     .join(', ')}
                 </span>
               )}
+              {activeSessionsForProject > 0 && (
+                <span>Active sessions: {activeSessionsForProject}</span>
+              )}
+              {selectedMeta?.preferred_agent && (
+                <span>Preferred agent: {selectedMeta.preferred_agent}</span>
+              )}
             </div>
             <div className="cc-project-actions">
               <button
                 className="relay-primary"
+                onClick={() => onNavigateToLaunch(selectedProject)}
+                disabled={!relayReady}
+              >
+                Continue Project
+              </button>
+              <button
                 onClick={() => void inspectSelectedProject()}
                 disabled={busy === 'inspect'}
+                className="relay-icon-button"
               >
-                {busy === 'inspect' ? 'Inspecting...' : 'Inspect Project'}
+                {busy === 'inspect' ? 'Inspecting...' : 'Inspect'}
+              </button>
+              <button onClick={() => void handleFavourite()} className="relay-icon-button">
+                {selectedMeta?.favourite ? 'Unfavourite' : 'Favourite'}
+              </button>
+              <button onClick={() => void handleOpenFolder()} className="relay-icon-button">
+                Open Folder
+              </button>
+              <button onClick={() => void handleCopyPath()} className="relay-icon-button">
+                Copy Path
               </button>
             </div>
           </>

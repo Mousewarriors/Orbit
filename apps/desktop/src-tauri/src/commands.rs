@@ -910,6 +910,82 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Project metadata (Orbit-owned enrichments for Relay-scanned projects)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn project_meta_get(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<Option<orbit_core::projects::ProjectMeta>, String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::get(&conn, &path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_upsert(
+    state: State<'_, AppState>,
+    path: String,
+    name: Option<String>,
+) -> Result<orbit_core::projects::ProjectMeta, String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::upsert(&conn, &path, name.as_deref(), now_ms()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_touch(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::touch(&conn, &path, now_ms()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_set_favourite(
+    state: State<'_, AppState>,
+    path: String,
+    favourite: bool,
+) -> Result<(), String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::set_favourite(&conn, &path, favourite, now_ms()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_set_preferred_agent(
+    state: State<'_, AppState>,
+    path: String,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::set_preferred_agent(&conn, &path, agent_id.as_deref(), now_ms())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_list_recent(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::projects::ProjectMeta>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::list_recent(&conn, limit.unwrap_or(20).clamp(1, 100))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_list_favourites(
+    state: State<'_, AppState>,
+) -> Result<Vec<orbit_core::projects::ProjectMeta>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::list_favourites(&conn).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Orbit Relay
 // ---------------------------------------------------------------------------
 

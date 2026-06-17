@@ -477,6 +477,58 @@ export async function quitApp(): Promise<void> {
   return invoke('quit_app');
 }
 
+// --- Project metadata ---
+
+export interface ProjectMeta {
+  path: string;
+  name: string | null;
+  favourite: boolean;
+  last_opened_at: number;
+  preferred_agent: string | null;
+  build_brief: string | null;
+  docs_path: string | null;
+  preview_url: string | null;
+  studio_url: string | null;
+  created_at: number;
+}
+
+export async function projectMetaGet(path: string): Promise<ProjectMeta | null> {
+  return invoke<ProjectMeta | null>('project_meta_get', { path });
+}
+
+export async function projectMetaUpsert(
+  path: string,
+  name: string | null,
+): Promise<ProjectMeta> {
+  return invoke<ProjectMeta>('project_meta_upsert', { path, name });
+}
+
+export async function projectMetaTouch(path: string): Promise<void> {
+  return invoke('project_meta_touch', { path });
+}
+
+export async function projectMetaSetFavourite(
+  path: string,
+  favourite: boolean,
+): Promise<void> {
+  return invoke('project_meta_set_favourite', { path, favourite });
+}
+
+export async function projectMetaSetPreferredAgent(
+  path: string,
+  agentId: string | null,
+): Promise<void> {
+  return invoke('project_meta_set_preferred_agent', { path, agentId });
+}
+
+export async function projectMetaListRecent(limit = 20): Promise<ProjectMeta[]> {
+  return invoke<ProjectMeta[]>('project_meta_list_recent', { limit });
+}
+
+export async function projectMetaListFavourites(): Promise<ProjectMeta[]> {
+  return invoke<ProjectMeta[]>('project_meta_list_favourites');
+}
+
 // --- Orbit Relay ---
 
 export type RelaySupervisorState =

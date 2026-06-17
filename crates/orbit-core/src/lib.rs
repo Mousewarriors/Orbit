@@ -8,6 +8,7 @@ pub mod extstore;
 pub mod files;
 pub mod migrations;
 pub mod notes;
+pub mod projects;
 pub mod quicklinks;
 pub mod snippets;
 

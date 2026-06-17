@@ -410,6 +410,13 @@ pub fn run() {
             commands::relay_validate_handoff,
             commands::relay_list_events,
             commands::relay_restart,
+            commands::project_meta_get,
+            commands::project_meta_upsert,
+            commands::project_meta_touch,
+            commands::project_meta_set_favourite,
+            commands::project_meta_set_preferred_agent,
+            commands::project_meta_list_recent,
+            commands::project_meta_list_favourites,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())

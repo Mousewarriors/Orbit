@@ -168,6 +168,26 @@ pub const MIGRATIONS: &[&str] = &[
     r#"
     CREATE VIRTUAL TABLE files_content_fts USING fts5(path UNINDEXED, content);
     "#,
+    // 0008 — Local project metadata for the Control Center. Relay owns project
+    // scanning and discovery; Orbit persists user-owned enrichments (favourite,
+    // preferred agent, last opened, display name override). The path is the
+    // natural key, matching Relay's project identity.
+    r#"
+    CREATE TABLE project_meta (
+        path            TEXT PRIMARY KEY NOT NULL,
+        name            TEXT,
+        favourite       INTEGER NOT NULL DEFAULT 0,
+        last_opened_at  INTEGER NOT NULL DEFAULT 0,
+        preferred_agent TEXT,
+        build_brief     TEXT,
+        docs_path       TEXT,
+        preview_url     TEXT,
+        studio_url      TEXT,
+        created_at      INTEGER NOT NULL
+    );
+    CREATE INDEX idx_project_meta_last_opened ON project_meta(last_opened_at DESC);
+    CREATE INDEX idx_project_meta_favourite ON project_meta(favourite) WHERE favourite = 1;
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -238,6 +258,7 @@ mod tests {
             "files",
             "notes",
             "extension_storage",
+            "project_meta",
         ] {
             let count: i64 = conn
                 .query_row(
