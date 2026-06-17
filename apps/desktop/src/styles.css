@@ -1000,3 +1000,40 @@ kbd {
 .cc-handoff-list {
   padding: 4px 0;
 }
+
+.cc-approvals-header {
+  padding: 10px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-approvals-header small {
+  font-size: 11px;
+  color: var(--orbit-secondary-text, #888);
+}
+
+.cc-approvals-stats {
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--orbit-border);
+}
+
+.cc-stat {
+  font-size: 12px;
+}
+
+.cc-stat strong {
+  margin-right: 3px;
+}
+
+.cc-stat-pending strong { color: var(--orbit-warning, #eb5); }
+.cc-stat-approved strong { color: var(--orbit-success, #5e5); }
+.cc-stat-denied strong { color: var(--orbit-error, #e55); }
+
+.cc-approvals-list {
+  padding: 4px 0;
+  overflow-y: auto;
+  max-height: 480px;
+}

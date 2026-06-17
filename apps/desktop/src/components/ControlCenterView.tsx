@@ -488,7 +488,12 @@ export function ControlCenterView({ onPop, initialTab }: ControlCenterViewProps)
       </TabPanel>
 
       <TabPanel active={tab === 'approvals'}>
-        <ApprovalsPanel tabError={tabErrors['approvals'] ?? null} />
+        <ApprovalsPanel
+          tabError={tabErrors['approvals'] ?? null}
+          events={events}
+          relayReady={relayReady}
+          onNavigate={(t) => setTab(t)}
+        />
       </TabPanel>
 
       <TabPanel active={tab === 'diagnostics'}>
@@ -1523,21 +1528,124 @@ function HandoffsPanel({
 // Approvals tab (observational foundation)
 // ---------------------------------------------------------------------------
 
+const APPROVAL_EVENT_TYPES = new Set([
+  'approval', 'approval_request', 'approval_response', 'approval_timeout',
+  'confirm', 'deny', 'permission', 'authorization',
+]);
+
+function isApprovalEvent(event: RelayObject): boolean {
+  const type = (recordString(event, 'type') ?? recordString(event, 'kind') ?? '').toLowerCase();
+  if (APPROVAL_EVENT_TYPES.has(type)) return true;
+  const summary = (recordString(event, 'summary') ?? recordString(event, 'message') ?? '').toLowerCase();
+  return summary.includes('approv') || summary.includes('permission') || summary.includes('confirm');
+}
+
 function ApprovalsPanel({
   tabError,
+  events,
+  relayReady,
+  onNavigate,
 }: {
   readonly tabError: string | null;
+  readonly events: readonly RelayObject[];
+  readonly relayReady: boolean;
+  readonly onNavigate: (tab: ControlCenterTab) => void;
 }): JSX.Element {
+  const approvalEvents = useMemo(() => events.filter(isApprovalEvent), [events]);
+
+  const stats = useMemo(() => {
+    let pending = 0;
+    let approved = 0;
+    let denied = 0;
+    for (const event of approvalEvents) {
+      const type = (recordString(event, 'type') ?? '').toLowerCase();
+      const status = (recordString(event, 'status') ?? '').toLowerCase();
+      if (type === 'approval_request' || status === 'pending') pending++;
+      else if (type === 'approval_response' || status === 'approved' || type === 'confirm') approved++;
+      else if (status === 'denied' || type === 'deny') denied++;
+    }
+    return { pending, approved, denied, total: approvalEvents.length };
+  }, [approvalEvents]);
+
   return (
-    <div className="relay-session-list cc-approvals">
+    <div className="cc-approvals">
       {tabError && <div className="relay-tab-error">{tabError}</div>}
-      <div className="relay-empty">
-        <div>Approvals — observational</div>
-        <small style={{ display: 'block', marginTop: 6 }}>
-          Approval-related events from Relay will appear here when available. Approval responses are
-          currently handled externally. This view will combine Relay and AgentOS Gateway approvals
-          once the Gateway integration is complete.
+      {!relayReady && (
+        <div className="relay-tab-error">Relay is not ready — approval events unavailable</div>
+      )}
+
+      <div className="cc-approvals-header">
+        <span>Approvals — observational</span>
+        <small>
+          Approval responses are handled externally. This view observes approval-related Relay events.
         </small>
+      </div>
+
+      {stats.total > 0 && (
+        <div className="cc-approvals-stats">
+          <span className="cc-stat">
+            <strong>{stats.total}</strong> total
+          </span>
+          {stats.pending > 0 && (
+            <span className="cc-stat cc-stat-pending">
+              <strong>{stats.pending}</strong> pending
+            </span>
+          )}
+          {stats.approved > 0 && (
+            <span className="cc-stat cc-stat-approved">
+              <strong>{stats.approved}</strong> approved
+            </span>
+          )}
+          {stats.denied > 0 && (
+            <span className="cc-stat cc-stat-denied">
+              <strong>{stats.denied}</strong> denied
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="cc-approvals-list">
+        {approvalEvents.length === 0 ? (
+          <div className="relay-empty">
+            <div>No approval events observed</div>
+            <small style={{ display: 'block', marginTop: 6 }}>
+              Approval-related events will appear here as they flow through Relay. Check the
+              Activity tab for all event types.
+            </small>
+            <button
+              className="relay-icon-button"
+              onClick={() => onNavigate('activity')}
+              style={{ marginTop: 8 }}
+            >
+              View All Activity
+            </button>
+          </div>
+        ) : (
+          approvalEvents.map((event, i) => {
+            const type = recordString(event, 'type') ?? recordString(event, 'kind') ?? 'approval';
+            const ts = displayTime(event.timestamp ?? event.timestampMs ?? event.ts);
+            const agent = recordString(event, 'agentId') ?? '';
+            const project = recordString(event, 'projectPath') ?? '';
+            const summary = recordString(event, 'summary') ?? recordString(event, 'message') ?? type;
+            const status = recordString(event, 'status') ?? '';
+            return (
+              <div key={eventKey(event, i)} className="relay-session-row cc-event-row">
+                <div>
+                  <strong>{summary}</strong>
+                  <span>
+                    <span className={`cc-event-badge cc-event-badge-${status === 'denied' ? 'error' : status === 'pending' ? 'warning' : 'info'}`}>
+                      {type}
+                    </span>
+                    {status && ` · ${status}`}
+                    {agent ? ` · ${agent}` : ''}
+                    {project ? ` · ${project.split(/[\\/]/).pop()}` : ''}
+                  </span>
+                  <small>{ts}</small>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
