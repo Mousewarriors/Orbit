@@ -11,3 +11,6 @@ coverage/
 .DS_Store
 Thumbs.db
 apps/desktop/src-tauri/target/
+
+# Local AgentOS runtime and handoff state
+apps/desktop/.agentos/
