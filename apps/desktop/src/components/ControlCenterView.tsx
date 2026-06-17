@@ -1129,6 +1129,17 @@ function SessionsPanel({
 // Activity tab
 // ---------------------------------------------------------------------------
 
+function eventSeverity(event: RelayObject): string {
+  const level = recordString(event, 'level') ?? recordString(event, 'severity') ?? '';
+  if (level === 'error' || level === 'critical') return 'error';
+  if (level === 'warning' || level === 'warn') return 'warning';
+  return 'info';
+}
+
+function eventTypeLabel(event: RelayObject): string {
+  return recordString(event, 'type') ?? recordString(event, 'kind') ?? 'event';
+}
+
 function ActivityPanel({
   events,
   tabError,
@@ -1140,40 +1151,108 @@ function ActivityPanel({
   readonly relayReady: boolean;
   readonly onNavigate: (tab: ControlCenterTab) => void;
 }): JSX.Element {
+  const [typeFilter, setTypeFilter] = useState('');
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  const eventTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const event of events) types.add(eventTypeLabel(event));
+    return Array.from(types).sort();
+  }, [events]);
+
+  const filteredEvents = useMemo(() => {
+    if (!typeFilter) return events;
+    return events.filter((e) => eventTypeLabel(e) === typeFilter);
+  }, [events, typeFilter]);
+
+  // Auto-scroll to bottom when new events arrive (if already near bottom)
+  const prevCountRef = useRef(events.length);
+  useEffect(() => {
+    if (events.length > prevCountRef.current && listRef.current) {
+      const el = listRef.current;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      if (nearBottom) el.scrollTop = el.scrollHeight;
+    }
+    prevCountRef.current = events.length;
+  }, [events.length]);
+
   return (
-    <div className="relay-session-list cc-activity">
+    <div className="cc-activity">
       {!relayReady && <div className="relay-tab-error">Relay is not ready — events unavailable</div>}
       {tabError && <div className="relay-tab-error">{tabError}</div>}
-      {events.length === 0 ? (
-        <div className="relay-empty">No activity yet</div>
-      ) : (
-        events.map((event, i) => {
-          const type = recordString(event, 'type') ?? recordString(event, 'kind') ?? 'event';
-          const ts = displayTime(event.timestamp ?? event.timestampMs ?? event.ts);
-          const agent = recordString(event, 'agentId') ?? '';
-          const project = recordString(event, 'projectPath') ?? '';
-          const summary = recordString(event, 'summary') ?? recordString(event, 'message') ?? type;
-          const sid = recordString(event, 'sessionId') ?? '';
-          return (
-            <div key={eventKey(event, i)} className="relay-session-row cc-event-row">
-              <div>
-                <strong>{summary}</strong>
-                <span>
-                  {type}
-                  {agent ? ` · ${agent}` : ''}
-                  {project ? ` · ${project.split(/[\\/]/).pop()}` : ''}
-                </span>
-                <small>{ts}</small>
+      <div className="cc-activity-toolbar">
+        <span className="cc-activity-count">{filteredEvents.length} events</span>
+        <select
+          className="cc-activity-filter"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option value="">All types</option>
+          {eventTypes.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="cc-activity-list" ref={listRef}>
+        {filteredEvents.length === 0 ? (
+          <div className="relay-empty">
+            {events.length === 0 ? 'No activity yet' : 'No events match filter'}
+          </div>
+        ) : (
+          filteredEvents.map((event, i) => {
+            const type = eventTypeLabel(event);
+            const ts = displayTime(event.timestamp ?? event.timestampMs ?? event.ts);
+            const agent = recordString(event, 'agentId') ?? '';
+            const project = recordString(event, 'projectPath') ?? '';
+            const summary = recordString(event, 'summary') ?? recordString(event, 'message') ?? type;
+            const sid = recordString(event, 'sessionId') ?? '';
+            const severity = eventSeverity(event);
+            const key = eventKey(event, i);
+            const isExpanded = expandedEvent === key;
+            return (
+              <div
+                key={key}
+                className={`relay-session-row cc-event-row cc-event-${severity}`}
+                onClick={() => setExpandedEvent(isExpanded ? null : key)}
+              >
+                <div>
+                  <strong>{summary}</strong>
+                  <span>
+                    <span className={`cc-event-badge cc-event-badge-${severity}`}>{type}</span>
+                    {agent ? ` · ${agent}` : ''}
+                    {project ? ` · ${project.split(/[\\/]/).pop()}` : ''}
+                  </span>
+                  <small>{ts}</small>
+                  {isExpanded && (
+                    <div className="cc-event-detail">
+                      {sid && <span>Session: {sid}</span>}
+                      {agent && <span>Agent: {agent}</span>}
+                      {project && <span>Project: {project}</span>}
+                      {recordString(event, 'detail') && (
+                        <span>Detail: {recordString(event, 'detail')}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {sid && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate('sessions');
+                    }}
+                    title="View session"
+                  >
+                    Session
+                  </button>
+                )}
               </div>
-              {sid && (
-                <button onClick={() => onNavigate('sessions')} title="View session">
-                  Session
-                </button>
-              )}
-            </div>
-          );
-        })
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

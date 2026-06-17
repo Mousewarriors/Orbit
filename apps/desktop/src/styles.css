@@ -862,3 +862,78 @@ kbd {
   border-top: 1px solid var(--orbit-border);
   padding-top: 6px;
 }
+
+.cc-activity-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--orbit-border);
+  font-size: 12px;
+}
+
+.cc-activity-count {
+  color: var(--orbit-secondary-text, #888);
+}
+
+.cc-activity-filter {
+  background: var(--orbit-input-bg, #1e1e1e);
+  color: inherit;
+  border: 1px solid var(--orbit-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.cc-activity-list {
+  overflow-y: auto;
+  max-height: 480px;
+  padding: 4px 0;
+}
+
+.cc-event-error {
+  border-left: 3px solid var(--orbit-error, #e55);
+}
+
+.cc-event-warning {
+  border-left: 3px solid var(--orbit-warning, #eb5);
+}
+
+.cc-event-info {
+  border-left: 3px solid transparent;
+}
+
+.cc-event-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.cc-event-badge-error {
+  background: rgba(238, 85, 85, 0.15);
+  color: var(--orbit-error, #e55);
+}
+
+.cc-event-badge-warning {
+  background: rgba(238, 187, 85, 0.15);
+  color: var(--orbit-warning, #eb5);
+}
+
+.cc-event-badge-info {
+  background: rgba(100, 100, 100, 0.15);
+  color: var(--orbit-secondary-text, #888);
+}
+
+.cc-event-detail {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--orbit-input-bg, rgba(255, 255, 255, 0.04));
+  border-radius: 4px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
