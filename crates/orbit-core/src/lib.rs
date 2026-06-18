@@ -2,6 +2,7 @@
 //! shell and (potentially) headless tooling. Keeps all SQLite/migration logic
 //! out of the UI and out of `src-tauri/main.rs`.
 
+pub mod chat;
 pub mod clipboard;
 pub mod db;
 pub mod extstore;
@@ -12,6 +13,7 @@ pub mod projects;
 pub mod quicklinks;
 pub mod snippets;
 
+pub use chat::{Chat, ChatMessage};
 pub use clipboard::ClipboardEntry;
 pub use files::{FileFilters, FileInput, FileRecord};
 pub use notes::Note;

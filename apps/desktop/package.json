@@ -19,6 +19,7 @@
     "@orbit/automations": "*",
     "@orbit/branding": "*",
     "@orbit/calculator": "*",
+    "@orbit/chat": "*",
     "@orbit/command-model": "*",
     "@orbit/mission": "*",
     "@orbit/placeholders": "*",

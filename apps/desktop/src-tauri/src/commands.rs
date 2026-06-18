@@ -453,6 +453,127 @@ pub fn note_set_pinned(state: State<'_, AppState>, id: String, pinned: bool) -> 
 }
 
 // ---------------------------------------------------------------------------
+// AI Chat
+// ---------------------------------------------------------------------------
+
+const MAX_CHAT_CONTENT: usize = 200_000;
+const MAX_CHAT_TITLE: usize = 200;
+
+#[tauri::command]
+pub fn chat_list(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::Chat>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::list_chats(&conn, &query, limit.unwrap_or(100).clamp(1, 1000))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_create(
+    state: State<'_, AppState>,
+    id: String,
+    title: String,
+) -> Result<orbit_core::Chat, String> {
+    if id.is_empty() || id.len() > MAX_SNIPPET_FIELD {
+        return Err("invalid chat id".into());
+    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::create_chat(&conn, &id, title.trim().chars().take(MAX_CHAT_TITLE).collect::<String>().as_str(), now_ms())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_rename(state: State<'_, AppState>, id: String, title: String) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::rename_chat(
+        &conn,
+        &id,
+        title.trim().chars().take(MAX_CHAT_TITLE).collect::<String>().as_str(),
+        now_ms(),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_set_pinned(state: State<'_, AppState>, id: String, pinned: bool) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::set_pinned(&conn, &id, pinned).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::delete_chat(&conn, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_add_message(
+    state: State<'_, AppState>,
+    id: String,
+    chat_id: String,
+    role: String,
+    content: String,
+    model: Option<String>,
+) -> Result<orbit_core::ChatMessage, String> {
+    if id.is_empty() || chat_id.is_empty() {
+        return Err("invalid message/chat id".into());
+    }
+    if role != "user" && role != "assistant" && role != "system" {
+        return Err("invalid role".into());
+    }
+    if content.len() > MAX_CHAT_CONTENT {
+        return Err("message too large".into());
+    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::add_message(&conn, &id, &chat_id, &role, &content, model.as_deref(), now_ms())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_messages(
+    state: State<'_, AppState>,
+    chat_id: String,
+) -> Result<Vec<orbit_core::ChatMessage>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::list_messages(&conn, &chat_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_delete_from(
+    state: State<'_, AppState>,
+    chat_id: String,
+    from_seq: i64,
+) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::delete_messages_from(&conn, &chat_id, from_seq).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_branch(
+    state: State<'_, AppState>,
+    new_id: String,
+    from_chat: String,
+    upto_seq: i64,
+    title: String,
+) -> Result<orbit_core::Chat, String> {
+    if new_id.is_empty() || from_chat.is_empty() {
+        return Err("invalid chat id".into());
+    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::chat::branch_chat(
+        &conn,
+        &new_id,
+        &from_chat,
+        upto_seq,
+        title.trim().chars().take(MAX_CHAT_TITLE).collect::<String>().as_str(),
+        now_ms(),
+    )
+    .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Quicklinks
 // ---------------------------------------------------------------------------
 

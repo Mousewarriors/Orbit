@@ -201,6 +201,76 @@ export async function noteSetPinned(id: string, pinned: boolean): Promise<void> 
   return invoke('note_set_pinned', { id, pinned });
 }
 
+// --- AI Chat ---
+
+export interface Chat {
+  id: string;
+  title: string;
+  pinned: boolean;
+  archived: boolean;
+  model: string | null;
+  parent_chat_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  chat_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  model: string | null;
+  seq: number;
+  created_at: number;
+}
+
+export async function chatList(query = '', limit = 100): Promise<Chat[]> {
+  return invoke<Chat[]>('chat_list', { query, limit });
+}
+
+export async function chatCreate(id: string, title: string): Promise<Chat> {
+  return invoke<Chat>('chat_create', { id, title });
+}
+
+export async function chatRename(id: string, title: string): Promise<void> {
+  return invoke('chat_rename', { id, title });
+}
+
+export async function chatSetPinned(id: string, pinned: boolean): Promise<void> {
+  return invoke('chat_set_pinned', { id, pinned });
+}
+
+export async function chatDelete(id: string): Promise<void> {
+  return invoke('chat_delete', { id });
+}
+
+export async function chatAddMessage(
+  id: string,
+  chatId: string,
+  role: ChatMessage['role'],
+  content: string,
+  model: string | null,
+): Promise<ChatMessage> {
+  return invoke<ChatMessage>('chat_add_message', { id, chatId, role, content, model });
+}
+
+export async function chatMessages(chatId: string): Promise<ChatMessage[]> {
+  return invoke<ChatMessage[]>('chat_messages', { chatId });
+}
+
+export async function chatDeleteFrom(chatId: string, fromSeq: number): Promise<void> {
+  return invoke('chat_delete_from', { chatId, fromSeq });
+}
+
+export async function chatBranch(
+  newId: string,
+  fromChat: string,
+  uptoSeq: number,
+  title: string,
+): Promise<Chat> {
+  return invoke<Chat>('chat_branch', { newId, fromChat, uptoSeq, title });
+}
+
 export interface Quicklink {
   id: string;
   title: string;

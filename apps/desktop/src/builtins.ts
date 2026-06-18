@@ -224,6 +224,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'quick-ai' }),
   },
   {
+    definition: def('builtin.ai.chat', 'AI Chat', 'AI', 'ai', {
+      keywords: ['chat', 'conversation', 'talk', 'ask', 'assistant', 'gpt', 'llm', 'discuss'],
+      subtitle: 'Persistent multi-turn conversation with history',
+    }),
+    effect: (): EffectResult => ({ pushView: 'chat' }),
+  },
+  {
     definition: def('builtin.ai.agent', 'Orbit Agent', 'AI', 'agentos', {
       keywords: ['agent', 'mission', 'do', 'task', 'automate', 'goal', 'plan', 'run', 'launch agent'],
       subtitle: 'Describe a goal — Orbit plans safe steps, asks, then runs them',

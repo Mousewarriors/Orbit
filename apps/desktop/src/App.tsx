@@ -37,6 +37,7 @@ import { ControlCenterView } from './components/ControlCenterView.js';
 import { QuickAiView } from './components/QuickAiView.js';
 import { ToolsView } from './components/ToolsView.js';
 import { OrbitAgentView } from './components/OrbitAgentView.js';
+import { ChatView } from './components/ChatView.js';
 import { createAgentProvider } from './agent/agentProvider.js';
 import { createAutomationProvider } from './agent/automationProvider.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
@@ -55,7 +56,8 @@ type View =
   | 'control-center'
   | 'quick-ai'
   | 'mcp-tools'
-  | 'orbit-agent';
+  | 'orbit-agent'
+  | 'chat';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -334,7 +336,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'control-center' ||
           outcome.pushView === 'quick-ai' ||
           outcome.pushView === 'mcp-tools' ||
-          outcome.pushView === 'orbit-agent'
+          outcome.pushView === 'orbit-agent' ||
+          outcome.pushView === 'chat'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -426,7 +429,8 @@ export function App(): JSX.Element {
           pushTarget === 'control-center' ||
           pushTarget === 'quick-ai' ||
           pushTarget === 'mcp-tools' ||
-          pushTarget === 'orbit-agent'
+          pushTarget === 'orbit-agent' ||
+          pushTarget === 'chat'
         ) {
           setViewArg(ef.pushViewArg ?? null);
           setView(pushTarget);
@@ -522,6 +526,10 @@ export function App(): JSX.Element {
 
   if (view === 'mcp-tools') {
     return <><ToolsView onPop={() => setView('root')} />{toast}</>;
+  }
+
+  if (view === 'chat') {
+    return <><ChatView onPop={() => setView('root')} />{toast}</>;
   }
 
   if (view === 'orbit-agent') {

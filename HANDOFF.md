@@ -456,6 +456,22 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > the Tauri `orbit-desktop`). Not yet executed on a live runner from here; code-signing +
 > release automation remain (DISTRIBUTION.md). FEATURE_MATRIX CI row → 🟡.
 
+> **Update (session 15, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 5: AI Chat.**
+> Persistent multi-turn Chat, built end-to-end on the live provider. **Real SQLite
+> persistence**: migration **0009** (`chats` + `chat_messages`) + `orbit-core::chat` (CRUD,
+> monotonic per-chat `seq`, branch, delete-from-seq; 6 tests) behind typed IPC
+> (`chat_list/create/rename/set_pinned/delete/add_message/messages/delete_from/branch`).
+> Pure `@orbit/chat` (7 tests): `buildChatMessages` (system + recent turns within a char
+> budget), `deriveTitle`, a minimal/safe Markdown block parser (fenced code + text, tolerates
+> a mid-stream unterminated fence), Markdown export. **`ChatView`** (command "AI Chat"):
+> conversation list (new/select/search/pin/delete), **streamed** responses against real
+> Ollama, **Stop**, **Regenerate** (drops tail + re-streams), per-message **Copy**, **Export**
+> transcript, editable title, on-device/leaves-device badge, honest no-provider state; messages
+> framed as data (injection defence). **Honest gaps:** branch-to-new-chat is in core+IPC but
+> not surfaced in the UI; attachments, tool-call cards, mid-chat model switching, citations are
+> later. **Counts: 483 JS tests** (+7) **/ 129 Rust** (+6); lint, strict typecheck, `vite
+> build`, `cargo check --workspace` all green. Not GUI-run here.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

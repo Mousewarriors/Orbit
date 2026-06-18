@@ -188,6 +188,35 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_project_meta_last_opened ON project_meta(last_opened_at DESC);
     CREATE INDEX idx_project_meta_favourite ON project_meta(favourite) WHERE favourite = 1;
     "#,
+    // 0009 — persistent AI Chat: conversations and their messages. A message's
+    // `seq` orders it within a chat (so regenerate/edit can drop everything from
+    // a point forward); `parent_chat_id` records a branch origin. Messages are
+    // deleted with their chat (enforced in code — no cross-table FK so the schema
+    // matches the rest of the app's code-defined-id convention).
+    r#"
+    CREATE TABLE chats (
+        id             TEXT PRIMARY KEY NOT NULL,
+        title          TEXT NOT NULL DEFAULT '',
+        pinned         INTEGER NOT NULL DEFAULT 0,
+        archived       INTEGER NOT NULL DEFAULT 0,
+        model          TEXT,
+        parent_chat_id TEXT,
+        created_at     INTEGER NOT NULL,
+        updated_at     INTEGER NOT NULL
+    );
+    CREATE INDEX idx_chats_updated ON chats(updated_at DESC);
+
+    CREATE TABLE chat_messages (
+        id         TEXT PRIMARY KEY NOT NULL,
+        chat_id    TEXT NOT NULL,
+        role       TEXT NOT NULL,        -- 'user' | 'assistant' | 'system'
+        content    TEXT NOT NULL,
+        model      TEXT,
+        seq        INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX idx_chat_messages_chat ON chat_messages(chat_id, seq);
+    "#,
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -259,6 +288,8 @@ mod tests {
             "notes",
             "extension_storage",
             "project_meta",
+            "chats",
+            "chat_messages",
         ] {
             let count: i64 = conn
                 .query_row(
