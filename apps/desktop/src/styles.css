@@ -1403,3 +1403,21 @@ kbd {
 .agent-routing-note { font-size: 11px; color: var(--orbit-muted, #777); margin: 12px 0; line-height: 1.4; }
 
 .agent-step-hint { font-size: 11px; color: #8ad; margin: 3px 0 0 24px; }
+
+/* --- MCP servers panel (Tools view) --- */
+.tools-servers { padding: 4px 14px 10px; border-bottom: 1px solid var(--orbit-border, #2a2a30); }
+.tools-servers-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orbit-muted, #888); margin-bottom: 6px; }
+.tools-server-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 0; }
+.tools-server-name { font-weight: 600; }
+.tools-server-ep { flex: 1; color: var(--orbit-muted, #888); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tools-server-toggle, .tools-server-remove {
+  background: none; border: 1px solid var(--orbit-border, #333); color: inherit; border-radius: 5px;
+  padding: 2px 8px; font-size: 11px; cursor: pointer;
+}
+.tools-server-remove { color: #e85; }
+.tools-server-form { display: flex; gap: 6px; margin-top: 8px; }
+.tools-server-input {
+  background: var(--orbit-input-bg, #1c1c22); border: 1px solid var(--orbit-border, #333); color: inherit;
+  border-radius: 6px; padding: 5px 8px; font-size: 12px; width: 80px;
+}
+.tools-server-ep-input { flex: 1; width: auto; }

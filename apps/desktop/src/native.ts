@@ -681,3 +681,49 @@ export async function onRelaySessionEvent(
   ];
   return Promise.all(names.map((name) => listen<unknown>(name, (event) => handler(event.payload))));
 }
+
+// --- Native HTTP bridge (AI providers + HTTP MCP) ---
+
+export interface HttpResponse {
+  status: number;
+  body: string;
+}
+
+export interface HttpStreamEvent {
+  id: string;
+  kind: 'chunk' | 'end' | 'error';
+  /** base64 bytes for `chunk`; an error message for `error`; empty for `end`. */
+  data: string;
+  status: number;
+}
+
+/** One-shot HTTP request through the native client (http/https only). */
+export async function httpRequest(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body?: string | null,
+): Promise<HttpResponse> {
+  return invoke<HttpResponse>('http_request', { method, url, headers, body: body ?? null });
+}
+
+/** Begin a streamed HTTP request; body chunks arrive on the `http-stream` event. */
+export async function httpStreamOpen(
+  id: string,
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body?: string | null,
+): Promise<void> {
+  return invoke('http_stream_open', { id, method, url, headers, body: body ?? null });
+}
+
+/** Cancel an in-flight streamed request. */
+export async function httpStreamCancel(id: string): Promise<void> {
+  return invoke('http_stream_cancel', { id });
+}
+
+/** Subscribe to streamed HTTP chunks (filter by `id` in the handler). */
+export async function onHttpStream(handler: (ev: HttpStreamEvent) => void): Promise<UnlistenFn> {
+  return listen<HttpStreamEvent>('http-stream', (event) => handler(event.payload));
+}

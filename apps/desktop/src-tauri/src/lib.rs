@@ -14,6 +14,7 @@ mod clipboard_monitor;
 mod commands;
 mod extension_host;
 mod file_index;
+mod http;
 mod launcher;
 mod relay_manifest;
 mod relay_protocol;
@@ -417,6 +418,9 @@ pub fn run() {
             commands::project_meta_set_preferred_agent,
             commands::project_meta_list_recent,
             commands::project_meta_list_favourites,
+            http::http_request,
+            http::http_stream_open,
+            http::http_stream_cancel,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())

@@ -14,6 +14,7 @@ import {
   parseRecentPrompts,
   type QuickAiContext,
 } from '../ai/quickAi.js';
+import { createNativeFetch } from '../ai/nativeFetch.js';
 import { describeConfirmation } from '../confirm.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 
@@ -62,7 +63,7 @@ export function QuickAiView({
           native.getSetting(AI_SETTING_KEYS.recent),
           native.clipboardList('', 1).catch((): native.ClipboardEntry[] => []),
         ]);
-        setInfo(createProvider(parseAiSettings({ provider, endpoint, model })));
+        setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
         setRecent(parseRecentPrompts(recentRaw));
         setClipboard(clip[0]?.content ?? '');
       } catch {

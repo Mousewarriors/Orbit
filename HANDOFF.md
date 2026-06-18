@@ -411,6 +411,29 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > JS tests** (+7) **/ 123 Rust** (unchanged); lint, strict typecheck, `vite build`, `cargo
 > check --workspace` green. This completes the 5th interaction mode (saved automation).
 
+> **Update (session 12, 2026-06-18, branch `claude/orbit-ai-runtime`) — Native HTTP
+> bridge: Ollama + HTTP MCP are now live.** The activation step that connects the
+> already-built AI runtime + MCP client to real servers (the renderer can't open sockets
+> under the CSP; Rust can). **Rust** (`http.rs`, +reqwest/rustls): `http_request`,
+> `http_stream_open` (emits base64 body chunks on the `http-stream` event),
+> `http_stream_cancel` — **http(s)-only, validated** (unit-tested URL guard). **Renderer:**
+> `ai/nativeFetch.ts` is a `FetchLike` over an injectable bridge — non-streaming via
+> `http_request`, streaming via an **event-fed `ReadableStream<Uint8Array>`** (base64→bytes,
+> subscribe-before-open) so the unchanged `OllamaProvider`'s TextDecoder handles byte
+> boundaries; wired at the Quick AI + Orbit Agent call sites. So selecting **Ollama** in
+> Settings → AI now streams **real on-device tokens** through Quick AI / AI Commands /
+> mission AI-planning. **HTTP MCP:** `NativeHttpMcpTransport` POSTs JSON-RPC through the
+> bridge (parses JSON or SSE `data:`), server configs persist in the settings KV
+> (`mcp.servers`, validated), the MCP & Tools view gained an add/enable/remove panel, and
+> `buildToolRegistry` connects enabled servers (unreachable ones skipped). **Remaining:**
+> cloud providers (credentials/secure-storage), **stdio** MCP (process host). **Counts: 465
+> JS tests** (+13: nativeFetch/mcpServers/nativeMcpTransport) **/ 123 Rust libs** + new
+> http.rs cfg(test) URL-guard tests (run under the slow `-p orbit-desktop` target, not the
+> routine gate); lint, strict typecheck, `vite build`, `cargo check --workspace` all green.
+> Not live-run against a real Ollama here (headless) — the streaming assembly + URL guard
+> are unit-covered; a `tauri dev` pass against a local Ollama is the first confirmation.
+> See [docs/architecture/NATIVE_HTTP_BRIDGE.md](docs/architecture/NATIVE_HTTP_BRIDGE.md).
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

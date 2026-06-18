@@ -19,6 +19,7 @@ import {
 } from '../ai/providerConfig.js';
 import { buildMessages, decodeQuickAiArg, type QuickAiContext } from '../ai/quickAi.js';
 import { buildToolRegistry } from '../ai/toolRegistry.js';
+import { createNativeFetch } from '../ai/nativeFetch.js';
 import { buildAutomationPlan, getAutomation } from '@orbit/automations';
 import { decodeAutomationArg } from '../agent/automationProvider.js';
 import { dispatchAgentViaRelay } from '../agent/agentDispatch.js';
@@ -89,7 +90,7 @@ export function OrbitAgentView({
           native.relayStatus().catch(() => null),
           native.clipboardList('', 1).catch((): native.ClipboardEntry[] => []),
         ]);
-        setInfo(createProvider(parseAiSettings({ provider, endpoint, model })));
+        setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
         apps.current = appList;
         const merged = new Map<string, ProjectCandidate>();
         for (const p of [...recent, ...favs]) merged.set(p.path, { path: p.path, name: p.name });

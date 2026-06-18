@@ -21,6 +21,9 @@ import {
   type McpToolDescriptor,
   type ToolRecord,
 } from '@orbit/tool-registry';
+import * as native from '../native.js';
+import { MCP_SERVERS_SETTING_KEY, parseMcpServers } from './mcpServers.js';
+import { NativeHttpMcpTransport } from './nativeMcpTransport.js';
 
 /** The bundled demo MCP server's id (clearly synthetic, never live data). */
 export const DEMO_MCP_SERVER_ID = 'demo';
@@ -96,6 +99,30 @@ export async function buildToolRegistry(): Promise<BuiltRegistry> {
     clients.set(DEMO_MCP_SERVER_ID, demo);
   } catch {
     // A failed server must never break the registry; native tools remain.
+  }
+
+  // Connect any configured HTTP MCP servers (real, via the native bridge).
+  if (native.isTauri()) {
+    try {
+      const servers = parseMcpServers(await native.getSetting(MCP_SERVERS_SETTING_KEY)).filter(
+        (s) => s.enabled,
+      );
+      for (const server of servers) {
+        try {
+          const client = new McpClient(new NativeHttpMcpTransport(server.id, server.endpoint));
+          await client.initialize();
+          const tools = await client.listTools();
+          registry.register(
+            mcpToolsToRecords(server.id, tools, { availability: 'available', health: 'healthy' }),
+          );
+          clients.set(server.id, client);
+        } catch {
+          // Unreachable / misbehaving server: skip it, keep everything else.
+        }
+      }
+    } catch {
+      // Settings unavailable: native + demo tools still stand.
+    }
   }
 
   return { registry, clients };
