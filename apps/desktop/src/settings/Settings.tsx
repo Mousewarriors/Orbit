@@ -12,11 +12,29 @@ import {
 } from '../ai/providerConfig.js';
 import { Toggle, Field, Section, Row } from './controls.js';
 import { ShortcutRecorder } from './ShortcutRecorder.js';
+import {
+  deleteMemory,
+  PROFILE_KEYS,
+  PROFILE_LABELS,
+  setFact,
+  toggleMemory,
+  type MemoryRecord,
+  type MemorySettings,
+  type Profile,
+  type ProfileKey,
+} from '@orbit/profile';
+import {
+  loadProfileBundle,
+  saveMemories,
+  saveMemorySettings,
+  saveProfile,
+} from '../ai/profileStore.js';
 
 type SectionId =
   | 'general'
   | 'appearance'
   | 'ai'
+  | 'profile'
   | 'snippets'
   | 'files'
   | 'extensions'
@@ -27,6 +45,7 @@ const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; icon: string }> = 
   { id: 'general', label: 'General', icon: '⚙' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
   { id: 'ai', label: 'AI', icon: '🤖' },
+  { id: 'profile', label: 'Profile & Memory', icon: '👤' },
   { id: 'snippets', label: 'Snippets', icon: '⌨' },
   { id: 'files', label: 'Files', icon: '📁' },
   { id: 'extensions', label: 'Extensions', icon: '🧩' },
@@ -64,6 +83,7 @@ export function Settings(): JSX.Element {
         {active === 'general' && <GeneralSection />}
         {active === 'appearance' && <AppearanceSection />}
         {active === 'ai' && <AiSection />}
+        {active === 'profile' && <ProfileSection />}
         {active === 'snippets' && <SnippetsSection />}
         {active === 'files' && <FilesSection />}
         {active === 'extensions' && <ExtensionsSection />}
@@ -255,6 +275,7 @@ function AiSection(): JSX.Element {
           {([
             ['none', 'None'],
             ['mock', 'Mock (offline)'],
+            ['ollama', 'Local Ollama'],
           ] as ReadonlyArray<[ConfiguredProviderId, string]>).map(([id, label]) => (
             <button
               key={id}
@@ -270,12 +291,13 @@ function AiSection(): JSX.Element {
       </Field>
       <p className="settings-note">
         <strong>Mock</strong> is a fully-offline placeholder that proves the Quick AI surface works
-        end-to-end — it does not produce real answers. <strong>Local Ollama</strong> and cloud
-        providers (OpenAI-compatible, Anthropic) and AgentOS Auto routing arrive with the native AI
-        bridge; their connection details below are saved now so they are ready to switch on.
+        end-to-end — it does not produce real answers. <strong>Local Ollama</strong> now works for
+        real via the native HTTP bridge — set the endpoint + model below and Quick AI, AI Commands
+        and mission AI-planning stream real tokens on-device. Cloud providers (OpenAI-compatible,
+        Anthropic) and AgentOS Auto routing arrive with credential storage next.
       </p>
 
-      <Field label="Local Ollama endpoint" hint="Saved for when the native bridge ships; not reachable from the launcher yet.">
+      <Field label="Local Ollama endpoint" hint="Where your local Ollama server is listening.">
         <input
           className="settings-input"
           value={endpoint}
@@ -293,6 +315,104 @@ function AiSection(): JSX.Element {
           placeholder="llama3.1"
         />
       </Field>
+    </Section>
+  );
+}
+
+function ProfileSection(): JSX.Element {
+  const [profile, setProfileState] = useState<Profile>({ facts: [] });
+  const [memories, setMemoriesState] = useState<readonly MemoryRecord[]>([]);
+  const [settings, setSettingsState] = useState<MemorySettings>({ enabled: false, privateMode: false });
+
+  useEffect(() => {
+    void (async () => {
+      const bundle = await loadProfileBundle();
+      setProfileState(bundle.profile);
+      setMemoriesState(bundle.memories);
+      setSettingsState(bundle.memorySettings);
+    })();
+  }, []);
+
+  const factValue = (key: ProfileKey): string =>
+    profile.facts.find((f) => f.key === key)?.value ?? '';
+
+  const updateFact = useCallback((key: ProfileKey, value: string) => {
+    setProfileState((prev) => {
+      const next = setFact(prev, key, value);
+      void saveProfile(next);
+      return next;
+    });
+  }, []);
+
+  const updateMemorySettings = useCallback((patch: Partial<MemorySettings>) => {
+    setSettingsState((prev) => {
+      const next = { ...prev, ...patch };
+      void saveMemorySettings(next);
+      return next;
+    });
+  }, []);
+
+  const mutateMemories = useCallback((next: MemoryRecord[]) => {
+    setMemoriesState(next);
+    void saveMemories(next);
+  }, []);
+
+  return (
+    <Section
+      title="Profile & Memory"
+      description="Profile is facts you write about yourself; memory is optional, summarised, and every item is shown and deletable. They are kept separate and never uploaded without your action."
+    >
+      {PROFILE_KEYS.map((key) => (
+        <Field key={key} label={PROFILE_LABELS[key]}>
+          <input
+            className="settings-input"
+            defaultValue={factValue(key)}
+            onBlur={(e) => updateFact(key, e.target.value)}
+            placeholder="—"
+          />
+        </Field>
+      ))}
+
+      <Field label="Memory" hint="When off, no memory is ever used or shown to the model.">
+        <Toggle
+          label={settings.enabled ? 'Memory on' : 'Memory off'}
+          checked={settings.enabled}
+          onChange={(v) => updateMemorySettings({ enabled: v })}
+        />
+      </Field>
+      <Field label="Private mode" hint="Don't record new memories from your current activity.">
+        <Toggle
+          label={settings.privateMode ? 'Private' : 'Recording allowed'}
+          checked={settings.privateMode}
+          onChange={(v) => updateMemorySettings({ privateMode: v })}
+        />
+      </Field>
+
+      <div className="settings-memory-list">
+        {memories.length === 0 && <p className="settings-note">No memories yet.</p>}
+        {memories.map((m) => (
+          <div key={m.id} className="settings-memory-row">
+            <Toggle
+              label=""
+              checked={m.enabled}
+              onChange={() => mutateMemories(toggleMemory(memories, m.id))}
+            />
+            <span className="settings-memory-content">{m.content}</span>
+            {m.sensitive && <span className="settings-memory-sensitive">sensitive</span>}
+            <button
+              className="settings-memory-delete"
+              onClick={() => mutateMemories(deleteMemory(memories, m.id))}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+        {memories.length > 0 && (
+          <button className="settings-btn" onClick={() => mutateMemories([])}>
+            Clear all memory
+          </button>
+        )}
+      </div>
     </Section>
   );
 }

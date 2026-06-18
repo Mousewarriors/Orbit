@@ -434,6 +434,20 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > are unit-covered; a `tauri dev` pass against a local Ollama is the first confirmation.
 > See [docs/architecture/NATIVE_HTTP_BRIDGE.md](docs/architecture/NATIVE_HTTP_BRIDGE.md).
 
+> **Update (session 13, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 12:
+> Profile & Memory.** New pure `@orbit/profile` (11 tests): profile (user-edited facts)
+> and memory (optional, summarised records) kept **strictly separate** (§18); memory has a
+> global on/off + private mode (off by default — no hidden memory); `buildContext` reports
+> exactly which items would be sent and **excludes sensitive-looking items when they'd leave
+> the device** (`looksSensitive`); context rendered as data, not instructions. Wired into
+> Quick AI: a removable **Personal** chip + a **"Why this context?"** inspector (per-item
+> kind/sensitivity/on-device vs leaves-device) = real memory transparency. Persisted in the
+> settings KV (no migration); new **Settings → Profile & Memory** section edits facts and
+> manages memory. Bridge follow-up: **Settings → AI now offers Local Ollama as a real
+> selectable provider** (the session-12 bridge had landed the plumbing but not the radio).
+> **Counts: 476 JS tests** (+11) **/ 123 Rust** (unchanged); lint, strict typecheck, `vite
+> build`, `cargo check --workspace` green.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

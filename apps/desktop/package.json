@@ -22,6 +22,7 @@
     "@orbit/command-model": "*",
     "@orbit/mission": "*",
     "@orbit/placeholders": "*",
+    "@orbit/profile": "*",
     "@orbit/search-engine": "*",
     "@orbit/shared-types": "*",
     "@orbit/shortcuts": "*",

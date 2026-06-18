@@ -1421,3 +1421,19 @@ kbd {
   border-radius: 6px; padding: 5px 8px; font-size: 12px; width: 80px;
 }
 .tools-server-ep-input { flex: 1; width: auto; }
+
+/* --- Quick AI: personal context inspector --- */
+.quick-ai-why {
+  background: none; border: none; color: var(--orbit-accent, #6a9); font-size: 12px; cursor: pointer;
+  text-decoration: underline; padding: 0 4px;
+}
+.quick-ai-why-panel {
+  margin: 4px 14px; font-size: 12px; background: var(--orbit-input-bg, #15151a);
+  border: 1px solid var(--orbit-border, #2a2a30); border-radius: 6px; padding: 8px 10px;
+}
+.quick-ai-why-title { color: var(--orbit-muted, #999); margin-bottom: 4px; }
+.quick-ai-why-item { display: flex; gap: 8px; align-items: center; padding: 2px 0; }
+.quick-ai-why-kind { font-size: 10px; color: var(--orbit-accent, #6a9); border: 1px solid currentColor; border-radius: 8px; padding: 0 6px; }
+.quick-ai-why-label { flex: 1; }
+.quick-ai-why-sensitive { font-size: 10px; color: #e85; }
+.quick-ai-why-note { color: var(--orbit-muted, #888); margin-top: 4px; }

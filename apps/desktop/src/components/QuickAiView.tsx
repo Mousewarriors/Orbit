@@ -15,6 +15,8 @@ import {
   type QuickAiContext,
 } from '../ai/quickAi.js';
 import { createNativeFetch } from '../ai/nativeFetch.js';
+import { loadProfileBundle } from '../ai/profileStore.js';
+import { buildContext, type ContextItem, type MemoryRecord, type MemorySettings, type Profile } from '@orbit/profile';
 import { describeConfirmation } from '../confirm.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
 
@@ -44,6 +46,14 @@ export function QuickAiView({
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
+  const [profile, setProfile] = useState<Profile>({ facts: [] });
+  const [memories, setMemories] = useState<readonly MemoryRecord[]>([]);
+  const [memorySettings, setMemorySettings] = useState<MemorySettings>({
+    enabled: false,
+    privateMode: false,
+  });
+  const [usePersonal, setUsePersonal] = useState(false);
+  const [showWhy, setShowWhy] = useState(false);
   const [confirmPaste, setConfirmPaste] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -66,6 +76,10 @@ export function QuickAiView({
         setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
         setRecent(parseRecentPrompts(recentRaw));
         setClipboard(clip[0]?.content ?? '');
+        const bundle = await loadProfileBundle();
+        setProfile(bundle.profile);
+        setMemories(bundle.memories);
+        setMemorySettings(bundle.memorySettings);
       } catch {
         setInfo(createProvider({ provider: 'none', ollamaEndpoint: '', ollamaModel: '' }));
       }
@@ -77,14 +91,27 @@ export function QuickAiView({
     return () => abortRef.current?.abort();
   }, []);
 
+  const remote = !(info?.local ?? true);
+
+  // Personal context (profile + enabled memories), honouring the memory switch
+  // and excluding sensitive items that would leave the device.
+  const personalItems = useMemo<ContextItem[]>(
+    () => buildContext(profile, memories, memorySettings, { remote }),
+    [profile, memories, memorySettings, remote],
+  );
+
   const contexts = useMemo<QuickAiContext[]>(() => {
+    const list: QuickAiContext[] = [];
     if (useClipboard && clipboard.trim()) {
-      return [
-        { kind: 'clipboard', label: 'Clipboard', text: clipboard, remote: !(info?.local ?? true) },
-      ];
+      list.push({ kind: 'clipboard', label: 'Clipboard', text: clipboard, remote });
     }
-    return [];
-  }, [useClipboard, clipboard, info?.local]);
+    if (usePersonal) {
+      for (const it of personalItems) {
+        list.push({ kind: it.kind, label: it.label, text: it.text, remote });
+      }
+    }
+    return list;
+  }, [useClipboard, clipboard, usePersonal, personalItems, remote]);
 
   const run = useCallback(async () => {
     const provider = info?.provider;
@@ -215,6 +242,23 @@ export function QuickAiView({
             >
               {useClipboard ? '✓ ' : '+ '}Clipboard
             </button>
+            <button
+              className={`quick-ai-chip${usePersonal ? ' is-on' : ''}`}
+              disabled={personalItems.length === 0}
+              onClick={() => setUsePersonal((v) => !v)}
+              title={
+                personalItems.length === 0
+                  ? 'No profile or memory yet (add it in Settings → Profile)'
+                  : `${personalItems.length} item(s) about you`
+              }
+            >
+              {usePersonal ? '✓ ' : '+ '}Personal
+            </button>
+            {usePersonal && personalItems.length > 0 && (
+              <button className="quick-ai-why" onClick={() => setShowWhy((v) => !v)}>
+                {showWhy ? 'Hide' : 'Why this context?'}
+              </button>
+            )}
             <div className="quick-ai-run">
               {status === 'streaming' ? (
                 <button className="quick-ai-stop" onClick={stop}>
@@ -227,6 +271,24 @@ export function QuickAiView({
               )}
             </div>
           </div>
+
+          {usePersonal && showWhy && (
+            <div className="quick-ai-why-panel">
+              <div className="quick-ai-why-title">
+                Sent to the model {remote ? '(leaves device)' : '(on-device)'}:
+              </div>
+              {personalItems.map((it, i) => (
+                <div key={i} className="quick-ai-why-item">
+                  <span className="quick-ai-why-kind">{it.kind === 'profile' ? 'Profile' : 'Memory'}</span>
+                  <span className="quick-ai-why-label">{it.label}</span>
+                  {it.sensitive && <span className="quick-ai-why-sensitive">sensitive</span>}
+                </div>
+              ))}
+              {memorySettings.enabled ? null : (
+                <div className="quick-ai-why-note">Memory is off — only profile facts are included.</div>
+              )}
+            </div>
+          )}
 
           {error && <div className="orbit-error">⚠ {error}</div>}
 

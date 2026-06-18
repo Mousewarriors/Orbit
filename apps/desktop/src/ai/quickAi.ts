@@ -5,7 +5,7 @@
  */
 import type { AiMessage } from '@orbit/ai-runtime';
 
-export type QuickAiContextKind = 'clipboard' | 'selection' | 'custom';
+export type QuickAiContextKind = 'clipboard' | 'selection' | 'custom' | 'profile' | 'memory';
 
 export interface QuickAiContext {
   readonly kind: QuickAiContextKind;

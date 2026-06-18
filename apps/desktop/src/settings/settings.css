@@ -483,3 +483,10 @@ input[type='range'] {
   font-size: 12px;
   word-break: break-all;
 }
+
+/* --- Profile & Memory section --- */
+.settings-memory-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.settings-memory-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 4px 0; }
+.settings-memory-content { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-memory-sensitive { font-size: 11px; color: #e85; }
+.settings-memory-delete { background: none; border: none; color: #e85; cursor: pointer; font-size: 12px; }
