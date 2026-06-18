@@ -224,6 +224,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'quick-ai' }),
   },
   {
+    definition: def('builtin.tools.mcp', 'MCP & Tools', 'AI', 'list', {
+      keywords: ['mcp', 'tools', 'tool', 'registry', 'capabilities', 'integrations', 'servers'],
+      subtitle: 'Browse the unified tool registry, risk and approvals',
+    }),
+    effect: (): EffectResult => ({ pushView: 'mcp-tools' }),
+  },
+  {
     definition: def('builtin.settings.open', 'Open Settings', 'Orbit', 'settings', {
       keywords: ['preferences', 'options', 'config', 'shortcut', 'theme'],
       subtitle: 'Configure shortcut, appearance, snippets and privacy',

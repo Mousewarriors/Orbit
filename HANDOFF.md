@@ -345,6 +345,27 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > 123 Rust** (unchanged); lint, strict typecheck, `vite build`, `cargo check
 > --workspace` all green. Not GUI-run here.
 
+> **Update (session 8, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 8: MCP
+> client + Tool Registry.** New pure `@orbit/tool-registry` (39 tests): a unified
+> `ToolRecord` vocabulary across sources (native/relay/agentos/extension/mcp/ai-
+> provider); **risk + approval policy derived from declared side effects** (write/
+> delete/send/run/push/publish/deploy/spend force confirmation; high/critical risk
+> is **once-only**, never persistent — §21); an **MCP client** speaking JSON-RPC 2.0
+> over an *injected* transport (discovery + `tools/call`, **bounded** output, typed
+> `McpError`, failure isolation); a `MockMcpTransport` that exercises the whole path;
+> `validateArgs` at the tool choke-point; and `nativeToolRecords()` publishing Orbit's
+> own safe capabilities (incl. **dispatch_agent via Relay**) so native + MCP tools are
+> uniform. Renderer: `buildToolRegistry()` (native + a clearly-labelled in-process demo
+> MCP server) + an **MCP & Tools** view (registry by source, risk/approval badges,
+> schema inspector, gated test-call) reachable from a new command. **Honest gap:** live
+> stdio/HTTP MCP servers need a **native MCP bridge** (renderer can't spawn/socket under
+> the CSP); the demo server is in-process mock and the server-settings UI lands with the
+> bridge. Untrusted MCP annotations only ever *raise* caution. **Counts: 409 JS tests**
+> (+39) **/ 123 Rust** (unchanged — no Rust touched); lint, strict typecheck, `vite
+> build`, `cargo check --workspace` all green. Not GUI-run here. This is the tool/
+> permission foundation the Phase 9 Mission engine dispatches through. See
+> [docs/architecture/MCP_TOOL_REGISTRY.md](docs/architecture/MCP_TOOL_REGISTRY.md).
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

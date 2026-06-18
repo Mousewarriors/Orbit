@@ -35,6 +35,7 @@ import { ExtensionListView } from './components/ExtensionListView.js';
 import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
 import { QuickAiView } from './components/QuickAiView.js';
+import { ToolsView } from './components/ToolsView.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
 import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { describeConfirmation, needsConfirmation } from './confirm.js';
@@ -49,7 +50,8 @@ type View =
   | 'extension-list'
   | 'all-commands'
   | 'control-center'
-  | 'quick-ai';
+  | 'quick-ai'
+  | 'mcp-tools';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -324,7 +326,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'extension-list' ||
           outcome.pushView === 'all-commands' ||
           outcome.pushView === 'control-center' ||
-          outcome.pushView === 'quick-ai'
+          outcome.pushView === 'quick-ai' ||
+          outcome.pushView === 'mcp-tools'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -414,7 +417,8 @@ export function App(): JSX.Element {
           pushTarget === 'extension-list' ||
           pushTarget === 'all-commands' ||
           pushTarget === 'control-center' ||
-          pushTarget === 'quick-ai'
+          pushTarget === 'quick-ai' ||
+          pushTarget === 'mcp-tools'
         ) {
           setViewArg(ef.pushViewArg ?? null);
           setView(pushTarget);
@@ -506,6 +510,10 @@ export function App(): JSX.Element {
 
   if (view === 'quick-ai') {
     return <><QuickAiView initialArg={viewArg ?? undefined} onPop={() => setView('root')} />{toast}</>;
+  }
+
+  if (view === 'mcp-tools') {
+    return <><ToolsView onPop={() => setView('root')} />{toast}</>;
   }
 
   return (
