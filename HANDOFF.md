@@ -448,6 +448,14 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > **Counts: 476 JS tests** (+11) **/ 123 Rust** (unchanged); lint, strict typecheck, `vite
 > build`, `cargo check --workspace` green.
 
+> **Update (session 14, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 16
+> (partial): CI baseline.** Added `.github/workflows/ci.yml` running the verification gate:
+> a JS job (lint + strict typecheck + Vitest + `vite build`) and a cross-platform Rust-libs
+> job (`cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files`) on
+> ubuntu, plus a Windows job that builds the renderer and `cargo check --workspace` (incl.
+> the Tauri `orbit-desktop`). Not yet executed on a live runner from here; code-signing +
+> release automation remain (DISTRIBUTION.md). FEATURE_MATRIX CI row → 🟡.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

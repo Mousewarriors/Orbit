@@ -1,0 +1,58 @@
+name: CI
+
+# Verification gate for Orbit: lint, strict typecheck, JS tests + build, and the
+# cross-platform Rust library crates. The full Tauri app (orbit-desktop) needs
+# Windows + WebView2 + the Win32 toolchain, so its `cargo check`/`tauri build`
+# run on the Windows job only.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  js:
+    name: JS — lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck --workspaces --if-present
+      - run: npm test
+      - run: npm run build:vite --workspace @orbit/desktop
+
+  rust-libs:
+    name: Rust — cross-platform library crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test (pure/cross-platform crates)
+        run: cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files
+
+  windows-desktop:
+    name: Windows — full workspace check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Build the renderer first so the Tauri build inputs exist.
+      - run: npm run build:vite --workspace @orbit/desktop
+      - name: cargo check (full workspace, incl. orbit-desktop)
+        run: cargo check --workspace
