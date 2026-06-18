@@ -389,6 +389,16 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > lint, strict typecheck, `vite build`, `cargo check --workspace` all green. Not GUI-run
 > here. See [docs/architecture/AI_AGENT_MODE.md](docs/architecture/AI_AGENT_MODE.md).
 
+> **Update (session 10, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 10:
+> specialist agents.** New pure `@orbit/agents` (5 tests): a catalogue of the specialist
+> agents Orbit surfaces (Codex / Claude Code / Antigravity / OpenClaw) with genuine
+> strengths + source, plus a task→specialist `recommendAgent` hint. Surfaced in the Orbit
+> Agent mission preview on an agent-dispatch step that has no explicit specialist preference
+> ("Suggested: … — Relay/Hermes make the final choice"). **Scope boundary kept:** a hint
+> only — Hermes still selects/sequences agents, the Model Gateway still selects models;
+> Orbit duplicates neither. **Counts: 445 JS tests** (+5) **/ 123 Rust** (unchanged); lint,
+> strict typecheck, `vite build`, `cargo check --workspace` green.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

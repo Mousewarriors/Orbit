@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@orbit/agents": "*",
     "@orbit/appearance": "*",
     "@orbit/branding": "*",
     "@orbit/calculator": "*",

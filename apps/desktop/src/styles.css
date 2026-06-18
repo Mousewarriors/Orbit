@@ -1401,3 +1401,5 @@ kbd {
   max-height: 120px; overflow-y: auto;
 }
 .agent-routing-note { font-size: 11px; color: var(--orbit-muted, #777); margin: 12px 0; line-height: 1.4; }
+
+.agent-step-hint { font-size: 11px; color: #8ad; margin: 3px 0 0 24px; }

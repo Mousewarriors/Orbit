@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bestProject, rankApps, type ProjectCandidate } from '@orbit/intent';
+import { recommendAgent } from '@orbit/agents';
 import {
   missionStepViews,
   planMission,
@@ -318,6 +319,9 @@ export function OrbitAgentView({
                   {v.requiresConfirmation && <span className="tools-gated">Confirm</span>}
                 </div>
                 {v.rationale && <div className="agent-step-why">{v.rationale}</div>}
+                {dispatchHint(v.toolId, v.args, goal) && (
+                  <div className="agent-step-hint">{dispatchHint(v.toolId, v.args, goal)}</div>
+                )}
                 {argSummary(v.args) && <div className="agent-step-args">{argSummary(v.args)}</div>}
                 {outcomes[i] && (
                   <div className={`agent-step-out${outcomes[i]!.ok ? '' : ' is-fail'}`}>
@@ -377,6 +381,23 @@ function statusIcon(status: MissionStepStatus): string {
     default:
       return '•';
   }
+}
+
+/**
+ * For an agent-dispatch step with no explicit specialist preference, surface a
+ * suggestion of which specialist suits the goal — clearly a hint; Relay/Hermes
+ * make the final choice.
+ */
+function dispatchHint(
+  toolId: string,
+  args: Readonly<Record<string, unknown>>,
+  goal: string,
+): string | null {
+  if (toolId !== 'native:dispatch_agent') return null;
+  const pref = args['agentPreference'];
+  if (typeof pref === 'string' && pref !== 'best') return null;
+  const rec = recommendAgent(goal);
+  return rec ? `Suggested: ${rec.agent.name} (${rec.reason}). Relay/Hermes make the final choice.` : null;
 }
 
 function argSummary(args: Readonly<Record<string, unknown>>): string {
