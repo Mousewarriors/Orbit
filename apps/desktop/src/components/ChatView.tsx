@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AiError } from '@orbit/ai-runtime';
+import { AiError, type AiModelInfo } from '@orbit/ai-runtime';
 import {
   buildChatMessages,
+  CHAT_SYSTEM_PROMPT,
   conversationToMarkdown,
   deriveTitle,
   parseMarkdownBlocks,
   type ConversationMessage,
 } from '@orbit/chat';
+import { addMemory, buildContext, renderContextBlock, type ContextItem } from '@orbit/profile';
 import * as native from '../native.js';
 import {
   AI_SETTING_KEYS,
@@ -15,6 +17,7 @@ import {
   type ProviderInfo,
 } from '../ai/providerConfig.js';
 import { createNativeFetch } from '../ai/nativeFetch.js';
+import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 
 type Status = 'idle' | 'streaming';
 
@@ -38,6 +41,12 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<readonly AiModelInfo[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [personalItems, setPersonalItems] = useState<ContextItem[]>([]);
+  const [memories, setMemories] = useState<Awaited<ReturnType<typeof loadProfileBundle>>['memories']>([]);
+  const [usePersonal, setUsePersonal] = useState(false);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -60,8 +69,19 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
         native.getSetting(AI_SETTING_KEYS.endpoint),
         native.getSetting(AI_SETTING_KEYS.model),
       ]);
-      setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
+      const built = createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch());
+      setInfo(built);
+      setSelectedModel(model?.trim() ?? '');
       await refreshChats();
+      // Populate the model list + personal context (both best-effort).
+      if (built.provider?.listModels) {
+        built.provider.listModels().then(setModels).catch(() => setModels([]));
+      }
+      const bundle = await loadProfileBundle();
+      setMemories(bundle.memories);
+      setPersonalItems(
+        buildContext(bundle.profile, bundle.memories, bundle.memorySettings, { remote: !built.local }),
+      );
     })();
   }, [tauri, refreshChats]);
 
@@ -114,10 +134,21 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       setStatus('streaming');
       setStreaming('');
       setError(null);
+      // Personal context (profile + enabled memories) is prepended to the
+      // system prompt as data when the user has opted in.
+      const system =
+        usePersonal && personalItems.length > 0
+          ? `${CHAT_SYSTEM_PROMPT}\n\n${renderContextBlock(personalItems)}`
+          : CHAT_SYSTEM_PROMPT;
+      const modelName = selectedModel.trim();
       let acc = '';
       try {
         await provider.stream(
-          { messages: buildChatMessages(convo), temperature: 0.4 },
+          {
+            messages: buildChatMessages(convo, system),
+            temperature: 0.4,
+            ...(modelName ? { model: modelName } : {}),
+          },
           (chunk) => {
             if (chunk.delta) {
               acc += chunk.delta;
@@ -127,7 +158,13 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
           controller.signal,
         );
         if (tauri) {
-          const saved = await native.chatAddMessage(genId(), chatId, 'assistant', acc, info?.label ?? null);
+          const saved = await native.chatAddMessage(
+            genId(),
+            chatId,
+            'assistant',
+            acc,
+            modelName || info?.label || null,
+          );
           setMessages((prev) => [...prev, saved]);
         } else {
           setMessages((prev) => [
@@ -150,7 +187,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
         void refreshChats();
       }
     },
-    [info, tauri, refreshChats],
+    [info, tauri, refreshChats, usePersonal, personalItems, selectedModel],
   );
 
   const send = useCallback(async () => {
@@ -205,6 +242,31 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       await refreshChats();
     },
     [tauri, currentId, newChat, refreshChats],
+  );
+
+  // Branch a new conversation from a message: copies the prefix up to `seq`.
+  const branchFrom = useCallback(
+    async (seq: number) => {
+      if (!currentId || !tauri) return;
+      const parentTitle = chats.find((c) => c.id === currentId)?.title ?? 'Chat';
+      const id = genId();
+      await native.chatBranch(id, currentId, seq, `${parentTitle} (branch)`).catch(() => {});
+      await refreshChats();
+      await selectChat(id);
+    },
+    [currentId, tauri, chats, refreshChats, selectChat],
+  );
+
+  // Explicit (never silent) save of a message into Memory.
+  const saveToMemory = useCallback(
+    async (content: string) => {
+      const next = addMemory(memories, { id: genId(), content, source: 'chat', createdAt: Date.now() });
+      setMemories(next);
+      if (tauri) await saveMemories(next).catch(() => {});
+      setSavedNote('Saved to memory');
+      setTimeout(() => setSavedNote(null), 2000);
+    },
+    [memories, tauri],
   );
 
   const togglePin = useCallback(
@@ -332,6 +394,32 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                 {info.label} · {info.local ? 'On-device' : 'Leaves device'}
               </span>
             )}
+            {models.length > 0 && (
+              <select
+                className="chat-model-select"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                title="Model for the next reply"
+              >
+                {!models.some((m) => m.id === selectedModel) && selectedModel && (
+                  <option value={selectedModel}>{selectedModel}</option>
+                )}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {personalItems.length > 0 && (
+              <button
+                className={`chat-head-btn${usePersonal ? ' is-on' : ''}`}
+                onClick={() => setUsePersonal((v) => !v)}
+                title={`${personalItems.length} item(s) about you`}
+              >
+                {usePersonal ? '✓ Personal' : 'Personal'}
+              </button>
+            )}
             <button className="chat-head-btn" disabled={history.length === 0} onClick={() => void exportChat()}>
               Export
             </button>
@@ -346,7 +434,14 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
 
           <div className="chat-thread" ref={threadRef}>
             {messages.map((m) => (
-              <ChatBubble key={m.id} role={m.role} content={m.content} onCopy={() => void copyText(m.content)} />
+              <ChatBubble
+                key={m.id}
+                role={m.role}
+                content={m.content}
+                onCopy={() => void copyText(m.content)}
+                onSaveMemory={() => void saveToMemory(m.content)}
+                {...(m.role === 'assistant' ? { onBranch: () => void branchFrom(m.seq) } : {})}
+              />
             ))}
             {status === 'streaming' && (
               <ChatBubble role="assistant" content={streaming} streaming onCopy={() => void copyText(streaming)} />
@@ -357,6 +452,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
           </div>
 
           {error && <div className="orbit-error">⚠ {error}</div>}
+          {savedNote && <div className="chat-saved-note">{savedNote}</div>}
 
           <div className="chat-input-row">
             <textarea
@@ -394,11 +490,15 @@ function ChatBubble({
   content,
   streaming,
   onCopy,
+  onBranch,
+  onSaveMemory,
 }: {
   role: native.ChatMessage['role'];
   content: string;
   streaming?: boolean;
   onCopy: () => void;
+  onBranch?: () => void;
+  onSaveMemory?: () => void;
 }): JSX.Element {
   const blocks = useMemo(() => parseMarkdownBlocks(content), [content]);
   return (
@@ -420,9 +520,21 @@ function ChatBubble({
         {streaming && <span className="quick-ai-caret">▌</span>}
       </div>
       {!streaming && content && (
-        <button className="chat-copy" onClick={onCopy}>
-          Copy
-        </button>
+        <div className="chat-bubble-actions">
+          <button className="chat-copy" onClick={onCopy}>
+            Copy
+          </button>
+          {onBranch && (
+            <button className="chat-copy" onClick={onBranch} title="Start a new chat from here">
+              Branch
+            </button>
+          )}
+          {onSaveMemory && (
+            <button className="chat-copy" onClick={onSaveMemory} title="Save this to Memory">
+              Save to memory
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
