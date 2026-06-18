@@ -224,6 +224,13 @@ export const BUILTINS: BuiltinCommand[] = [
     effect: (): EffectResult => ({ pushView: 'quick-ai' }),
   },
   {
+    definition: def('builtin.ai.agent', 'Orbit Agent', 'AI', 'agentos', {
+      keywords: ['agent', 'mission', 'do', 'task', 'automate', 'goal', 'plan', 'run', 'launch agent'],
+      subtitle: 'Describe a goal — Orbit plans safe steps, asks, then runs them',
+    }),
+    effect: (): EffectResult => ({ pushView: 'orbit-agent' }),
+  },
+  {
     definition: def('builtin.tools.mcp', 'MCP & Tools', 'AI', 'list', {
       keywords: ['mcp', 'tools', 'tool', 'registry', 'capabilities', 'integrations', 'servers'],
       subtitle: 'Browse the unified tool registry, risk and approvals',

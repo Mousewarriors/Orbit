@@ -366,6 +366,29 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > permission foundation the Phase 9 Mission engine dispatches through. See
 > [docs/architecture/MCP_TOOL_REGISTRY.md](docs/architecture/MCP_TOOL_REGISTRY.md).
 
+> **Update (session 9, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 9: Mission
+> engine / Orbit Agent.** The "tell Orbit what to do and it does it" surface, built on
+> the Phase 8 Tool Registry. New pure `@orbit/mission` (14 tests): a `MissionPlan` is an
+> ordered list of steps, each referencing a **registry tool id** with args validated
+> against the tool schema — so a planner (deterministic *or* model) can only assemble
+> Orbit's existing safe capabilities (`parseMissionPlan` hard-validates exactly like
+> `classify.ts`). **Deterministic-first** `planDeterministically` maps recognised goals
+> to a one-step plan with **no AI call**; `planMission` only calls the injected provider
+> when nothing is recognised. Renderer (26 tests): `agentDispatch.ts` launches a local
+> agent through Relay's real `listAgents → createLaunchPlan → executeLaunch(confirm:true)`
+> flow (pure `chooseAgent`; executes only after approval); `missionExecutor.ts` maps each
+> whitelisted tool to a real action (no generic run-command); `agentProvider.ts` routes NL
+> agent goals. **OrbitAgentView**: provider/Relay banners, plan preview with per-step
+> risk/rationale, per-step confirmation (Approve/Skip), sequential run with Stop, bounded
+> results, "Open result" nav. Command "Orbit Agent" + NL ("agent: …", "have an agent …",
+> "ask orbit to …", "… for me"). **Honest gaps:** multi-step AI planning needs a real
+> provider (Mock can't plan — the view says so); **model routing preview** stays the
+> AgentOS Model Gateway's job (surfaces when its adapter lands — not duplicated); mission
+> persistence/audit/handoffs, a unified Approval Centre, and remote Gateway/Hermes dispatch
+> are later. **Counts: 440 JS tests** (+31) **/ 123 Rust** (unchanged — no Rust touched);
+> lint, strict typecheck, `vite build`, `cargo check --workspace` all green. Not GUI-run
+> here. See [docs/architecture/AI_AGENT_MODE.md](docs/architecture/AI_AGENT_MODE.md).
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

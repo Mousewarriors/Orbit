@@ -18,6 +18,7 @@
     "@orbit/branding": "*",
     "@orbit/calculator": "*",
     "@orbit/command-model": "*",
+    "@orbit/mission": "*",
     "@orbit/placeholders": "*",
     "@orbit/search-engine": "*",
     "@orbit/shared-types": "*",

@@ -36,6 +36,8 @@ import { AllCommandsView } from './components/AllCommandsView.js';
 import { ControlCenterView } from './components/ControlCenterView.js';
 import { QuickAiView } from './components/QuickAiView.js';
 import { ToolsView } from './components/ToolsView.js';
+import { OrbitAgentView } from './components/OrbitAgentView.js';
+import { createAgentProvider } from './agent/agentProvider.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
 import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { describeConfirmation, needsConfirmation } from './confirm.js';
@@ -51,7 +53,8 @@ type View =
   | 'all-commands'
   | 'control-center'
   | 'quick-ai'
-  | 'mcp-tools';
+  | 'mcp-tools'
+  | 'orbit-agent';
 
 function buildSignals(snapshot: Array<[string, number, number]>): RankingSignals {
   const usage = new Map<string, number>();
@@ -113,6 +116,7 @@ export function App(): JSX.Element {
         noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
       }),
       createAiCommandProvider(),
+      createAgentProvider(),
       createCalculatorProvider(),
     ],
     [registry],
@@ -327,7 +331,8 @@ export function App(): JSX.Element {
           outcome.pushView === 'all-commands' ||
           outcome.pushView === 'control-center' ||
           outcome.pushView === 'quick-ai' ||
-          outcome.pushView === 'mcp-tools'
+          outcome.pushView === 'mcp-tools' ||
+          outcome.pushView === 'orbit-agent'
         ) {
           setViewArg(outcome.pushViewArg ?? null);
           setView(outcome.pushView);
@@ -418,7 +423,8 @@ export function App(): JSX.Element {
           pushTarget === 'all-commands' ||
           pushTarget === 'control-center' ||
           pushTarget === 'quick-ai' ||
-          pushTarget === 'mcp-tools'
+          pushTarget === 'mcp-tools' ||
+          pushTarget === 'orbit-agent'
         ) {
           setViewArg(ef.pushViewArg ?? null);
           setView(pushTarget);
@@ -514,6 +520,24 @@ export function App(): JSX.Element {
 
   if (view === 'mcp-tools') {
     return <><ToolsView onPop={() => setView('root')} />{toast}</>;
+  }
+
+  if (view === 'orbit-agent') {
+    return (
+      <>
+        <OrbitAgentView
+          initialArg={viewArg ?? undefined}
+          onPop={() => setView('root')}
+          onNavigate={(viewId, arg) => {
+            if (viewId === 'control-center') {
+              setViewArg(arg);
+              setView('control-center');
+            }
+          }}
+        />
+        {toast}
+      </>
+    );
   }
 
   return (
