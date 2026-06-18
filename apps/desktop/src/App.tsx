@@ -38,6 +38,7 @@ import { QuickAiView } from './components/QuickAiView.js';
 import { ToolsView } from './components/ToolsView.js';
 import { OrbitAgentView } from './components/OrbitAgentView.js';
 import { createAgentProvider } from './agent/agentProvider.js';
+import { createAutomationProvider } from './agent/automationProvider.js';
 import { NotificationToast, useNotifications } from './components/NotificationToast.js';
 import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { describeConfirmation, needsConfirmation } from './confirm.js';
@@ -117,6 +118,7 @@ export function App(): JSX.Element {
       }),
       createAiCommandProvider(),
       createAgentProvider(),
+      createAutomationProvider(),
       createCalculatorProvider(),
     ],
     [registry],

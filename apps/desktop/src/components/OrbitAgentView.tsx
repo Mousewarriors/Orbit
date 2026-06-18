@@ -19,6 +19,8 @@ import {
 } from '../ai/providerConfig.js';
 import { buildMessages, decodeQuickAiArg, type QuickAiContext } from '../ai/quickAi.js';
 import { buildToolRegistry } from '../ai/toolRegistry.js';
+import { buildAutomationPlan, getAutomation } from '@orbit/automations';
+import { decodeAutomationArg } from '../agent/automationProvider.js';
 import { dispatchAgentViaRelay } from '../agent/agentDispatch.js';
 import { executeMissionStep, type MissionExecutorDeps } from '../agent/missionExecutor.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
@@ -43,7 +45,11 @@ export function OrbitAgentView({
   onPop: () => void;
   onNavigate: (viewId: string, arg: string | null) => void;
 }): JSX.Element {
-  const launch = useMemo(() => decodeQuickAiArg(initialArg), [initialArg]);
+  const automationId = useMemo(() => decodeAutomationArg(initialArg), [initialArg]);
+  const launch = useMemo(
+    () => (automationId ? { prompt: '' } : decodeQuickAiArg(initialArg)),
+    [automationId, initialArg],
+  );
   const [goal, setGoal] = useState(launch.prompt);
   const [phase, setPhase] = useState<Phase>('idle');
   const [plan, setPlan] = useState<MissionPlan | null>(null);
@@ -99,6 +105,25 @@ export function OrbitAgentView({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // A saved automation arrives as a prebuilt plan: compile it against the live
+  // registry once that's ready and land straight on the preview.
+  useEffect(() => {
+    if (!registry || !automationId) return;
+    const def = getAutomation(automationId);
+    if (!def) return;
+    const built = buildAutomationPlan(def, registry);
+    if (!built) {
+      setPlanNote('This automation uses a tool that is currently unavailable.');
+      return;
+    }
+    setGoal(def.title);
+    setPlan(built);
+    setStatuses(built.steps.map(() => 'pending'));
+    setOutcomes(built.steps.map(() => null));
+    setNavTarget(null);
+    setPhase('preview');
+  }, [registry, automationId]);
 
   const stepViews: MissionStepView[] = useMemo(
     () => (plan && registry ? missionStepViews(plan, registry) : []),

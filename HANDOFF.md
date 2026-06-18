@@ -399,6 +399,18 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > Orbit duplicates neither. **Counts: 445 JS tests** (+5) **/ 123 Rust** (unchanged); lint,
 > strict typecheck, `vite build`, `cargo check --workspace` green.
 
+> **Update (session 11, 2026-06-18, branch `claude/orbit-ai-runtime`) — Phase 11:
+> Automations.** New pure `@orbit/automations` (7 tests): saved workflows as ordered
+> lists of whitelisted tool steps that `buildAutomationPlan` compiles into a `MissionPlan`
+> and runs through the *same* Orbit Agent executor — inheriting per-step confirmation +
+> existing-tools-only safety. 5 real starters (Review Pending Approvals, Triage Failed
+> Sessions, Catch Up on Activity, Summarise Clipboard, Restart Relay) surfaced by a Root
+> Search provider that opens Orbit Agent on a prebuilt plan (`auto:<id>`). **Honest:** only
+> the **manual** trigger is active; schedule/app-opened/file-changed/session-completed need
+> native wiring (scheduler + watchers); an editor + import/export are later. **Counts: 452
+> JS tests** (+7) **/ 123 Rust** (unchanged); lint, strict typecheck, `vite build`, `cargo
+> check --workspace` green. This completes the 5th interaction mode (saved automation).
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

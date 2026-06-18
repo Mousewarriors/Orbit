@@ -16,6 +16,7 @@
   "dependencies": {
     "@orbit/agents": "*",
     "@orbit/appearance": "*",
+    "@orbit/automations": "*",
     "@orbit/branding": "*",
     "@orbit/calculator": "*",
     "@orbit/command-model": "*",
