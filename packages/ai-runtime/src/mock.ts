@@ -13,6 +13,7 @@ import {
   type AiRequest,
   type AiResponse,
   type AiStreamChunk,
+  type AiToolCall,
   type ProviderHealth,
 } from './types.js';
 
@@ -22,6 +23,13 @@ export interface MockProviderOptions {
   readonly models?: readonly AiModelInfo[];
   /** Force health to report unconfigured/unreachable, for UI testing. */
   readonly status?: ProviderHealth['status'];
+  /**
+   * Scriptable tool calls. Returns the tool calls the model should "request"
+   * for this request (empty/undefined ⇒ a normal text reply). The function sees
+   * the full message history so it can return calls on the first round and a
+   * text answer once the tool results are present — exercising the agent loop.
+   */
+  readonly toolScript?: (req: AiRequest) => readonly AiToolCall[] | undefined;
 }
 
 const DEFAULT_MODELS: readonly AiModelInfo[] = [
@@ -69,6 +77,17 @@ export class MockProvider implements AiProvider {
 
   async complete(req: AiRequest, signal?: AbortSignal): Promise<AiResponse> {
     throwIfAborted(signal);
+    // A model only emits tool calls when it was actually offered tools.
+    const toolCalls = (req.tools && req.tools.length > 0 ? this.opts.toolScript?.(req) : undefined) ?? [];
+    if (toolCalls.length > 0) {
+      return {
+        content: '',
+        model: req.model ?? 'mock-small',
+        provider: this.id,
+        local: true,
+        toolCalls,
+      };
+    }
     const content = this.replyFor(req);
     return {
       content,

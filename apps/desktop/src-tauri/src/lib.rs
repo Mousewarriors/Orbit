@@ -15,6 +15,7 @@ mod commands;
 mod extension_host;
 mod file_index;
 mod http;
+mod mcp_stdio;
 mod secrets;
 mod launcher;
 mod relay_manifest;
@@ -431,6 +432,10 @@ pub fn run() {
             http::http_request,
             http::http_stream_open,
             http::http_stream_cancel,
+            mcp_stdio::mcp_stdio_open,
+            mcp_stdio::mcp_stdio_request,
+            mcp_stdio::mcp_stdio_logs,
+            mcp_stdio::mcp_stdio_close,
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,

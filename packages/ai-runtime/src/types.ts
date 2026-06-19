@@ -8,11 +8,31 @@
  * carries usage + a clear local-vs-remote flag so the UI can show where data went.
  */
 
-export type AiRole = 'system' | 'user' | 'assistant';
+export type AiRole = 'system' | 'user' | 'assistant' | 'tool';
+
+/** A tool call the model wants to make (assistant turn). */
+export interface AiToolCall {
+  /** Provider-supplied id (OpenAI); optional for providers that key by name. */
+  readonly id?: string;
+  readonly name: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
+}
 
 export interface AiMessage {
   readonly role: AiRole;
   readonly content: string;
+  /** assistant turn: the tool calls it requested. */
+  readonly toolCalls?: readonly AiToolCall[];
+  /** tool turn: which call this result answers (id and/or name). */
+  readonly toolCallId?: string;
+  readonly toolName?: string;
+}
+
+/** A tool the model may call: name + description + JSON-schema parameters. */
+export interface AiToolDef {
+  readonly name: string;
+  readonly description?: string;
+  readonly parameters: Readonly<Record<string, unknown>>;
 }
 
 /** Known provider adapters. Auto mode routes through the AgentOS Gateway. */
@@ -45,6 +65,8 @@ export interface AiRequest {
   readonly maxTokens?: number;
   /** Best-effort hint that the response must be valid JSON. */
   readonly json?: boolean;
+  /** Tools the model may call this turn (function-calling). */
+  readonly tools?: readonly AiToolDef[];
 }
 
 export interface AiResponse {
@@ -54,6 +76,8 @@ export interface AiResponse {
   readonly usage?: AiUsage;
   /** True when processing stayed on-device (no data left the machine). */
   readonly local: boolean;
+  /** Tool calls the model requested instead of (or alongside) a final answer. */
+  readonly toolCalls?: readonly AiToolCall[];
 }
 
 export interface AiStreamChunk {

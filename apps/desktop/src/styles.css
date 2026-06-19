@@ -1422,6 +1422,39 @@ kbd {
 }
 .tools-server-ep-input { flex: 1; width: auto; }
 
+/* --- MCP & Tools: AgentOS one-click connect --- */
+.tools-agentos { background: var(--orbit-input-bg, #15151a); }
+.tools-agentos-row { display: flex; align-items: center; gap: 8px; }
+.tools-agentos-status { font-size: 12px; font-weight: 600; min-width: 120px; }
+.tools-agentos-hint { font-size: 11px; color: var(--orbit-muted, #888); margin-top: 6px; line-height: 1.4; }
+.tools-agentos-hint code {
+  background: var(--orbit-code-bg, #222); border-radius: 4px; padding: 1px 4px; font-size: 11px;
+}
+
+/* --- Chat: tool-use cards --- */
+.chat-tool-cards { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; }
+.chat-tool-card {
+  border: 1px solid var(--orbit-border, #2a2a30); border-radius: 8px; padding: 8px 10px;
+  background: var(--orbit-input-bg, #15151a); font-size: 12px;
+}
+.chat-tool-card.is-running { border-color: var(--orbit-accent, #6a9); }
+.chat-tool-card.is-error, .chat-tool-card.is-unknown-tool { border-color: #e85; }
+.chat-tool-card.is-denied { opacity: 0.7; }
+.chat-tool-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chat-tool-card-name { font-weight: 600; }
+.chat-tool-card-server { color: var(--orbit-muted, #888); font-size: 11px; }
+.chat-tool-card-status { margin-left: auto; font-size: 11px; color: var(--orbit-muted, #999); }
+.chat-tool-card-dur { font-size: 11px; color: var(--orbit-muted, #777); }
+.chat-tool-card-args {
+  color: var(--orbit-muted, #aaa); margin-top: 6px; white-space: pre-wrap; word-break: break-word;
+  font-family: var(--orbit-mono, ui-monospace, monospace); font-size: 11px;
+}
+.chat-tool-card-result {
+  margin-top: 6px; max-height: 200px; overflow: auto; background: var(--orbit-code-bg, #0e0e12);
+  border-radius: 6px; padding: 6px 8px; font-size: 11px; white-space: pre-wrap; word-break: break-word;
+}
+.chat-tool-card-error { margin-top: 6px; color: #e85; }
+
 /* --- Quick AI: personal context inspector --- */
 .quick-ai-why {
   background: none; border: none; color: var(--orbit-accent, #6a9); font-size: 12px; cursor: pointer;

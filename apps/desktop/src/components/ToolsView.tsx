@@ -11,10 +11,12 @@ import {
   parseMcpServers,
   removeServer,
   serializeMcpServers,
+  serverKind,
   upsertServer,
   validateServer,
   type StoredMcpServer,
 } from '../ai/mcpServers.js';
+import { agentosMcpServer, AGENTOS_SERVER_ID, DEFAULT_AGENTOS_DIR } from '../ai/agentosMcp.js';
 import * as native from '../native.js';
 import { describeConfirmation } from '../confirm.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
@@ -45,6 +47,33 @@ const SOURCE_LABEL: Record<string, string> = {
   'ai-provider': 'AI provider',
 };
 
+/**
+ * Build arguments for a test call from a single input box. A `{…}` value is
+ * parsed as JSON; otherwise the plain string is mapped onto the tool's first
+ * required string property (so `search_vault` ← `query`, the demo ← `text`).
+ */
+function buildTestArgs(tool: ToolRecord, raw: string): Record<string, unknown> {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* fall through to single-field mapping */
+    }
+  }
+  const props = tool.inputSchema.properties;
+  const required = tool.inputSchema.required ?? [];
+  const stringKeys = Object.entries(props)
+    .filter(([, p]) => p.type === 'string')
+    .map(([k]) => k);
+  const key = required.find((k) => stringKeys.includes(k)) ?? stringKeys[0];
+  return key ? { [key]: trimmed } : { text: trimmed, title: trimmed };
+}
+
 export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
   const [tools, setTools] = useState<ToolRecord[]>([]);
   const [clients, setClients] = useState<ReadonlyMap<string, McpClient>>(new Map());
@@ -57,6 +86,7 @@ export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
   const [form, setForm] = useState({ id: '', name: '', endpoint: '' });
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [agentosDir, setAgentosDir] = useState(DEFAULT_AGENTOS_DIR);
 
   const reload = useCallback(async () => {
     setBusy(true);
@@ -96,6 +126,16 @@ export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
     void persistServers(upsertServer(servers, { ...candidate, enabled: true }));
   }, [form, servers, persistServers]);
 
+  const connectAgentOs = useCallback(() => {
+    setFormError(null);
+    void persistServers(upsertServer(servers, agentosMcpServer(agentosDir)));
+  }, [servers, agentosDir, persistServers]);
+
+  const agentosConnected = useMemo(
+    () => servers.some((s) => s.id === AGENTOS_SERVER_ID && s.enabled),
+    [servers],
+  );
+
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return tools;
@@ -124,10 +164,10 @@ export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
       setResult(null);
       const client = clients.get(tool.serverId ?? '');
       if (!client) {
-        setResult('Only the in-process demo MCP server is callable here (real servers need the native MCP bridge).');
+        setResult('This tool has no connected server to call.');
         return;
       }
-      const args = testArg.trim() ? { text: testArg, title: testArg } : {};
+      const args = buildTestArgs(tool, testArg);
       const check = validateArgs(tool.inputSchema, args);
       if (!check.ok) {
         setResult(`Invalid arguments: ${check.errors.join(', ')}`);
@@ -170,16 +210,44 @@ export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
       <div className="tools-note">
         One unified registry. Risk and approval policy are derived from each tool's declared side
         effects — anything that writes, sends, runs, deploys or spends is gated. The demo MCP server
-        runs in-process (synthetic); add a real HTTP MCP server below — it connects through the
-        native bridge.
+        runs in-process (synthetic). Connect AgentOS (below) to control your Second Brain, or add any
+        MCP server — stdio servers run as a child process; HTTP servers connect through the bridge.
+      </div>
+
+      <div className="tools-servers tools-agentos">
+        <div className="tools-servers-title">AgentOS</div>
+        <div className="tools-agentos-row">
+          <span className="tools-agentos-status">
+            {agentosConnected ? '● Connected' : '○ Not connected'}
+          </span>
+          <input
+            className="tools-server-input tools-server-ep-input"
+            value={agentosDir}
+            onChange={(e) => setAgentosDir(e.target.value)}
+            placeholder="C:/AgentOS"
+            spellCheck={false}
+            aria-label="AgentOS install directory"
+          />
+          <button className="tools-test-run" disabled={busy} onClick={connectAgentOs}>
+            {agentosConnected ? 'Reconnect AgentOS' : 'Connect AgentOS'}
+          </button>
+        </div>
+        <div className="tools-agentos-hint">
+          Runs <code>node {agentosDir}/server/mcp/server.js</code>. Adds search vault, ask Second
+          Brain, memories, route task, create handoff, log decision and battle plan as tools.
+        </div>
       </div>
 
       <div className="tools-servers">
-        <div className="tools-servers-title">HTTP MCP servers</div>
+        <div className="tools-servers-title">MCP servers</div>
         {servers.map((s) => (
           <div key={s.id} className="tools-server-row">
             <span className="tools-server-name">{s.name}</span>
-            <span className="tools-server-ep">{s.endpoint}</span>
+            <span className="tools-server-ep">
+              {serverKind(s) === 'stdio'
+                ? `${s.command ?? ''} ${(s.args ?? []).join(' ')}`.trim()
+                : s.endpoint}
+            </span>
             <button
               className="tools-server-toggle"
               onClick={() => void persistServers(servers.map((x) => (x.id === s.id ? { ...x, enabled: !x.enabled } : x)))}
@@ -272,13 +340,17 @@ export function ToolsView({ onPop }: { onPop: () => void }): JSX.Element {
                   </div>
                 ))}
               </div>
-              {selected.serverId === DEMO_MCP_SERVER_ID && (
+              {selected.serverId && clients.has(selected.serverId) && (
                 <div className="tools-test">
                   <input
                     className="tools-test-input"
                     value={testArg}
                     onChange={(e) => setTestArg(e.target.value)}
-                    placeholder="Test input…"
+                    placeholder={
+                      selected.serverId === DEMO_MCP_SERVER_ID
+                        ? 'Test input…'
+                        : 'Test input (text, or {"key":"value"} JSON)…'
+                    }
                     spellCheck={false}
                   />
                   <button className="tools-test-run" onClick={() => onTestClick(selected)}>

@@ -31,6 +31,29 @@ describe('parseMcpServers', () => {
     const list: StoredMcpServer[] = [{ id: 'x', name: 'X', endpoint: 'http://x/mcp', enabled: false }];
     expect(parseMcpServers(serializeMcpServers(list))).toEqual(list);
   });
+
+  it('keeps stdio servers (command-based) and round-trips them', () => {
+    const list: StoredMcpServer[] = [
+      {
+        id: 'agentos',
+        name: 'AgentOS',
+        command: 'node',
+        args: ['C:/AgentOS/server/mcp/server.js'],
+        cwd: 'C:/AgentOS',
+        enabled: true,
+      },
+    ];
+    const parsed = parseMcpServers(serializeMcpServers(list));
+    expect(parsed).toEqual(list);
+  });
+
+  it('drops a stdio entry with no command and a bad endpoint, but keeps a valid stdio one', () => {
+    const raw = JSON.stringify([
+      { id: 'bad', name: 'Bad', enabled: true }, // neither command nor endpoint
+      { id: 'os', name: 'OS', command: 'node', args: ['x.js'], enabled: true },
+    ]);
+    expect(parseMcpServers(raw).map((s) => s.id)).toEqual(['os']);
+  });
 });
 
 describe('validateServer', () => {
@@ -45,6 +68,10 @@ describe('validateServer', () => {
     expect(validateServer({ id: 'a', name: 'n', endpoint: 'http://x' }, existing)).toMatch(/exists/);
     expect(validateServer({ id: 'ok', name: '', endpoint: 'http://x' }, existing)).toMatch(/Name/);
     expect(validateServer({ id: 'ok', name: 'n', endpoint: 'ws://x' }, existing)).toMatch(/http/);
+  });
+
+  it('accepts a stdio server with just a command (no endpoint needed)', () => {
+    expect(validateServer({ id: 'os', name: 'AgentOS', command: 'node' }, existing)).toBeNull();
   });
 });
 

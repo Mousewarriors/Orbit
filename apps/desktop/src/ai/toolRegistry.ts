@@ -22,8 +22,9 @@ import {
   type ToolRecord,
 } from '@orbit/tool-registry';
 import * as native from '../native.js';
-import { MCP_SERVERS_SETTING_KEY, parseMcpServers } from './mcpServers.js';
+import { MCP_SERVERS_SETTING_KEY, parseMcpServers, serverKind } from './mcpServers.js';
 import { NativeHttpMcpTransport } from './nativeMcpTransport.js';
+import { NativeStdioMcpTransport } from './nativeStdioMcpTransport.js';
 
 /** The bundled demo MCP server's id (clearly synthetic, never live data). */
 export const DEMO_MCP_SERVER_ID = 'demo';
@@ -109,7 +110,16 @@ export async function buildToolRegistry(): Promise<BuiltRegistry> {
       );
       for (const server of servers) {
         try {
-          const client = new McpClient(new NativeHttpMcpTransport(server.id, server.endpoint));
+          const transport =
+            serverKind(server) === 'stdio'
+              ? new NativeStdioMcpTransport(
+                  server.id,
+                  server.command ?? '',
+                  server.args ?? [],
+                  server.cwd ?? null,
+                )
+              : new NativeHttpMcpTransport(server.id, server.endpoint ?? '');
+          const client = new McpClient(transport);
           await client.initialize();
           const tools = await client.listTools();
           registry.register(

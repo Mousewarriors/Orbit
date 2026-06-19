@@ -798,6 +798,37 @@ export async function onHttpStream(handler: (ev: HttpStreamEvent) => void): Prom
   return listen<HttpStreamEvent>('http-stream', (event) => handler(event.payload));
 }
 
+// --- Native stdio MCP host (long-lived child-process MCP servers) ---
+
+/** Open (or re-open) a stdio MCP connection under `id` for `command args`. */
+export async function mcpStdioOpen(
+  id: string,
+  command: string,
+  args: string[],
+  cwd?: string | null,
+): Promise<void> {
+  return invoke('mcp_stdio_open', { id, command, args, cwd: cwd ?? null });
+}
+
+/** Send one JSON-RPC request line; resolves with the matching response line. */
+export async function mcpStdioRequest(
+  id: string,
+  request: string,
+  timeoutMs?: number,
+): Promise<string> {
+  return invoke<string>('mcp_stdio_request', { id, request, timeoutMs: timeoutMs ?? null });
+}
+
+/** Recent stderr lines from a stdio MCP connection (diagnostics only). */
+export async function mcpStdioLogs(id: string): Promise<string[]> {
+  return invoke<string[]>('mcp_stdio_logs', { id });
+}
+
+/** Close a stdio MCP connection and kill its child process. */
+export async function mcpStdioClose(id: string): Promise<void> {
+  return invoke('mcp_stdio_close', { id });
+}
+
 // --- OS secure storage (credentials) ---
 
 /** Store a secret (e.g. an API key) in OS secure storage. Never persisted elsewhere. */
