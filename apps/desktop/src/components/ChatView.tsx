@@ -10,13 +10,8 @@ import {
 } from '@orbit/chat';
 import { addMemory, buildContext, renderContextBlock, type ContextItem } from '@orbit/profile';
 import * as native from '../native.js';
-import {
-  AI_SETTING_KEYS,
-  createProvider,
-  parseAiSettings,
-  type ProviderInfo,
-} from '../ai/providerConfig.js';
-import { createNativeFetch } from '../ai/nativeFetch.js';
+import { type ProviderInfo } from '../ai/providerConfig.js';
+import { loadProviderInfo } from '../ai/providerLoad.js';
 import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 
 type Status = 'idle' | 'streaming';
@@ -60,18 +55,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
 
   useEffect(() => {
     void (async () => {
-      if (!tauri) {
-        setInfo(createProvider({ provider: 'mock', ollamaEndpoint: '', ollamaModel: '' }));
-        return;
-      }
-      const [provider, endpoint, model] = await Promise.all([
-        native.getSetting(AI_SETTING_KEYS.provider),
-        native.getSetting(AI_SETTING_KEYS.endpoint),
-        native.getSetting(AI_SETTING_KEYS.model),
-      ]);
-      const built = createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch());
+      const built = await loadProviderInfo();
       setInfo(built);
-      setSelectedModel(model?.trim() ?? '');
+      if (!tauri) return;
       await refreshChats();
       // Populate the model list + personal context (both best-effort).
       if (built.provider?.listModels) {

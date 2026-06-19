@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AiError } from '@orbit/ai-runtime';
 import * as native from '../native.js';
-import {
-  AI_SETTING_KEYS,
-  createProvider,
-  parseAiSettings,
-  type ProviderInfo,
-} from '../ai/providerConfig.js';
+import { AI_SETTING_KEYS, type ProviderInfo } from '../ai/providerConfig.js';
 import {
   addRecentPrompt,
   buildMessages,
@@ -14,7 +9,7 @@ import {
   parseRecentPrompts,
   type QuickAiContext,
 } from '../ai/quickAi.js';
-import { createNativeFetch } from '../ai/nativeFetch.js';
+import { loadProviderInfo } from '../ai/providerLoad.js';
 import { loadProfileBundle } from '../ai/profileStore.js';
 import { buildContext, type ContextItem, type MemoryRecord, type MemorySettings, type Profile } from '@orbit/profile';
 import { describeConfirmation } from '../confirm.js';
@@ -61,19 +56,13 @@ export function QuickAiView({
   // Load provider config, clipboard context and recent prompts.
   useEffect(() => {
     void (async () => {
-      if (!native.isTauri()) {
-        setInfo(createProvider({ provider: 'mock', ollamaEndpoint: '', ollamaModel: '' }));
-        return;
-      }
+      setInfo(await loadProviderInfo());
+      if (!native.isTauri()) return;
       try {
-        const [provider, endpoint, model, recentRaw, clip] = await Promise.all([
-          native.getSetting(AI_SETTING_KEYS.provider),
-          native.getSetting(AI_SETTING_KEYS.endpoint),
-          native.getSetting(AI_SETTING_KEYS.model),
+        const [recentRaw, clip] = await Promise.all([
           native.getSetting(AI_SETTING_KEYS.recent),
           native.clipboardList('', 1).catch((): native.ClipboardEntry[] => []),
         ]);
-        setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
         setRecent(parseRecentPrompts(recentRaw));
         setClipboard(clip[0]?.content ?? '');
         const bundle = await loadProfileBundle();
@@ -81,7 +70,7 @@ export function QuickAiView({
         setMemories(bundle.memories);
         setMemorySettings(bundle.memorySettings);
       } catch {
-        setInfo(createProvider({ provider: 'none', ollamaEndpoint: '', ollamaModel: '' }));
+        /* secondary context is best-effort */
       }
     })();
   }, []);

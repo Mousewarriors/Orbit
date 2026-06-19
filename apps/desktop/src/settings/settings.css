@@ -490,3 +490,7 @@ input[type='range'] {
 .settings-memory-content { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-memory-sensitive { font-size: 11px; color: #e85; }
 .settings-memory-delete { background: none; border: none; color: #e85; cursor: pointer; font-size: 12px; }
+
+/* --- Cloud API key field --- */
+.settings-key-row { display: flex; gap: 8px; align-items: center; }
+.settings-key-stored { font-size: 13px; color: var(--orbit-accent, #6a9); }

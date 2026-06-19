@@ -472,6 +472,26 @@ get oriented, then rely on [CLAUDE.md](CLAUDE.md) for durable rules and
 > later. **Counts: 483 JS tests** (+7) **/ 129 Rust** (+6); lint, strict typecheck, `vite
 > build`, `cargo check --workspace` all green. Not GUI-run here.
 
+> **Update (session 16, 2026-06-19, branch `claude/orbit-ai-runtime`) — Filling gaps:
+> Chat polish + cloud providers + secure credentials.** Two slices. **(a) Chat gaps:**
+> branch-to-new-chat surfaced on assistant messages (uses the existing `chat_branch`
+> IPC); **mid-chat model switching** (selector from `provider.listModels()`, passed per
+> request + recorded on the assistant message); opt-in **Personal** context (profile +
+> enabled memories, sensitive excluded when remote) prepended to the system prompt as
+> data; explicit (never silent) **Save to memory** on messages. **(b) Cloud + secrets:**
+> new pure **`OpenAiCompatProvider`** (4 tests) for any OpenAI-compatible `/v1` endpoint
+> (OpenAI/OpenRouter/LM Studio/vLLM) — Bearer auth, SSE streaming, `/models`, json mode,
+> local-vs-remote from host. **API keys stored in OS secure storage** via the `keyring`
+> crate (`secrets.rs`: `secret_set/get/delete/has`, Windows Credential Manager) — never in
+> settings/files/logs. Provider construction centralised in `ai/providerLoad.ts` (reads
+> settings + the cloud secret); Quick AI, Chat and Orbit Agent all use it. **Settings → AI**
+> adds the Cloud (OpenAI-compatible) provider + endpoint/model + a secure API-key field
+> (stored / remove). **Honest gaps:** a **native Anthropic** adapter (different API shape)
+> and **AgentOS Auto** routing remain; cloud streaming/secret round-trip not GUI-verified
+> here (adapter is unit-tested with injected fetch; keyring compiles). **Counts: 489 JS
+> tests** (+6) **/ 129 Rust** (+ keyring URL tests under `cargo test -p orbit-desktop`);
+> lint, strict typecheck, `vite build`, `cargo check --workspace` all green.
+
 > **Update (session 5h, 2026-06-15) — Priority 2b: file content indexing (opt-in).**
 > Migration **0007** adds a standalone `files_content_fts(path UNINDEXED, content)`
 > (separate from the always-on metadata `files_fts`; cleared wholesale on rebuild).

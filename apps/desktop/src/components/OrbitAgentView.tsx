@@ -11,15 +11,10 @@ import {
 } from '@orbit/mission';
 import type { AiMessage } from '@orbit/ai-runtime';
 import * as native from '../native.js';
-import {
-  AI_SETTING_KEYS,
-  createProvider,
-  parseAiSettings,
-  type ProviderInfo,
-} from '../ai/providerConfig.js';
+import { type ProviderInfo } from '../ai/providerConfig.js';
+import { loadProviderInfo } from '../ai/providerLoad.js';
 import { buildMessages, decodeQuickAiArg, type QuickAiContext } from '../ai/quickAi.js';
 import { buildToolRegistry } from '../ai/toolRegistry.js';
-import { createNativeFetch } from '../ai/nativeFetch.js';
 import { buildAutomationPlan, getAutomation } from '@orbit/automations';
 import { decodeAutomationArg } from '../agent/automationProvider.js';
 import { dispatchAgentViaRelay } from '../agent/agentDispatch.js';
@@ -75,22 +70,16 @@ export function OrbitAgentView({
     void (async () => {
       const built = await buildToolRegistry();
       setRegistry(built.registry);
-      if (!native.isTauri()) {
-        setInfo(createProvider({ provider: 'none', ollamaEndpoint: '', ollamaModel: '' }));
-        return;
-      }
+      setInfo(await loadProviderInfo());
+      if (!native.isTauri()) return;
       try {
-        const [provider, endpoint, model, appList, recent, favs, status, clip] = await Promise.all([
-          native.getSetting(AI_SETTING_KEYS.provider),
-          native.getSetting(AI_SETTING_KEYS.endpoint),
-          native.getSetting(AI_SETTING_KEYS.model),
+        const [appList, recent, favs, status, clip] = await Promise.all([
           native.listApplications().catch((): native.NativeApp[] => []),
           native.projectMetaListRecent(20).catch((): native.ProjectMeta[] => []),
           native.projectMetaListFavourites().catch((): native.ProjectMeta[] => []),
           native.relayStatus().catch(() => null),
           native.clipboardList('', 1).catch((): native.ClipboardEntry[] => []),
         ]);
-        setInfo(createProvider(parseAiSettings({ provider, endpoint, model }), createNativeFetch()));
         apps.current = appList;
         const merged = new Map<string, ProjectCandidate>();
         for (const p of [...recent, ...favs]) merged.set(p.path, { path: p.path, name: p.name });
@@ -98,7 +87,7 @@ export function OrbitAgentView({
         setRelayState(status?.state ?? 'unknown');
         clipboard.current = clip[0]?.content ?? '';
       } catch {
-        setInfo(createProvider({ provider: 'none', ollamaEndpoint: '', ollamaModel: '' }));
+        /* secondary context is best-effort */
       }
     })();
   }, []);

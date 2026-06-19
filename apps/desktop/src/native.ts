@@ -797,3 +797,22 @@ export async function httpStreamCancel(id: string): Promise<void> {
 export async function onHttpStream(handler: (ev: HttpStreamEvent) => void): Promise<UnlistenFn> {
   return listen<HttpStreamEvent>('http-stream', (event) => handler(event.payload));
 }
+
+// --- OS secure storage (credentials) ---
+
+/** Store a secret (e.g. an API key) in OS secure storage. Never persisted elsewhere. */
+export async function secretSet(key: string, value: string): Promise<void> {
+  return invoke('secret_set', { key, value });
+}
+
+export async function secretGet(key: string): Promise<string | null> {
+  return invoke<string | null>('secret_get', { key });
+}
+
+export async function secretDelete(key: string): Promise<void> {
+  return invoke('secret_delete', { key });
+}
+
+export async function secretHas(key: string): Promise<boolean> {
+  return invoke<boolean>('secret_has', { key });
+}

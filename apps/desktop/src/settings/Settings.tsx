@@ -6,6 +6,7 @@ import * as native from '../native.js';
 import { initAppearance, saveAppearance } from '../appearance.js';
 import {
   AI_SETTING_KEYS,
+  CLOUD_API_KEY_SECRET,
   DEFAULT_AI_SETTINGS,
   parseAiSettings,
   type ConfiguredProviderId,
@@ -245,24 +246,47 @@ function AiSection(): JSX.Element {
   const [provider, setProvider] = useState<ConfiguredProviderId>(DEFAULT_AI_SETTINGS.provider);
   const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.ollamaEndpoint);
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.ollamaModel);
+  const [cloudBase, setCloudBase] = useState(DEFAULT_AI_SETTINGS.cloudBaseUrl ?? '');
+  const [cloudModel, setCloudModel] = useState(DEFAULT_AI_SETTINGS.cloudModel ?? '');
+  const [apiKey, setApiKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      const [p, e, m] = await Promise.all([
+      const [p, e, m, cb, cm, keyStored] = await Promise.all([
         native.getSetting(AI_SETTING_KEYS.provider),
         native.getSetting(AI_SETTING_KEYS.endpoint),
         native.getSetting(AI_SETTING_KEYS.model),
+        native.getSetting(AI_SETTING_KEYS.cloudBase),
+        native.getSetting(AI_SETTING_KEYS.cloudModel),
+        native.secretHas(CLOUD_API_KEY_SECRET).catch(() => false),
       ]);
-      const s = parseAiSettings({ provider: p, endpoint: e, model: m });
+      const s = parseAiSettings({ provider: p, endpoint: e, model: m, cloudBase: cb, cloudModel: cm });
       setProvider(s.provider);
       setEndpoint(s.ollamaEndpoint);
       setModel(s.ollamaModel);
+      setCloudBase(s.cloudBaseUrl ?? '');
+      setCloudModel(s.cloudModel ?? '');
+      setHasKey(keyStored);
     })();
   }, []);
 
   const choose = useCallback((p: ConfiguredProviderId) => {
     setProvider(p);
     void native.setSetting(AI_SETTING_KEYS.provider, p);
+  }, []);
+
+  const saveKey = useCallback(async () => {
+    const v = apiKey.trim();
+    if (!v) return;
+    await native.secretSet(CLOUD_API_KEY_SECRET, v).catch(() => {});
+    setApiKey('');
+    setHasKey(true);
+  }, [apiKey]);
+
+  const removeKey = useCallback(async () => {
+    await native.secretDelete(CLOUD_API_KEY_SECRET).catch(() => {});
+    setHasKey(false);
   }, []);
 
   return (
@@ -276,6 +300,7 @@ function AiSection(): JSX.Element {
             ['none', 'None'],
             ['mock', 'Mock (offline)'],
             ['ollama', 'Local Ollama'],
+            ['openai-compat', 'Cloud (OpenAI-compatible)'],
           ] as ReadonlyArray<[ConfiguredProviderId, string]>).map(([id, label]) => (
             <button
               key={id}
@@ -293,8 +318,9 @@ function AiSection(): JSX.Element {
         <strong>Mock</strong> is a fully-offline placeholder that proves the Quick AI surface works
         end-to-end — it does not produce real answers. <strong>Local Ollama</strong> now works for
         real via the native HTTP bridge — set the endpoint + model below and Quick AI, AI Commands
-        and mission AI-planning stream real tokens on-device. Cloud providers (OpenAI-compatible,
-        Anthropic) and AgentOS Auto routing arrive with credential storage next.
+        and mission AI-planning stream real tokens on-device. <strong>Cloud (OpenAI-compatible)</strong>
+        now works too — set the endpoint, model and an API key (stored in OS secure storage). A
+        native Anthropic adapter and AgentOS Auto routing are next.
       </p>
 
       <Field label="Local Ollama endpoint" hint="Where your local Ollama server is listening.">
@@ -314,6 +340,55 @@ function AiSection(): JSX.Element {
           onBlur={() => void native.setSetting(AI_SETTING_KEYS.model, model)}
           placeholder="llama3.1"
         />
+      </Field>
+
+      <Field
+        label="Cloud endpoint (OpenAI-compatible)"
+        hint="Any OpenAI-compatible /v1 base — OpenAI, OpenRouter, or a local server (LM Studio, vLLM)."
+      >
+        <input
+          className="settings-input"
+          value={cloudBase}
+          onChange={(e) => setCloudBase(e.target.value)}
+          onBlur={() => void native.setSetting(AI_SETTING_KEYS.cloudBase, cloudBase)}
+          placeholder="https://api.openai.com/v1"
+        />
+      </Field>
+      <Field label="Cloud model">
+        <input
+          className="settings-input-narrow"
+          value={cloudModel}
+          onChange={(e) => setCloudModel(e.target.value)}
+          onBlur={() => void native.setSetting(AI_SETTING_KEYS.cloudModel, cloudModel)}
+          placeholder="gpt-4o-mini"
+        />
+      </Field>
+      <Field
+        label="Cloud API key"
+        hint="Stored in your OS secure storage (Windows Credential Manager) — never in settings, files or logs."
+      >
+        {hasKey ? (
+          <div className="settings-key-row">
+            <span className="settings-key-stored">🔑 Key stored</span>
+            <button className="settings-btn" onClick={() => void removeKey()}>
+              Remove key
+            </button>
+          </div>
+        ) : (
+          <div className="settings-key-row">
+            <input
+              className="settings-input"
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-…"
+              autoComplete="off"
+            />
+            <button className="settings-btn" disabled={!apiKey.trim()} onClick={() => void saveKey()}>
+              Save key
+            </button>
+          </div>
+        )}
       </Field>
     </Section>
   );

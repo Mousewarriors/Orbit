@@ -15,6 +15,7 @@ mod commands;
 mod extension_host;
 mod file_index;
 mod http;
+mod secrets;
 mod launcher;
 mod relay_manifest;
 mod relay_protocol;
@@ -430,6 +431,10 @@ pub fn run() {
             http::http_request,
             http::http_stream_open,
             http::http_stream_cancel,
+            secrets::secret_set,
+            secrets::secret_get,
+            secrets::secret_delete,
+            secrets::secret_has,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())

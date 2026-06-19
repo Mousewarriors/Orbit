@@ -16,33 +16,49 @@
 import {
   MockProvider,
   OllamaProvider,
+  OpenAiCompatProvider,
   type AiProvider,
   type FetchLike,
 } from '@orbit/ai-runtime';
 
-export type ConfiguredProviderId = 'none' | 'mock' | 'ollama';
+export type ConfiguredProviderId = 'none' | 'mock' | 'ollama' | 'openai-compat';
 
 export interface AiSettings {
   readonly provider: ConfiguredProviderId;
   readonly ollamaEndpoint: string;
   readonly ollamaModel: string;
+  /** OpenAI-compatible base URL (incl. version path), e.g. https://api.openai.com/v1 */
+  readonly cloudBaseUrl?: string;
+  readonly cloudModel?: string;
+  /** Resolved from OS secure storage by the caller; never persisted in settings. */
+  readonly cloudApiKey?: string;
 }
+
+const DEFAULT_CLOUD_BASE = 'https://api.openai.com/v1';
+const DEFAULT_CLOUD_MODEL = 'gpt-4o-mini';
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: 'none',
   ollamaEndpoint: 'http://127.0.0.1:11434',
   ollamaModel: 'llama3.1',
+  cloudBaseUrl: DEFAULT_CLOUD_BASE,
+  cloudModel: DEFAULT_CLOUD_MODEL,
 };
 
 export const AI_SETTING_KEYS = {
   provider: 'ai.provider',
   endpoint: 'ai.ollama.endpoint',
   model: 'ai.ollama.model',
+  cloudBase: 'ai.cloud.base',
+  cloudModel: 'ai.cloud.model',
   recent: 'ai.recent',
 } as const;
 
+/** Secret name under which the cloud API key lives in OS secure storage. */
+export const CLOUD_API_KEY_SECRET = 'ai.cloud.apikey';
+
 function isProviderId(value: unknown): value is ConfiguredProviderId {
-  return value === 'none' || value === 'mock' || value === 'ollama';
+  return value === 'none' || value === 'mock' || value === 'ollama' || value === 'openai-compat';
 }
 
 /** Build typed AI settings from raw (possibly null) setting strings. */
@@ -50,11 +66,17 @@ export function parseAiSettings(values: {
   provider?: string | null;
   endpoint?: string | null;
   model?: string | null;
+  cloudBase?: string | null;
+  cloudModel?: string | null;
+  cloudApiKey?: string | null;
 }): AiSettings {
   return {
     provider: isProviderId(values.provider) ? values.provider : DEFAULT_AI_SETTINGS.provider,
     ollamaEndpoint: values.endpoint?.trim() || DEFAULT_AI_SETTINGS.ollamaEndpoint,
     ollamaModel: values.model?.trim() || DEFAULT_AI_SETTINGS.ollamaModel,
+    cloudBaseUrl: values.cloudBase?.trim() || DEFAULT_CLOUD_BASE,
+    cloudModel: values.cloudModel?.trim() || DEFAULT_CLOUD_MODEL,
+    ...(values.cloudApiKey ? { cloudApiKey: values.cloudApiKey } : {}),
   };
 }
 
@@ -95,6 +117,22 @@ export function createProvider(settings: AiSettings, fetchImpl?: FetchLike): Pro
         local: true,
         configured: true,
       };
+    case 'openai-compat': {
+      const baseUrl = settings.cloudBaseUrl ?? DEFAULT_AI_SETTINGS.cloudBaseUrl!;
+      const model = settings.cloudModel ?? DEFAULT_AI_SETTINGS.cloudModel!;
+      const provider = new OpenAiCompatProvider({
+        baseUrl,
+        defaultModel: model,
+        ...(settings.cloudApiKey ? { apiKey: settings.cloudApiKey } : {}),
+        ...(fetchImpl ? { fetch: fetchImpl } : {}),
+      });
+      return {
+        provider,
+        label: `${provider.local ? 'Local' : 'Cloud'} · ${model}`,
+        local: provider.local,
+        configured: true,
+      };
+    }
     default:
       return { provider: null, label: 'No AI provider', local: true, configured: false };
   }

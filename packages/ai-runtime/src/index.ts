@@ -9,4 +9,5 @@
 export * from './types.js';
 export * from './mock.js';
 export * from './ollama.js';
+export * from './openaiCompat.js';
 export * from './classify.js';
