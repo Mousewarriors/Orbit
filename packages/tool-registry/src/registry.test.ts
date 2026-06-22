@@ -8,10 +8,22 @@ describe('ToolRegistry', () => {
   it('merges native + MCP tools and dedupes by id', () => {
     const reg = new ToolRegistry();
     reg.register(nativeToolRecords());
-    reg.register(mcpToolsToRecords('fs', [{ name: 'read_file', annotations: { readOnlyHint: true } }]));
+    reg.register(
+      mcpToolsToRecords(
+        'fs',
+        [{ name: 'read_file', annotations: { readOnlyHint: true } }],
+        { trustReadOnlyHint: true },
+      ),
+    );
     const before = reg.size;
     // Re-registering the same id replaces, doesn't grow.
-    reg.register(mcpToolsToRecords('fs', [{ name: 'read_file', annotations: { readOnlyHint: true } }]));
+    reg.register(
+      mcpToolsToRecords(
+        'fs',
+        [{ name: 'read_file', annotations: { readOnlyHint: true } }],
+        { trustReadOnlyHint: true },
+      ),
+    );
     expect(reg.size).toBe(before);
     expect(reg.get('mcp:fs:read_file')).toBeDefined();
     expect(reg.get(NATIVE_TOOL_IDS.dispatchAgent)?.source).toBe('relay');

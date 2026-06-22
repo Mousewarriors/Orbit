@@ -77,6 +77,10 @@ pub struct RelayExpectedMetadata {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelayStatusSnapshot {
+    pub app_version: &'static str,
+    pub build_commit: &'static str,
+    pub build_timestamp: &'static str,
+    pub executable_path: Option<String>,
     pub state: RelaySupervisorState,
     pub expected: RelayExpectedMetadata,
     pub user_message: String,
@@ -203,6 +207,12 @@ impl RelaySupervisor {
         };
         let pending_requests = self.pending.lock().map(|p| p.len()).unwrap_or_default();
         RelayStatusSnapshot {
+            app_version: env!("CARGO_PKG_VERSION"),
+            build_commit: env!("ORBIT_BUILD_COMMIT"),
+            build_timestamp: env!("ORBIT_BUILD_TIMESTAMP"),
+            executable_path: std::env::current_exe()
+                .ok()
+                .map(|path| path.to_string_lossy().to_string()),
             state: inner.state,
             expected: RelayExpectedMetadata {
                 relay_version: relay_manifest::RELAY_VERSION,

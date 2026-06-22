@@ -14,7 +14,13 @@ import { NATIVE_TOOL_IDS } from '@orbit/tool-registry';
 import { encodeControlCenterArg } from '../controlCenterState.js';
 import type { DispatchResult } from './agentDispatch.js';
 
+/** Tools the desktop mission executor can actually run today. */
+export const MISSION_EXECUTABLE_TOOL_IDS: ReadonlySet<string> = new Set(
+  Object.values(NATIVE_TOOL_IDS),
+);
+
 export interface ResolvedEntity {
+  readonly id?: string;
   readonly name: string;
   readonly path: string;
 }
@@ -23,6 +29,10 @@ export interface MissionExecutorDeps {
   readonly resolveApp: (query: string) => ResolvedEntity | null;
   readonly resolveProject: (query: string) => ResolvedEntity | null;
   readonly launchApp: (path: string) => Promise<void>;
+  readonly openProjectInApplication: (
+    applicationId: string,
+    projectPath: string,
+  ) => Promise<void>;
   readonly revealFolder: (path: string) => Promise<void>;
   readonly fileSearch: (
     query: string,
@@ -57,6 +67,19 @@ export async function executeMissionStep(
       if (!app) return fail(`No installed app matching "${str(args, 'applicationQuery')}"`);
       await deps.launchApp(app.path);
       return { ok: true, summary: `Opened ${app.name}` };
+    }
+
+    case NATIVE_TOOL_IDS.openProjectInApplication: {
+      const app = deps.resolveApp(str(args, 'applicationQuery'));
+      const project = deps.resolveProject(str(args, 'projectQuery'));
+      if (!app?.id) return fail(`No installed app matching "${str(args, 'applicationQuery')}"`);
+      if (!project) return fail(`No known project matching "${str(args, 'projectQuery')}"`);
+      await deps.openProjectInApplication(app.id, project.path);
+      return {
+        ok: true,
+        summary: `Opened ${project.name} in ${app.name}`,
+        detail: project.path,
+      };
     }
 
     case NATIVE_TOOL_IDS.openProjectFolder: {
@@ -102,11 +125,33 @@ export async function executeMissionStep(
     case NATIVE_TOOL_IDS.dispatchAgent: {
       const project = deps.resolveProject(str(args, 'projectQuery'));
       if (!project) return fail(`No known project matching "${str(args, 'projectQuery')}"`);
+      const objective = str(args, 'objective').trim();
+      if (objective) {
+        return fail(
+          'Relay cannot safely deliver this mission objective yet',
+          'No session was launched. The certified Relay launch protocol currently accepts an agent and project, but not an objective; objective-driven missions must wait for the Gateway/Hermes adapter.',
+        );
+      }
       const prefRaw = str(args, 'agentPreference');
       const pref = prefRaw ? (prefRaw as AgentPreference) : undefined;
       const result = await deps.dispatchAgent(project.path, pref);
       const detail = result.warnings.length > 0 ? `Warnings:\n${result.warnings.join('\n')}` : result.detail;
-      return detail ? { ok: result.ok, summary: result.summary, detail } : { ok: result.ok, summary: result.summary };
+      const navigateTo =
+        result.ok && result.sessionId
+          ? {
+              viewId: 'control-center',
+              arg: encodeControlCenterArg({
+                tab: 'sessions',
+                sessionId: result.sessionId,
+              }),
+            }
+          : undefined;
+      return {
+        ok: result.ok,
+        summary: result.summary,
+        ...(detail ? { detail } : {}),
+        ...(navigateTo ? { navigateTo } : {}),
+      };
     }
 
     case NATIVE_TOOL_IDS.restartRelay: {

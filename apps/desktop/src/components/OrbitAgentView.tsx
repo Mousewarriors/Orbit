@@ -18,9 +18,13 @@ import { buildToolRegistry } from '../ai/toolRegistry.js';
 import { buildAutomationPlan, getAutomation } from '@orbit/automations';
 import { decodeAutomationArg } from '../agent/automationProvider.js';
 import { dispatchAgentViaRelay } from '../agent/agentDispatch.js';
-import { executeMissionStep, type MissionExecutorDeps } from '../agent/missionExecutor.js';
+import {
+  executeMissionStep,
+  MISSION_EXECUTABLE_TOOL_IDS,
+  type MissionExecutorDeps,
+} from '../agent/missionExecutor.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
-import type { ToolRegistry } from '@orbit/tool-registry';
+import { ToolRegistry } from '@orbit/tool-registry';
 
 type Phase = 'idle' | 'planning' | 'preview' | 'running' | 'done';
 
@@ -73,16 +77,19 @@ export function OrbitAgentView({
       setInfo(await loadProviderInfo());
       if (!native.isTauri()) return;
       try {
-        const [appList, recent, favs, status, clip] = await Promise.all([
+        const [appList, recent, favs, catalogued, status, clip] = await Promise.all([
           native.listApplications().catch((): native.NativeApp[] => []),
           native.projectMetaListRecent(20).catch((): native.ProjectMeta[] => []),
           native.projectMetaListFavourites().catch((): native.ProjectMeta[] => []),
+          native.projectMetaListCatalogued().catch((): native.ProjectMeta[] => []),
           native.relayStatus().catch(() => null),
           native.clipboardList('', 1).catch((): native.ClipboardEntry[] => []),
         ]);
         apps.current = appList;
         const merged = new Map<string, ProjectCandidate>();
-        for (const p of [...recent, ...favs]) merged.set(p.path, { path: p.path, name: p.name });
+        for (const p of [...favs, ...recent, ...catalogued]) {
+          if (!merged.has(p.path)) merged.set(p.path, { path: p.path, name: p.name });
+        }
         projects.current = [...merged.values()];
         setRelayState(status?.state ?? 'unknown');
         clipboard.current = clip[0]?.content ?? '';
@@ -92,6 +99,15 @@ export function OrbitAgentView({
     })();
   }, []);
 
+  const missionRegistry = useMemo(() => {
+    if (!registry) return null;
+    const executable = new ToolRegistry();
+    executable.register(
+      registry.all().filter((tool) => MISSION_EXECUTABLE_TOOL_IDS.has(tool.id)),
+    );
+    return executable;
+  }, [registry]);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -99,10 +115,10 @@ export function OrbitAgentView({
   // A saved automation arrives as a prebuilt plan: compile it against the live
   // registry once that's ready and land straight on the preview.
   useEffect(() => {
-    if (!registry || !automationId) return;
+    if (!missionRegistry || !automationId) return;
     const def = getAutomation(automationId);
     if (!def) return;
-    const built = buildAutomationPlan(def, registry);
+    const built = buildAutomationPlan(def, missionRegistry);
     if (!built) {
       setPlanNote('This automation uses a tool that is currently unavailable.');
       return;
@@ -113,11 +129,11 @@ export function OrbitAgentView({
     setOutcomes(built.steps.map(() => null));
     setNavTarget(null);
     setPhase('preview');
-  }, [registry, automationId]);
+  }, [missionRegistry, automationId]);
 
   const stepViews: MissionStepView[] = useMemo(
-    () => (plan && registry ? missionStepViews(plan, registry) : []),
-    [plan, registry],
+    () => (plan && missionRegistry ? missionStepViews(plan, missionRegistry) : []),
+    [plan, missionRegistry],
   );
 
   const completeFn = useMemo(() => {
@@ -128,12 +144,12 @@ export function OrbitAgentView({
   }, [info]);
 
   const doPlan = useCallback(async () => {
-    if (!registry || !goal.trim()) return;
+    if (!missionRegistry || !goal.trim()) return;
     setPhase('planning');
     setPlan(null);
     setPlanNote(null);
-    const result = await planMission(goal.trim(), registry, {
-      tools: registry.all(),
+    const result = await planMission(goal.trim(), missionRegistry, {
+      tools: missionRegistry.all(),
       ...(completeFn ? { complete: completeFn } : {}),
     });
     if (!result.plan) {
@@ -152,20 +168,22 @@ export function OrbitAgentView({
     setOutcomes(result.plan.steps.map(() => null));
     setNavTarget(null);
     setPhase('preview');
-  }, [registry, goal, completeFn]);
+  }, [missionRegistry, goal, completeFn]);
 
   const executorDeps: MissionExecutorDeps = useMemo(
     () => ({
       resolveApp: (q) => {
         const ranked = rankApps(q, apps.current);
         const top = ranked[0]?.item;
-        return top ? { name: top.name, path: top.path } : null;
+        return top ? { id: top.id, name: top.name, path: top.path } : null;
       },
       resolveProject: (q) => {
         const p = bestProject(q, projects.current);
         return p ? { name: p.name ?? p.path, path: p.path } : null;
       },
       launchApp: (path) => native.launchPath(path),
+      openProjectInApplication: (applicationId, projectPath) =>
+        native.openProjectInApplication(applicationId, projectPath),
       revealFolder: (path) => native.revealPath(path),
       fileSearch: async (q, limit) =>
         (await native.fileSearch(q, { limit })).map((f) => ({ name: f.name, parent: f.parent })),

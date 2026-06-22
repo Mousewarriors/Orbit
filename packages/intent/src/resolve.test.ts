@@ -50,6 +50,14 @@ describe('rankProjects', () => {
     const best = bestProject('orbit docs', projects);
     expect(best?.name).toBe('Orbit Docs');
   });
+
+  it('prefers a canonical monorepo over a similarly named package', () => {
+    const candidates = [
+      { path: 'C:\\code\\orbit\\crates\\orbit-core', name: 'orbit-core' },
+      { path: 'C:\\Users\\me\\Raycast Clone', name: 'orbit-monorepo' },
+    ];
+    expect(bestProject('orbit', candidates)?.path).toBe('C:\\Users\\me\\Raycast Clone');
+  });
 });
 
 describe('rankApps', () => {

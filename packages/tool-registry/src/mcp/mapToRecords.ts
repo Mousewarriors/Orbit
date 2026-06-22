@@ -56,7 +56,10 @@ export function sanitizeSchema(raw: Readonly<Record<string, unknown>> | undefine
  * not explicitly read-only is assumed to potentially write; "open world" tools
  * add network; destructive tools add deletion.
  */
-export function inferSideEffects(tool: McpToolDescriptor): ToolSideEffect[] {
+export function inferSideEffects(
+  tool: McpToolDescriptor,
+  trustReadOnlyHint = false,
+): ToolSideEffect[] {
   const a = tool.annotations ?? {};
   const effects = new Set<ToolSideEffect>();
   // Tokenise on non-alphanumerics so snake_case / kebab-case / paths split too
@@ -77,9 +80,10 @@ export function inferSideEffects(tool: McpToolDescriptor): ToolSideEffect[] {
   if (has('write', 'create', 'update', 'edit', 'set', 'save', 'patch')) effects.add('write-file');
 
   if (effects.size === 0) {
-    // No clear signal. If explicitly read-only, it's a read; otherwise assume a
-    // write so an unannotated tool is never treated as fully safe.
-    effects.add(a.readOnlyHint === true ? 'read' : 'write-file');
+    // A server annotation is untrusted by default and therefore cannot lower
+    // risk. Only a caller-owned, explicitly trusted catalogue may opt into
+    // accepting readOnlyHint. Everything else is conservatively gated.
+    effects.add(trustReadOnlyHint && a.readOnlyHint === true ? 'read' : 'write-file');
   }
   return [...effects];
 }
@@ -90,6 +94,8 @@ export interface McpToolMapOptions {
   readonly projectScope?: readonly string[];
   readonly availability?: ToolRecord['availability'];
   readonly health?: ToolRecord['health'];
+  /** Only for caller-owned catalogues; never enable for arbitrary servers. */
+  readonly trustReadOnlyHint?: boolean;
 }
 
 /** Build a ToolRecord for one MCP tool. */
@@ -98,7 +104,7 @@ export function mcpToolToRecord(
   tool: McpToolDescriptor,
   options: McpToolMapOptions = {},
 ): ToolRecord {
-  const sideEffects = inferSideEffects(tool);
+  const sideEffects = inferSideEffects(tool, options.trustReadOnlyHint === true);
   const risk = deriveRisk(sideEffects);
   return {
     id: `mcp:${serverId}:${tool.name}`,

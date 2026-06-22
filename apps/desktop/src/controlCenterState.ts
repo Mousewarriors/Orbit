@@ -4,6 +4,7 @@
  */
 import type { RelayStatus, RelaySupervisorState } from './native.js';
 import type { RelayObject } from './relayViewModel.js';
+import { ALL_AGENT_PREFERENCES, type AgentPreference } from '@orbit/intent';
 
 export type ControlCenterTab =
   | 'projects'
@@ -45,6 +46,12 @@ export interface ControlCenterArg {
   readonly project?: string;
   /** Substring to filter the Sessions list by status (e.g. 'failed'). */
   readonly sessionStatus?: string;
+  /** A session to highlight after a launch. */
+  readonly sessionId?: string;
+  /** Agent requested by a natural-language launch/continue intent. */
+  readonly agentPreference?: AgentPreference;
+  /** Validate and surface the newest handoff for the selected project. */
+  readonly includeLatestHandoff?: boolean;
 }
 
 function isTab(value: string): value is ControlCenterTab {
@@ -57,7 +64,15 @@ function isTab(value: string): value is ControlCenterTab {
  * through unchanged; richer targets are JSON-encoded.
  */
 export function encodeControlCenterArg(arg: ControlCenterArg): string {
-  if (arg.project === undefined && arg.sessionStatus === undefined) return arg.tab;
+  if (
+    arg.project === undefined &&
+    arg.sessionStatus === undefined &&
+    arg.sessionId === undefined &&
+    arg.agentPreference === undefined &&
+    arg.includeLatestHandoff === undefined
+  ) {
+    return arg.tab;
+  }
   return JSON.stringify(arg);
 }
 
@@ -77,10 +92,21 @@ export function decodeControlCenterArg(raw: string | null): ControlCenterArg {
       const project = typeof obj['project'] === 'string' ? obj['project'] : undefined;
       const sessionStatus =
         typeof obj['sessionStatus'] === 'string' ? obj['sessionStatus'] : undefined;
+      const sessionId = typeof obj['sessionId'] === 'string' ? obj['sessionId'] : undefined;
+      const agentPreference =
+        typeof obj['agentPreference'] === 'string' &&
+        (ALL_AGENT_PREFERENCES as readonly string[]).includes(obj['agentPreference'])
+          ? (obj['agentPreference'] as AgentPreference)
+          : undefined;
+      const includeLatestHandoff =
+        obj['includeLatestHandoff'] === true ? true : undefined;
       return {
         tab,
         ...(project ? { project } : {}),
         ...(sessionStatus ? { sessionStatus } : {}),
+        ...(sessionId ? { sessionId } : {}),
+        ...(agentPreference ? { agentPreference } : {}),
+        ...(includeLatestHandoff ? { includeLatestHandoff } : {}),
       };
     }
   } catch {

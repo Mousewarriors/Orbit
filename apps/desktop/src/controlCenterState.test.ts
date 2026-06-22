@@ -68,6 +68,32 @@ describe('Control Center state model', () => {
     expect(decodeControlCenterArg(encoded)).toEqual({ tab: 'sessions', sessionStatus: 'failed' });
   });
 
+  it('round-trips a selected session', () => {
+    const encoded = encodeControlCenterArg({ tab: 'sessions', sessionId: 'session-1' });
+    expect(decodeControlCenterArg(encoded)).toEqual({
+      tab: 'sessions',
+      sessionId: 'session-1',
+    });
+  });
+
+  it('round-trips continuation preferences and ignores invalid agents', () => {
+    const encoded = encodeControlCenterArg({
+      tab: 'launch',
+      project: 'C:\\proj',
+      agentPreference: 'codex',
+      includeLatestHandoff: true,
+    });
+    expect(decodeControlCenterArg(encoded)).toEqual({
+      tab: 'launch',
+      project: 'C:\\proj',
+      agentPreference: 'codex',
+      includeLatestHandoff: true,
+    });
+    expect(
+      decodeControlCenterArg('{"tab":"launch","agentPreference":"powershell"}'),
+    ).toEqual({ tab: 'launch' });
+  });
+
   it('decodes a bare tab name and tolerates junk', () => {
     expect(decodeControlCenterArg('activity')).toEqual({ tab: 'activity' });
     expect(decodeControlCenterArg(null)).toEqual({ tab: 'projects' });

@@ -126,18 +126,18 @@ export function App(): JSX.Element {
     [registry],
   );
 
-  // Keep a cached recent ∪ favourite project list for natural-language project
-  // resolution ("Continue Orbit", "Open the Orbit project"). Favourites first,
-  // then recents, deduped by path.
+  // Keep a cached project catalogue for natural-language project resolution.
+  // Favourites/recents lead, followed by every Relay-scanned named project.
   const refreshProjects = useCallback(async () => {
     if (!native.isTauri()) return;
     try {
-      const [favourites, recent] = await Promise.all([
+      const [favourites, recent, catalogued] = await Promise.all([
         native.projectMetaListFavourites().catch((): native.ProjectMeta[] => []),
         native.projectMetaListRecent(30).catch((): native.ProjectMeta[] => []),
+        native.projectMetaListCatalogued().catch((): native.ProjectMeta[] => []),
       ]);
       const byPath = new Map<string, { path: string; name: string | null }>();
-      for (const p of [...favourites, ...recent]) {
+      for (const p of [...favourites, ...recent, ...catalogued]) {
         if (!byPath.has(p.path)) byPath.set(p.path, { path: p.path, name: p.name });
       }
       projectsRef.current = [...byPath.values()];
@@ -312,8 +312,11 @@ export function App(): JSX.Element {
   // subview (Clipboard/Snippets/Settings) — the input is freshly mounted, so the
   // mount-time focus effect above doesn't re-run.
   useEffect(() => {
-    if (view === 'root') inputRef.current?.focus();
-  }, [view]);
+    if (view === 'root') {
+      inputRef.current?.focus();
+      void refreshProjects();
+    }
+  }, [view, refreshProjects]);
 
   // Run an already-resolved action (past any confirmation gate).
   const executeResolved = useCallback(
@@ -514,6 +517,9 @@ export function App(): JSX.Element {
           initialTab={ccArg.tab}
           initialProject={ccArg.project}
           initialSessionStatus={ccArg.sessionStatus}
+          initialSessionId={ccArg.sessionId}
+          initialAgentPreference={ccArg.agentPreference}
+          includeLatestHandoff={ccArg.includeLatestHandoff}
         />
         {toast}
       </>

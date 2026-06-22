@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AgentPreference } from '@orbit/intent';
 import * as native from '../native.js';
 import {
   ALL_TABS,
@@ -40,6 +41,12 @@ export interface ControlCenterViewProps {
   readonly initialProject?: string | undefined;
   /** A status substring to pre-filter the Sessions list (e.g. 'failed'). */
   readonly initialSessionStatus?: string | undefined;
+  /** A newly launched or deep-linked session to highlight. */
+  readonly initialSessionId?: string | undefined;
+  /** Agent requested by the deep-linked intent. */
+  readonly initialAgentPreference?: AgentPreference | undefined;
+  /** Whether continuation should validate and surface the latest handoff. */
+  readonly includeLatestHandoff?: boolean | undefined;
 }
 
 export function ControlCenterView({
@@ -47,6 +54,9 @@ export function ControlCenterView({
   initialTab,
   initialProject,
   initialSessionStatus,
+  initialSessionId,
+  initialAgentPreference,
+  includeLatestHandoff,
 }: ControlCenterViewProps): JSX.Element {
   const [tab, setTab] = useState<ControlCenterTab>(initialTab ?? 'projects');
   const [status, setStatus] = useState<native.RelayStatus | null>(null);
@@ -66,6 +76,9 @@ export function ControlCenterView({
   const [tabErrors, setTabErrors] = useState<Partial<Record<ControlCenterTab, string>>>({});
   const [continuationProject, setContinuationProject] = useState<string | null>(
     initialTab === 'launch' && initialProject ? initialProject : null,
+  );
+  const [launchedSession, setLaunchedSession] = useState<string | null>(
+    initialSessionId ?? null,
   );
   const mountedRef = useRef(true);
   const eventPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,6 +174,12 @@ export function ControlCenterView({
     try {
       const payload = await native.relayScanProjects(trimmedRoot);
       const next = recordsFrom(payload, 'projects');
+      await Promise.allSettled(
+        next.flatMap((project) => {
+          const path = projectPath(project);
+          return path ? [native.projectMetaCatalogue(path, projectTitle(project))] : [];
+        }),
+      );
       if (mountedRef.current) {
         setProjects(next);
         setSelectedProject((current) =>
@@ -217,8 +236,9 @@ export function ControlCenterView({
     setBusy('execute');
     setError(null);
     try {
-      await native.relayExecuteLaunch(id, true);
+      const payload = await native.relayExecuteLaunch(id, true);
       if (mountedRef.current) {
+        setLaunchedSession(sessionId(asObject(payload)) || null);
         setConfirmed(false);
         setPlan(null);
         await refreshSessions();
@@ -268,6 +288,7 @@ export function ControlCenterView({
       await refreshStatus();
       await refreshAgents();
       await refreshSessions();
+      await refreshEvents();
       const persisted = await native.getSetting(SCAN_ROOT_SETTING_KEY);
       const homeDir = await native.getHomeDir();
       if (mountedRef.current) setProjectRoot(resolveInitialScanRoot(persisted, homeDir));
@@ -276,7 +297,7 @@ export function ControlCenterView({
     } finally {
       if (mountedRef.current) setRootHydrated(true);
     }
-  }, [refreshAgents, refreshSessions, refreshStatus]);
+  }, [refreshAgents, refreshEvents, refreshSessions, refreshStatus]);
 
   useEffect(() => {
     void loadInitialRelayData();
@@ -346,6 +367,13 @@ export function ControlCenterView({
   const relayReady = rState === 'ready';
   const launchDisabled = !relayReady || !selectedAgent || !selectedProject || busy === 'plan';
   const executeDisabled = !canExecuteLaunch(plan, confirmed, relayReady, busy);
+  const latestHandoff = useMemo(
+    () =>
+      includeLatestHandoff && selectedProject
+        ? latestHandoffPath(events, selectedProject)
+        : null,
+    [events, includeLatestHandoff, selectedProject],
+  );
 
   const onTabKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -475,6 +503,9 @@ export function ControlCenterView({
           sessions={sessions}
           continuationProject={continuationProject}
           onClearContinuation={() => setContinuationProject(null)}
+          initialAgentPreference={initialAgentPreference}
+          requestedLatestHandoff={includeLatestHandoff === true}
+          latestHandoff={latestHandoff}
         />
       </TabPanel>
 
@@ -485,6 +516,7 @@ export function ControlCenterView({
           stopSession={stopSession}
           tabError={tabErrors['sessions'] ?? null}
           initialStatusFilter={initialSessionStatus}
+          selectedSessionId={launchedSession}
         />
       </TabPanel>
 
@@ -850,6 +882,9 @@ function LaunchPanel({
   sessions,
   continuationProject,
   onClearContinuation,
+  initialAgentPreference,
+  requestedLatestHandoff,
+  latestHandoff,
 }: {
   readonly agents: RelayObject[];
   readonly selectedAgent: string;
@@ -879,9 +914,15 @@ function LaunchPanel({
   readonly sessions: readonly RelayObject[];
   readonly continuationProject: string | null;
   readonly onClearContinuation: () => void;
+  readonly initialAgentPreference: AgentPreference | undefined;
+  readonly requestedLatestHandoff: boolean;
+  readonly latestHandoff: string | null;
 }): JSX.Element {
   const isContinuation = continuationProject !== null && continuationProject === selectedProject;
   const [projectMeta, setProjectMeta] = useState<native.ProjectMeta | null>(null);
+  const [handoffValidation, setHandoffValidation] = useState<RelayObject | null>(null);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [validatingHandoff, setValidatingHandoff] = useState(false);
 
   useEffect(() => {
     if (!isContinuation || !native.isTauri()) {
@@ -891,14 +932,58 @@ function LaunchPanel({
     void native.projectMetaGet(continuationProject).then(setProjectMeta).catch(() => setProjectMeta(null));
   }, [isContinuation, continuationProject]);
 
-  // Auto-select preferred agent when entering continuation mode
+  // An explicit natural-language preference wins; otherwise use the persisted
+  // project preference.
   useEffect(() => {
-    if (!isContinuation || !projectMeta?.preferred_agent) return;
-    const preferred = projectMeta.preferred_agent;
-    if (agents.some((a) => agentId(a) === preferred)) {
-      setSelectedAgent(preferred);
+    if (!isContinuation || agents.length === 0) return;
+    if (initialAgentPreference) {
+      const available = agents.filter(
+        (agent) => availabilityLabel(agent).toLowerCase() === 'available',
+      );
+      const pool = available.length > 0 ? available : agents;
+      const chosen =
+        initialAgentPreference === 'best'
+          ? pool[0]
+          : pool.find((agent) =>
+              `${agentId(agent)} ${agentTitle(agent)}`
+                .toLowerCase()
+                .includes(initialAgentPreference),
+            );
+      if (chosen) setSelectedAgent(agentId(chosen));
+      return;
     }
-  }, [isContinuation, projectMeta, agents, setSelectedAgent]);
+    if (projectMeta?.preferred_agent) {
+      const preferred = projectMeta.preferred_agent;
+      if (agents.some((agent) => agentId(agent) === preferred)) {
+        setSelectedAgent(preferred);
+      }
+    }
+  }, [agents, initialAgentPreference, isContinuation, projectMeta, setSelectedAgent]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setHandoffValidation(null);
+    setHandoffError(null);
+    if (!isContinuation || !requestedLatestHandoff || !latestHandoff || !native.isTauri()) {
+      setValidatingHandoff(false);
+      return;
+    }
+    setValidatingHandoff(true);
+    void native
+      .relayValidateHandoff(latestHandoff)
+      .then((payload) => {
+        if (!cancelled) setHandoffValidation(asObject(payload));
+      })
+      .catch((e) => {
+        if (!cancelled) setHandoffError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setValidatingHandoff(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isContinuation, latestHandoff, requestedLatestHandoff]);
 
   const projectSessions = useMemo(() => {
     if (!isContinuation) return [];
@@ -975,6 +1060,25 @@ function LaunchPanel({
             )}
             {projectMeta?.build_brief && (
               <span>Build brief: {projectMeta.build_brief}</span>
+            )}
+            {requestedLatestHandoff && (
+              <>
+                {!latestHandoff && <span>No handoff was found for this project.</span>}
+                {latestHandoff && validatingHandoff && <span>Validating latest handoff...</span>}
+                {latestHandoff && handoffValidation && (
+                  <span>
+                    Latest handoff: {boolOf(handoffValidation.valid) ? 'valid' : 'invalid'} ·{' '}
+                    {latestHandoff}
+                  </span>
+                )}
+                {handoffError && <span className="relay-warning">Handoff: {handoffError}</span>}
+                {latestHandoff && (
+                  <span>
+                    Relay validates this handoff, but its current launch protocol cannot attach the
+                    file to a launch plan automatically.
+                  </span>
+                )}
+              </>
             )}
           </div>
           {projectSessions.length > 0 && (
@@ -1117,12 +1221,14 @@ function SessionsPanel({
   stopSession,
   tabError,
   initialStatusFilter,
+  selectedSessionId,
 }: {
   readonly sessions: RelayObject[];
   readonly busy: string | null;
   readonly stopSession: (id: string) => Promise<void>;
   readonly tabError: string | null;
   readonly initialStatusFilter?: string | undefined;
+  readonly selectedSessionId: string | null;
 }): JSX.Element {
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? '');
 
@@ -1142,6 +1248,13 @@ function SessionsPanel({
         placeholder="Filter by status (e.g. running, failed)…"
         aria-label="Filter sessions by status"
       />
+      {selectedSessionId && (
+        <div className="relay-detail-block">
+          <strong>New session</strong>
+          <span>{selectedSessionId}</span>
+          <span>Relay session updates appear here as they arrive.</span>
+        </div>
+      )}
       {filtered.length === 0 ? (
         <div className="relay-empty">
           {sessions.length === 0
@@ -1153,7 +1266,14 @@ function SessionsPanel({
           const id = sessionId(session);
           const stoppable = canStopSession(session);
           return (
-            <div key={id} className="relay-session-row">
+            <div
+              key={id}
+              className={
+                id === selectedSessionId
+                  ? 'relay-session-row is-selected'
+                  : 'relay-session-row'
+              }
+            >
               <div>
                 <strong>{recordString(session, 'agentId') ?? 'Unknown agent'}</strong>
                 <span>{recordString(session, 'projectPath') ?? 'Unknown project'}</span>
@@ -1712,6 +1832,17 @@ function DiagnosticsPanel({
     <div className="relay-diagnostics">
       <div className="relay-detail-block">
         <strong>{rState}</strong>
+        <span>
+          Orbit {status?.appVersion ?? 'unknown version'} · build{' '}
+          {status?.buildCommit ?? 'unknown'}
+        </span>
+        <span>
+          Built{' '}
+          {status?.buildTimestamp
+            ? new Date(Number(status.buildTimestamp) * 1000).toLocaleString()
+            : 'unknown'}
+        </span>
+        <span>Executable {status?.executablePath ?? 'not resolved'}</span>
         <span>{status?.technicalDetail ?? status?.userMessage ?? 'No status detail'}</span>
         <span>
           Relay {status?.expected.relayVersion ?? 'unknown'} | protocol{' '}
@@ -1760,4 +1891,34 @@ function deduplicateEvents(
     if (merged.length >= MAX_EVENTS) break;
   }
   return merged;
+}
+
+function latestHandoffPath(
+  events: readonly RelayObject[],
+  projectPathValue: string,
+): string | null {
+  const project = projectPathValue.replace(/[\\/]+$/, '').toLowerCase();
+  const matches = events.flatMap((event) => {
+    const kind = (
+      recordString(event, 'kind') ??
+      recordString(event, 'type') ??
+      ''
+    ).toLowerCase();
+    if (kind !== 'handoff.created' && kind !== 'handoff_created') return [];
+    const data = asObject(event.data);
+    const path = recordString(data, 'path') ?? recordString(event, 'path');
+    if (!path) return [];
+    const normalized = path.toLowerCase();
+    if (
+      normalized !== project &&
+      !normalized.startsWith(`${project}\\`) &&
+      !normalized.startsWith(`${project}/`)
+    ) {
+      return [];
+    }
+    const timestamp = Number(event.timestampMs ?? event.timestamp ?? event.ts ?? 0);
+    return [{ path, timestamp: Number.isFinite(timestamp) ? timestamp : 0 }];
+  });
+  matches.sort((a, b) => b.timestamp - a.timestamp);
+  return matches[0]?.path ?? null;
 }

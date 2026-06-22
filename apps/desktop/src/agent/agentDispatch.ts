@@ -68,6 +68,7 @@ export interface DispatchResult {
   readonly summary: string;
   readonly detail?: string;
   readonly agentTitle?: string;
+  readonly sessionId?: string;
   readonly warnings: readonly string[];
 }
 
@@ -117,16 +118,29 @@ export async function dispatchAgentViaRelay(
   }
 
   try {
-    await deps.executeLaunch(pid, true);
+    const executePayload = await deps.executeLaunch(pid, true);
+    const executeRecord =
+      executePayload && typeof executePayload === 'object'
+        ? (executePayload as RelayObject)
+        : null;
+    const sessionId =
+      (executeRecord &&
+        (typeof executeRecord['sessionId'] === 'string'
+          ? executeRecord['sessionId']
+          : typeof executeRecord['id'] === 'string'
+            ? executeRecord['id']
+            : null)) ||
+      undefined;
+    return {
+      ok: true,
+      summary: `Launched ${chosen.title} on the project`,
+      agentTitle: chosen.title,
+      ...(sessionId ? { sessionId } : {}),
+      warnings,
+    };
   } catch (e) {
     return { ok: false, summary: `Launch failed for ${chosen.title}`, detail: errText(e), agentTitle: chosen.title, warnings };
   }
-  return {
-    ok: true,
-    summary: `Launched ${chosen.title} on the project`,
-    agentTitle: chosen.title,
-    warnings,
-  };
 }
 
 function errText(e: unknown): string {

@@ -15,6 +15,7 @@ export type IntentName =
   // Local, deterministic actions
   | 'open_application'
   | 'open_project'
+  | 'open_project_in_application'
   | 'open_project_folder'
   | 'open_latest_project'
   | 'continue_project'
@@ -77,6 +78,7 @@ export interface RecognisedIntent {
 export const ALL_INTENTS: readonly IntentName[] = [
   'open_application',
   'open_project',
+  'open_project_in_application',
   'open_project_folder',
   'open_latest_project',
   'continue_project',

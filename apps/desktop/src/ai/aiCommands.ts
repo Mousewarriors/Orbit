@@ -107,7 +107,9 @@ export const BUILTIN_AI_COMMANDS: readonly AiCommand[] = [
 /**
  * Root Search provider over the AI command library. Matched/ranked by title +
  * keywords; running one opens Quick AI pre-filled with the rendered template
- * (clipboard pre-attached where the command uses it) and auto-runs.
+ * (clipboard pre-attached where the command uses it). Clipboard commands stop
+ * at the preview so remote-provider disclosure and context are visible before
+ * any clipboard content is sent.
  */
 export function createAiCommandProvider(
   commands: readonly AiCommand[] = BUILTIN_AI_COMMANDS,
@@ -136,7 +138,11 @@ export function createAiCommandProvider(
                 kind: 'push-view',
                 viewId: 'quick-ai',
                 args: {
-                  id: encodeQuickAiArg({ prompt, useClipboard: cmd.useClipboard, autoRun: true }),
+                  id: encodeQuickAiArg({
+                    prompt,
+                    useClipboard: cmd.useClipboard,
+                    autoRun: !cmd.useClipboard,
+                  }),
                 },
               },
             },

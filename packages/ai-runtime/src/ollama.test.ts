@@ -54,6 +54,32 @@ describe('OllamaProvider', () => {
     expect(res.usage).toEqual({ promptTokens: 7, completionTokens: 3 });
   });
 
+  it('is local for a loopback base and omits the Authorization header', async () => {
+    const fetchFn = vi.fn<FetchLike>(async (_url, init) => {
+      expect(init?.headers?.['Authorization']).toBeUndefined();
+      return jsonResponse({ models: [] });
+    });
+    const provider = new OllamaProvider({ fetch: fetchFn, baseUrl: 'http://127.0.0.1:11434' });
+    expect(provider.local).toBe(true);
+    await provider.listModels();
+  });
+
+  it('Ollama Cloud: remote base is non-local and sends the bearer key', async () => {
+    const fetchFn = vi.fn<FetchLike>(async (url, init) => {
+      expect(url).toBe('https://ollama.com/api/tags');
+      expect(init?.headers?.['Authorization']).toBe('Bearer secret-key');
+      return jsonResponse({ models: [{ name: 'gpt-oss:120b' }] });
+    });
+    const provider = new OllamaProvider({
+      fetch: fetchFn,
+      baseUrl: 'https://ollama.com',
+      apiKey: 'secret-key',
+    });
+    expect(provider.local).toBe(false);
+    const models = await provider.listModels();
+    expect(models.map((m) => m.id)).toEqual(['gpt-oss:120b']);
+  });
+
   it('passes format:json when json is requested', async () => {
     const fetchFn = vi.fn<FetchLike>(async (_url, init) => {
       expect(JSON.parse(init!.body!).format).toBe('json');

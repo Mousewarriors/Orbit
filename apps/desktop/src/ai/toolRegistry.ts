@@ -95,6 +95,7 @@ export async function buildToolRegistry(): Promise<BuiltRegistry> {
     const records: ToolRecord[] = mcpToolsToRecords(DEMO_MCP_SERVER_ID, tools, {
       availability: 'available',
       health: 'healthy',
+      trustReadOnlyHint: true,
     });
     registry.register(records);
     clients.set(DEMO_MCP_SERVER_ID, demo);

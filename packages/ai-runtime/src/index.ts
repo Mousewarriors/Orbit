@@ -10,4 +10,7 @@ export * from './types.js';
 export * from './mock.js';
 export * from './ollama.js';
 export * from './openaiCompat.js';
+export * from './openaiResponses.js';
+export * from './anthropic.js';
 export * from './classify.js';
+export * from './oauth.js';

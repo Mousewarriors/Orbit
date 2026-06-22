@@ -6,8 +6,16 @@ describe('inferSideEffects', () => {
     expect(inferSideEffects({ name: 'do_thing' })).toEqual(['write-file']);
   });
 
-  it('treats an explicitly read-only tool as a reader', () => {
-    expect(inferSideEffects({ name: 'list', annotations: { readOnlyHint: true } })).toEqual(['read']);
+  it('does not trust a server read-only hint by default', () => {
+    expect(inferSideEffects({ name: 'list', annotations: { readOnlyHint: true } })).toEqual([
+      'write-file',
+    ]);
+  });
+
+  it('accepts a read-only hint only for an explicitly trusted catalogue', () => {
+    expect(inferSideEffects({ name: 'list', annotations: { readOnlyHint: true } }, true)).toEqual([
+      'read',
+    ]);
   });
 
   it('escalates dangerous verbs in the tool name', () => {
@@ -31,8 +39,21 @@ describe('mcpToolToRecord', () => {
     expect(record.requiresConfirmation).toBe(true);
   });
 
-  it('produces an ungated record for a read-only tool', () => {
-    const record = mcpToolToRecord('fs', { name: 'read_file', annotations: { readOnlyHint: true } });
+  it('keeps an arbitrary server read-only tool gated', () => {
+    const record = mcpToolToRecord('fs', {
+      name: 'read_file',
+      annotations: { readOnlyHint: true },
+    });
+    expect(record.risk).toBe('medium');
+    expect(record.requiresConfirmation).toBe(true);
+  });
+
+  it('allows a caller-owned catalogue to trust read-only annotations', () => {
+    const record = mcpToolToRecord(
+      'owned',
+      { name: 'read_file', annotations: { readOnlyHint: true } },
+      { trustReadOnlyHint: true },
+    );
     expect(record.risk).toBe('safe');
     expect(record.requiresConfirmation).toBe(false);
   });

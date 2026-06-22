@@ -16,6 +16,7 @@ mod extension_host;
 mod file_index;
 mod http;
 mod mcp_stdio;
+mod oauth;
 mod secrets;
 mod launcher;
 mod relay_manifest;
@@ -348,6 +349,7 @@ pub fn run() {
             commands::record_command_usage,
             commands::usage_snapshot,
             commands::launch_path,
+            commands::open_project_in_application,
             commands::open_url,
             commands::manage_window,
             commands::clipboard_list,
@@ -424,11 +426,13 @@ pub fn run() {
             commands::relay_restart,
             commands::project_meta_get,
             commands::project_meta_upsert,
+            commands::project_meta_catalogue,
             commands::project_meta_touch,
             commands::project_meta_set_favourite,
             commands::project_meta_set_preferred_agent,
             commands::project_meta_list_recent,
             commands::project_meta_list_favourites,
+            commands::project_meta_list_catalogued,
             http::http_request,
             http::http_stream_open,
             http::http_stream_cancel,
@@ -440,6 +444,8 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_delete,
             secrets::secret_has,
+            oauth::oauth_listen,
+            oauth::oauth_cancel,
             commands::quit_app,
         ])
         .build(tauri::generate_context!())

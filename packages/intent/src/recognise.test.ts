@@ -94,6 +94,15 @@ describe('recogniseIntent — projects', () => {
     expectIntent('open the folder for Orbit', 'open_project_folder');
   });
 
+  it('open project in an application', () => {
+    const r = expectIntent(
+      'Open the Orbit project in Visual Studio Code',
+      'open_project_in_application',
+    );
+    expect(r.slots.projectQuery).toBe('orbit');
+    expect(r.slots.applicationQuery).toBe('visual studio code');
+  });
+
   it('open latest project', () => {
     expectIntent('Open the latest project', 'open_latest_project');
     expectIntent('open my most recent project', 'open_latest_project');

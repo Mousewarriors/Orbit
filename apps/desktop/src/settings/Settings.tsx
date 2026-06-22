@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BRANDING } from '@orbit/branding';
 import type { Appearance, ThemeChoice } from '@orbit/appearance';
 import { DEFAULT_APPEARANCE } from '@orbit/appearance';
@@ -6,11 +6,17 @@ import * as native from '../native.js';
 import { initAppearance, saveAppearance } from '../appearance.js';
 import {
   AI_SETTING_KEYS,
-  CLOUD_API_KEY_SECRET,
-  DEFAULT_AI_SETTINGS,
+  PROVIDER_PRESETS,
+  createProvider,
   parseAiSettings,
-  type ConfiguredProviderId,
+  presetById,
+  resolvePresetId,
+  type ProviderPreset,
+  type ProviderPresetId,
 } from '../ai/providerConfig.js';
+import { createNativeFetch } from '../ai/nativeFetch.js';
+import { OAUTH_PROVIDERS, type OAuthProviderConfig, type OAuthTokens } from '@orbit/ai-runtime';
+import { getValidAccessToken, loadTokens, signIn, signOut } from '../ai/oauthFlow.js';
 import { Toggle, Field, Section, Row } from './controls.js';
 import { ShortcutRecorder } from './ShortcutRecorder.js';
 import {
@@ -242,155 +248,393 @@ function AppearanceSection(): JSX.Element {
   );
 }
 
+/** The settings keys that hold the endpoint/model for a given engine. */
+function fieldKeys(engine: ProviderPreset['engine']): { endpoint: string; model: string } {
+  // Ollama (local/cloud) uses its own keys; every cloud engine shares the cloud keys.
+  return engine === 'ollama'
+    ? { endpoint: AI_SETTING_KEYS.endpoint, model: AI_SETTING_KEYS.model }
+    : { endpoint: AI_SETTING_KEYS.cloudBase, model: AI_SETTING_KEYS.cloudModel };
+}
+
 function AiSection(): JSX.Element {
-  const [provider, setProvider] = useState<ConfiguredProviderId>(DEFAULT_AI_SETTINGS.provider);
-  const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.ollamaEndpoint);
-  const [model, setModel] = useState(DEFAULT_AI_SETTINGS.ollamaModel);
-  const [cloudBase, setCloudBase] = useState(DEFAULT_AI_SETTINGS.cloudBaseUrl ?? '');
-  const [cloudModel, setCloudModel] = useState(DEFAULT_AI_SETTINGS.cloudModel ?? '');
+  const [presetId, setPresetId] = useState<ProviderPresetId>('none');
+  const [endpoint, setEndpoint] = useState('');
+  const [model, setModel] = useState('');
+  const [customModel, setCustomModel] = useState(false);
+  const [liveModels, setLiveModels] = useState<readonly string[]>([]);
   const [apiKey, setApiKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
 
+  const preset = useMemo(() => presetById(presetId) ?? PROVIDER_PRESETS[0]!, [presetId]);
+  const modelOptions = useMemo(
+    () => [...new Set([...preset.models, ...liveModels])],
+    [preset, liveModels],
+  );
+
+  // Load the persisted selection and reflect it into the form.
   useEffect(() => {
     void (async () => {
-      const [p, e, m, cb, cm, keyStored] = await Promise.all([
+      const [engine, storedPreset, e, m, cb, cm] = await Promise.all([
         native.getSetting(AI_SETTING_KEYS.provider),
+        native.getSetting(AI_SETTING_KEYS.preset),
         native.getSetting(AI_SETTING_KEYS.endpoint),
         native.getSetting(AI_SETTING_KEYS.model),
         native.getSetting(AI_SETTING_KEYS.cloudBase),
         native.getSetting(AI_SETTING_KEYS.cloudModel),
-        native.secretHas(CLOUD_API_KEY_SECRET).catch(() => false),
       ]);
-      const s = parseAiSettings({ provider: p, endpoint: e, model: m, cloudBase: cb, cloudModel: cm });
-      setProvider(s.provider);
-      setEndpoint(s.ollamaEndpoint);
-      setModel(s.ollamaModel);
-      setCloudBase(s.cloudBaseUrl ?? '');
-      setCloudModel(s.cloudModel ?? '');
-      setHasKey(keyStored);
+      const id =
+        (presetById(storedPreset ?? '')?.id ??
+          resolvePresetId(engine ?? 'none', (engine === 'openai-compat' ? cb : e) ?? '')) as
+          ProviderPresetId;
+      const p = presetById(id) ?? PROVIDER_PRESETS[0]!;
+      const ep = (p.engine === 'openai-compat' ? cb : e)?.trim() || p.baseUrl || '';
+      const md = (p.engine === 'openai-compat' ? cm : m)?.trim() || p.defaultModel || '';
+      setPresetId(id);
+      setEndpoint(ep);
+      setModel(md);
+      setCustomModel(md !== '' && !p.models.includes(md));
+      setLiveModels([]);
+      setHasKey(p.key ? await native.secretHas(p.key.secret).catch(() => false) : false);
+      setApiKey('');
+      setStatus(null);
     })();
   }, []);
 
-  const choose = useCallback((p: ConfiguredProviderId) => {
-    setProvider(p);
-    void native.setSetting(AI_SETTING_KEYS.provider, p);
+  // Switching presets auto-fills the endpoint + default model and points the key
+  // field at the right secret — the "instantly link up" behaviour.
+  const choosePreset = useCallback(async (id: ProviderPresetId) => {
+    const p = presetById(id) ?? PROVIDER_PRESETS[0]!;
+    const ep = p.baseUrl ?? '';
+    const md = p.defaultModel ?? p.models[0] ?? '';
+    setPresetId(id);
+    setEndpoint(ep);
+    setModel(md);
+    setCustomModel(md !== '' && !p.models.includes(md));
+    setLiveModels([]);
+    setStatus(null);
+    setApiKey('');
+    setHasKey(p.key ? await native.secretHas(p.key.secret).catch(() => false) : false);
+    const keys = fieldKeys(p.engine);
+    await native.setSetting(AI_SETTING_KEYS.preset, id);
+    await native.setSetting(AI_SETTING_KEYS.provider, p.engine);
+    if (p.baseUrl) await native.setSetting(keys.endpoint, ep);
+    if (md) await native.setSetting(keys.model, md);
   }, []);
+
+  const persistEndpoint = useCallback(
+    (value: string) => void native.setSetting(fieldKeys(preset.engine).endpoint, value),
+    [preset],
+  );
+  const persistModel = useCallback(
+    (value: string) => {
+      setModel(value);
+      void native.setSetting(fieldKeys(preset.engine).model, value);
+    },
+    [preset],
+  );
 
   const saveKey = useCallback(async () => {
+    if (!preset.key) return;
     const v = apiKey.trim();
     if (!v) return;
-    await native.secretSet(CLOUD_API_KEY_SECRET, v).catch(() => {});
+    await native.secretSet(preset.key.secret, v).catch(() => {});
     setApiKey('');
     setHasKey(true);
-  }, [apiKey]);
+    setStatus({ kind: 'ok', text: 'Key saved to OS secure storage.' });
+  }, [apiKey, preset]);
 
   const removeKey = useCallback(async () => {
-    await native.secretDelete(CLOUD_API_KEY_SECRET).catch(() => {});
+    if (!preset.key) return;
+    await native.secretDelete(preset.key.secret).catch(() => {});
     setHasKey(false);
-  }, []);
+  }, [preset]);
+
+  // Build a live provider from the current form (resolving the key/token from
+  // secure storage when needed) so "Load models" / "Test" hit the real server.
+  const buildProvider = useCallback(async () => {
+    let key = apiKey.trim();
+    let token: string | null = null;
+    if (preset.oauth) {
+      token = await getValidAccessToken(OAUTH_PROVIDERS[preset.oauth]).catch(() => null);
+    } else if (!key && preset.key && hasKey) {
+      key = (await native.secretGet(preset.key.secret)) ?? '';
+    }
+    const ollama = preset.engine === 'ollama';
+    const settings = parseAiSettings({
+      provider: preset.engine,
+      endpoint: ollama ? endpoint : null,
+      model: ollama ? model : null,
+      ollamaApiKey: ollama ? key : null,
+      cloudBase: ollama ? null : endpoint,
+      cloudModel: ollama ? null : model,
+      cloudApiKey: ollama || preset.oauth ? null : key,
+      oauthToken: token,
+    });
+    return createProvider(settings, createNativeFetch()).provider;
+  }, [apiKey, endpoint, model, preset, hasKey]);
+
+  const loadModels = useCallback(async () => {
+    const provider = await buildProvider();
+    if (!provider?.listModels) return;
+    setBusy(true);
+    setStatus({ kind: 'info', text: 'Loading models…' });
+    try {
+      const models = await provider.listModels();
+      const ids = models.map((m) => m.id);
+      setLiveModels(ids);
+      setStatus({ kind: 'ok', text: `Found ${ids.length} model${ids.length === 1 ? '' : 's'}.` });
+      if (ids.length > 0 && !ids.includes(model)) setCustomModel(false);
+    } catch (e) {
+      setStatus({ kind: 'err', text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }, [buildProvider, model]);
+
+  const testConnection = useCallback(async () => {
+    const provider = await buildProvider();
+    if (!provider) return;
+    setBusy(true);
+    setStatus({ kind: 'info', text: 'Testing…' });
+    try {
+      const health = await provider.health();
+      setStatus(
+        health.status === 'ready'
+          ? { kind: 'ok', text: '✓ Connected.' }
+          : { kind: 'err', text: `Not reachable${health.detail ? `: ${health.detail}` : ''}.` },
+      );
+    } catch (e) {
+      setStatus({ kind: 'err', text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }, [buildProvider]);
+
+  const needsModel = preset.engine !== 'none' && preset.engine !== 'mock';
 
   return (
     <Section
       title="AI"
-      description="Quick AI uses these settings. Orbit keeps API keys out of plaintext and never uploads context without your action."
+      description="Pick a provider, link it once, and switch any time. Quick AI, AI Chat, AI Commands and mission planning all use this. Orbit keeps keys in OS secure storage and never uploads context without your action."
     >
-      <Field label="Provider" hint="Which engine Quick AI talks to.">
-        <div className="settings-segment" role="radiogroup" aria-label="AI provider">
-          {([
-            ['none', 'None'],
-            ['mock', 'Mock (offline)'],
-            ['ollama', 'Local Ollama'],
-            ['openai-compat', 'Cloud (OpenAI-compatible)'],
-          ] as ReadonlyArray<[ConfiguredProviderId, string]>).map(([id, label]) => (
-            <button
-              key={id}
-              role="radio"
-              aria-checked={provider === id}
-              className={`settings-segment-btn${provider === id ? ' is-active' : ''}`}
-              onClick={() => choose(id)}
-            >
-              {label}
-            </button>
+      <Field label="Provider" hint="Choose a provider — the endpoint and a default model fill in automatically.">
+        <select
+          className="settings-input settings-select"
+          aria-label="AI provider"
+          value={presetId}
+          onChange={(e) => void choosePreset(e.target.value as ProviderPresetId)}
+        >
+          {PROVIDER_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+              {p.local ? ' — on-device' : ''}
+            </option>
           ))}
-        </div>
+        </select>
       </Field>
-      <p className="settings-note">
-        <strong>Mock</strong> is a fully-offline placeholder that proves the Quick AI surface works
-        end-to-end — it does not produce real answers. <strong>Local Ollama</strong> now works for
-        real via the native HTTP bridge — set the endpoint + model below and Quick AI, AI Commands
-        and mission AI-planning stream real tokens on-device. <strong>Cloud (OpenAI-compatible)</strong>
-        now works too — set the endpoint, model and an API key (stored in OS secure storage). A
-        native Anthropic adapter and AgentOS Auto routing are next.
-      </p>
+      <p className="settings-note">{preset.blurb}</p>
 
-      <Field label="Local Ollama endpoint" hint="Where your local Ollama server is listening.">
-        <input
-          className="settings-input"
-          value={endpoint}
-          onChange={(e) => setEndpoint(e.target.value)}
-          onBlur={() => void native.setSetting(AI_SETTING_KEYS.endpoint, endpoint)}
-          placeholder="http://127.0.0.1:11434"
-        />
-      </Field>
-      <Field label="Local Ollama model">
-        <input
-          className="settings-input-narrow"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          onBlur={() => void native.setSetting(AI_SETTING_KEYS.model, model)}
-          placeholder="llama3.1"
-        />
-      </Field>
+      {preset.editableEndpoint && (
+        <Field
+          label="Endpoint"
+          hint={
+            preset.engine === 'ollama'
+              ? 'Where your Ollama server is listening.'
+              : 'Any OpenAI-compatible /v1 base (OpenRouter, LM Studio, vLLM…).'
+          }
+        >
+          <input
+            className="settings-input"
+            value={endpoint}
+            onChange={(e) => setEndpoint(e.target.value)}
+            onBlur={() => persistEndpoint(endpoint)}
+            placeholder={preset.baseUrl}
+          />
+        </Field>
+      )}
+      {!preset.editableEndpoint && preset.baseUrl && (
+        <Field label="Endpoint">
+          <span className="settings-key-stored settings-mono">{preset.baseUrl}</span>
+        </Field>
+      )}
 
-      <Field
-        label="Cloud endpoint (OpenAI-compatible)"
-        hint="Any OpenAI-compatible /v1 base — OpenAI, OpenRouter, or a local server (LM Studio, vLLM)."
-      >
-        <input
-          className="settings-input"
-          value={cloudBase}
-          onChange={(e) => setCloudBase(e.target.value)}
-          onBlur={() => void native.setSetting(AI_SETTING_KEYS.cloudBase, cloudBase)}
-          placeholder="https://api.openai.com/v1"
-        />
-      </Field>
-      <Field label="Cloud model">
-        <input
-          className="settings-input-narrow"
-          value={cloudModel}
-          onChange={(e) => setCloudModel(e.target.value)}
-          onBlur={() => void native.setSetting(AI_SETTING_KEYS.cloudModel, cloudModel)}
-          placeholder="gpt-4o-mini"
-        />
-      </Field>
-      <Field
-        label="Cloud API key"
-        hint="Stored in your OS secure storage (Windows Credential Manager) — never in settings, files or logs."
-      >
-        {hasKey ? (
-          <div className="settings-key-row">
-            <span className="settings-key-stored">🔑 Key stored</span>
-            <button className="settings-btn" onClick={() => void removeKey()}>
-              Remove key
-            </button>
-          </div>
-        ) : (
-          <div className="settings-key-row">
+      {needsModel && (
+        <Field label="Model" hint="Pick a model, or load the live list from the server below.">
+          {modelOptions.length > 0 && !customModel ? (
+            <select
+              className="settings-input settings-select"
+              value={modelOptions.includes(model) ? model : '__custom__'}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') setCustomModel(true);
+                else persistModel(e.target.value);
+              }}
+            >
+              {modelOptions.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+              <option value="__custom__">Custom model…</option>
+            </select>
+          ) : (
             <input
               className="settings-input"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-…"
-              autoComplete="off"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              onBlur={() => persistModel(model)}
+              placeholder={preset.defaultModel ?? 'model name'}
             />
-            <button className="settings-btn" disabled={!apiKey.trim()} onClick={() => void saveKey()}>
-              Save key
+          )}
+        </Field>
+      )}
+
+      {preset.oauth && (
+        <Field
+          label="Subscription sign-in (experimental)"
+          hint="Sign in with your plan in the browser; the token is stored in OS secure storage. Experimental and subject to the provider’s terms — sign-in details may need updating if the provider changes its flow."
+        >
+          <div className="settings-oauth-list">
+            <OAuthProviderRow cfg={OAUTH_PROVIDERS[preset.oauth]} />
+          </div>
+        </Field>
+      )}
+
+      {preset.key && (
+        <Field label={preset.key.label} hint={preset.key.hint}>
+          {hasKey ? (
+            <div className="settings-key-row">
+              <span className="settings-key-stored">🔑 Key stored</span>
+              <button className="settings-btn" disabled={busy} onClick={() => void removeKey()}>
+                Remove key
+              </button>
+            </div>
+          ) : (
+            <div className="settings-key-row">
+              <input
+                className="settings-input"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="paste key…"
+                autoComplete="off"
+              />
+              <button
+                className="settings-btn"
+                disabled={busy || !apiKey.trim()}
+                onClick={() => void saveKey()}
+              >
+                Save key
+              </button>
+            </div>
+          )}
+          <p className="settings-note">
+            Get a key:{' '}
+            <button className="settings-link" onClick={() => void native.openUrl(preset.key!.url)}>
+              {preset.key.url}
+            </button>
+          </p>
+        </Field>
+      )}
+
+      {needsModel && (
+        <Field label="Connection" hint="Load the server's model list, or test that the link works.">
+          <div className="settings-key-row">
+            <button className="settings-btn-ghost" disabled={busy} onClick={() => void loadModels()}>
+              Load models
+            </button>
+            <button className="settings-btn-ghost" disabled={busy} onClick={() => void testConnection()}>
+              Test connection
             </button>
           </div>
-        )}
-      </Field>
+          {status && (
+            <p
+              className={
+                status.kind === 'ok'
+                  ? 'settings-ok'
+                  : status.kind === 'err'
+                    ? 'settings-err'
+                    : 'settings-note'
+              }
+            >
+              {status.text}
+            </p>
+          )}
+        </Field>
+      )}
+
+      {preset.engine !== 'none' && (
+        <p className="settings-note">
+          Subscription sign-in (Claude / ChatGPT-Codex) is <strong>experimental</strong>: the
+          provider endpoints mirror the public first-party clients and may change. API-key options
+          are billed per token, separate from those plans.
+        </p>
+      )}
     </Section>
+  );
+}
+
+function OAuthProviderRow({ cfg }: { cfg: OAuthProviderConfig }): JSX.Element {
+  const [tokens, setTokens] = useState<OAuthTokens | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadTokens(cfg)
+      .then(setTokens)
+      .catch(() => {});
+  }, [cfg]);
+
+  const doSignIn = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setTokens(await signIn(cfg));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [cfg]);
+
+  const doSignOut = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signOut(cfg);
+      setTokens(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [cfg]);
+
+  const signedIn = tokens !== null;
+
+  return (
+    <div className="settings-oauth-row">
+      <div className="settings-oauth-main">
+        <div className="settings-oauth-title">
+          {cfg.label}
+          <span className={`settings-ext-health is-${signedIn ? 'ready' : 'disabled'}`}>
+            {signedIn ? 'signed in' : 'not signed in'}
+          </span>
+        </div>
+        <div className="settings-oauth-note">{cfg.note}</div>
+        {error && <div className="settings-err">⚠ {error}</div>}
+      </div>
+      {signedIn ? (
+        <button className="settings-btn" disabled={busy} onClick={() => void doSignOut()}>
+          Sign out
+        </button>
+      ) : (
+        <button className="settings-btn" disabled={busy} onClick={() => void doSignIn()}>
+          {busy ? 'Waiting for browser…' : 'Sign in'}
+        </button>
+      )}
+    </div>
   );
 }
 

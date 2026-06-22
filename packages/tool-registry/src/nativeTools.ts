@@ -15,6 +15,7 @@ import type { ToolInputSchema, ToolRecord, ToolSideEffect } from './types.js';
 /** Stable ids the Mission engine maps to its step kinds. */
 export const NATIVE_TOOL_IDS = {
   openApplication: 'native:open_application',
+  openProjectInApplication: 'native:open_project_in_application',
   openProjectFolder: 'native:open_project_folder',
   openControlCenter: 'native:open_control_center',
   findFiles: 'native:find_files',
@@ -67,6 +68,19 @@ export function nativeToolRecords(): ToolRecord[] {
       'Open application',
       'Launch an installed application by name.',
       obj({ applicationQuery: { type: 'string', description: 'App name to open' } }, ['applicationQuery']),
+      [],
+    ),
+    record(
+      NATIVE_TOOL_IDS.openProjectInApplication,
+      'Open project in application',
+      'Resolve an installed application and a known project, then open the project in that application.',
+      obj(
+        {
+          applicationQuery: { type: 'string', description: 'Application name or alias' },
+          projectQuery: { type: 'string', description: 'Project to resolve' },
+        },
+        ['applicationQuery', 'projectQuery'],
+      ),
       [],
     ),
     record(

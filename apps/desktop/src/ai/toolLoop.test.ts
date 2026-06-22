@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MockProvider, type AiRequest } from '@orbit/ai-runtime';
 import type { ToolRecord } from '@orbit/tool-registry';
-import { runToolLoop, toolRecordToDef, type ToolCallCard } from './toolLoop.js';
+import {
+  providerToolName,
+  runToolLoop,
+  toolRecordToDef,
+  type ToolCallCard,
+} from './toolLoop.js';
 
 function tool(partial: Partial<ToolRecord> & { name: string }): ToolRecord {
   return {
@@ -31,10 +36,18 @@ function callOnce(name: string, args: Record<string, unknown>) {
 
 describe('toolRecordToDef', () => {
   it('exposes name, description and JSON-schema parameters', () => {
-    const def = toolRecordToDef(tool({ name: 'search_vault', description: 'Search the vault' }));
-    expect(def.name).toBe('search_vault');
+    const record = tool({ name: 'search_vault', description: 'Search the vault' });
+    const def = toolRecordToDef(record);
+    expect(def.name).toBe(providerToolName(record));
     expect(def.description).toBe('Search the vault');
     expect(def.parameters).toMatchObject({ type: 'object', properties: { query: { type: 'string' } } });
+  });
+
+  it('namespaces identical tool names from different servers', () => {
+    const a = tool({ name: 'search', serverId: 'one', id: 'mcp:one:search' });
+    const b = tool({ name: 'search', serverId: 'two', id: 'mcp:two:search' });
+    expect(providerToolName(a)).not.toBe(providerToolName(b));
+    expect(providerToolName(a)).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
   });
 });
 
@@ -42,7 +55,7 @@ describe('runToolLoop', () => {
   it('executes a safe tool call without confirmation and feeds the result back', async () => {
     const provider = new MockProvider({
       reply: 'Your battle plan is ready.',
-      toolScript: callOnce('get_battle_plan', {}),
+      toolScript: callOnce(providerToolName(tool({ name: 'get_battle_plan' })), {}),
     });
     const execute = vi.fn(async () => ({ ok: true, content: 'PLAN: ship Orbit' }));
     const confirm = vi.fn(async () => true);
@@ -67,7 +80,17 @@ describe('runToolLoop', () => {
   it('requires confirmation for a consequential tool and skips it when denied', async () => {
     const provider = new MockProvider({
       reply: 'I did not save anything.',
-      toolScript: callOnce('save_memory', { title: 'x', summary: 'y' }),
+      toolScript: callOnce(
+        providerToolName(
+          tool({
+            name: 'save_memory',
+            risk: 'medium',
+            requiresConfirmation: true,
+            sideEffects: ['write-file'],
+          }),
+        ),
+        { query: 'remember this' },
+      ),
     });
     const execute = vi.fn(async () => ({ ok: true, content: 'saved' }));
     const confirm = vi.fn(async () => false); // user denies
@@ -113,7 +136,10 @@ describe('runToolLoop', () => {
     // A pathological model that always calls a tool: the loop must terminate.
     const provider = new MockProvider({
       reply: 'Final summary.',
-      toolScript: () => [{ name: 'get_battle_plan', arguments: {} }],
+      toolScript: () => {
+        const record = tool({ name: 'get_battle_plan' });
+        return [{ name: providerToolName(record), arguments: { query: 'again' } }];
+      },
     });
     const result = await runToolLoop([{ role: 'user', content: 'loop forever' }], {
       provider,
@@ -125,5 +151,37 @@ describe('runToolLoop', () => {
     });
     expect(result.content).toBe('Final summary.');
     expect(result.executed).toBe(2);
+  });
+
+  it('rejects invalid arguments before confirmation or execution', async () => {
+    const record = tool({
+      name: 'search_vault',
+      inputSchema: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      },
+    });
+    const provider = new MockProvider({
+      reply: 'I could not run the malformed call.',
+      toolScript: callOnce(providerToolName(record), { query: 42, extra: 'drop me' }),
+    });
+    const execute = vi.fn();
+    const confirm = vi.fn(async () => true);
+    const cards: ToolCallCard[] = [];
+
+    const result = await runToolLoop([{ role: 'user', content: 'search' }], {
+      provider,
+      tools: [record],
+      execute,
+      confirm,
+      onCard: (c) => cards.push(c),
+    });
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(cards.at(-1)?.status).toBe('error');
+    expect(cards.at(-1)?.error).toMatch(/query.*string/i);
+    expect(result.executed).toBe(0);
   });
 });

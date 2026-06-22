@@ -16,12 +16,13 @@ import { loadProviderInfo } from '../ai/providerLoad.js';
 import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 import { buildToolRegistry, DEMO_MCP_SERVER_ID } from '../ai/toolRegistry.js';
 import { runToolLoop, type ToolCallCard } from '../ai/toolLoop.js';
+import { CHAT_NATIVE_TOOL_IDS, executeNativeTool } from '../ai/nativeToolExecute.js';
 import { pickDefaultModel } from '../ai/modelPick.js';
 
 type Status = 'idle' | 'streaming';
 
 /** Providers whose adapters implement function-calling. */
-const TOOL_CAPABLE_PROVIDERS = new Set(['ollama', 'openai-compat', 'mock']);
+const TOOL_CAPABLE_PROVIDERS = new Set(['ollama', 'mock']);
 
 /** A pending tool confirmation awaiting the user's choice. */
 interface PendingToolConfirm {
@@ -65,7 +66,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const clientsRef = useRef<ReadonlyMap<string, McpClient>>(new Map());
-  /** Tool names approved for the rest of this session (medium-risk only). */
+  /** Tool ids approved for the rest of this session (medium-risk only). */
   const sessionApprovedRef = useRef<Set<string>>(new Set());
 
   const tauri = native.isTauri();
@@ -97,15 +98,17 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       try {
         const reg = await buildToolRegistry();
         clientsRef.current = reg.clients;
-        const callable = reg.registry
-          .all()
-          .filter(
-            (t) =>
-              t.source === 'mcp' &&
-              t.serverId &&
-              t.serverId !== DEMO_MCP_SERVER_ID &&
-              reg.clients.has(t.serverId),
+        const callable = reg.registry.all().filter((t) => {
+          // Orbit's own safe native tools (open app, find files/notes) …
+          if (t.source === 'native') return CHAT_NATIVE_TOOL_IDS.includes(t.id);
+          // … plus any connected real MCP server's tools (AgentOS, etc.).
+          return (
+            t.source === 'mcp' &&
+            !!t.serverId &&
+            t.serverId !== DEMO_MCP_SERVER_ID &&
+            reg.clients.has(t.serverId)
           );
+        });
         setChatTools(callable);
         setUseTools(callable.length > 0);
       } catch {
@@ -167,7 +170,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
     (record: ToolRecord, args: Readonly<Record<string, unknown>>): Promise<boolean> => {
       // Session-remembered approval applies to medium-risk tools only; high and
       // critical risk always ask again (never persistently approvable, §21).
-      if (sessionApprovedRef.current.has(record.name)) return Promise.resolve(true);
+      if (sessionApprovedRef.current.has(record.id)) return Promise.resolve(true);
       const allowSession =
         record.approvalScopes.includes('per-mission') || record.approvalScopes.includes('per-project');
       return new Promise<boolean>((resolve) => {
@@ -176,7 +179,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
           args,
           allowSession,
           resolve: (approved, remember) => {
-            if (approved && remember) sessionApprovedRef.current.add(record.name);
+            if (approved && remember) sessionApprovedRef.current.add(record.id);
             setPendingConfirm(null);
             resolve(approved);
           },
@@ -229,6 +232,36 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
             ...(modelName ? { model: modelName } : {}),
             tools: chatTools,
             execute: async (record, args) => {
+              // Native Orbit tools (open app, find files/notes) run through the
+              // typed native executor; MCP tools go to their connected server.
+              if (record.source === 'native') {
+                return executeNativeTool(record, args, {
+                  listApplications: () => native.listApplications(),
+                  listProjects: async () => {
+                    const [recent, favourites, catalogued] = await Promise.all([
+                      native.projectMetaListRecent(30),
+                      native.projectMetaListFavourites(),
+                      native.projectMetaListCatalogued(),
+                    ]);
+                    const projects = new Map<string, { path: string; name: string | null }>();
+                    for (const project of [...favourites, ...recent, ...catalogued]) {
+                      if (!projects.has(project.path)) {
+                        projects.set(project.path, {
+                          path: project.path,
+                          name: project.name,
+                        });
+                      }
+                    }
+                    return [...projects.values()];
+                  },
+                  launchPath: (p) => native.launchPath(p),
+                  openProjectInApplication: (applicationId, projectPath) =>
+                    native.openProjectInApplication(applicationId, projectPath),
+                  recordUsage: (id) => native.recordCommandUsage(id),
+                  fileSearch: (q) => native.fileSearch(q),
+                  noteList: (q) => native.noteList(q),
+                });
+              }
               const client = clientsRef.current.get(record.serverId ?? '');
               if (!client) return { ok: false, content: 'No connected server for this tool.' };
               const out = await client.callTool(record.name, args, controller.signal);

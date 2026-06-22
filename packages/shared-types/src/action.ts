@@ -46,6 +46,11 @@ export type ActionToken =
   | { readonly kind: 'deeplink'; readonly url: string }
   | { readonly kind: 'open-url'; readonly url: string }
   | { readonly kind: 'open-path'; readonly path: string }
+  | {
+      readonly kind: 'open-project-in-application';
+      readonly applicationId: string;
+      readonly projectPath: string;
+    }
   | { readonly kind: 'reveal-path'; readonly path: string }
   | { readonly kind: 'copy'; readonly text: string }
   | {

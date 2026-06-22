@@ -119,6 +119,43 @@ pub fn launch_path(app: AppHandle, path: String) -> Result<(), String> {
     }
 }
 
+/// Open a catalogued project in an indexed desktop application. Both entities
+/// are re-resolved natively; the renderer cannot supply an executable path or
+/// arbitrary argv.
+#[tauri::command]
+pub fn open_project_in_application(
+    state: State<'_, AppState>,
+    application_id: String,
+    project_path: String,
+) -> Result<(), String> {
+    validate_relay_path("project path", &project_path)?;
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        if orbit_core::projects::get(&conn, &project_path)
+            .map_err(|e| e.to_string())?
+            .is_none()
+        {
+            return Err("project is not in Orbit's catalogue".into());
+        }
+    }
+    let application = {
+        let apps = state.apps.lock().map_err(|e| e.to_string())?;
+        apps.iter()
+            .find(|entry| entry.id == application_id)
+            .cloned()
+            .ok_or_else(|| "application is not in Orbit's index".to_string())?
+    };
+    #[cfg(windows)]
+    {
+        crate::launcher::platform::launch_with_path(&application.path, &project_path)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = application;
+        Err("opening a project in an application is implemented on Windows only".into())
+    }
+}
+
 /// Open an external URL. Only http(s)/mailto schemes are permitted.
 #[tauri::command]
 pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {
@@ -1056,6 +1093,18 @@ pub fn project_meta_upsert(
 }
 
 #[tauri::command]
+pub fn project_meta_catalogue(
+    state: State<'_, AppState>,
+    path: String,
+    name: Option<String>,
+) -> Result<orbit_core::projects::ProjectMeta, String> {
+    validate_relay_path("project path", &path)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::catalogue(&conn, &path, name.as_deref(), now_ms())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn project_meta_touch(
     state: State<'_, AppState>,
     path: String,
@@ -1104,6 +1153,16 @@ pub fn project_meta_list_favourites(
 ) -> Result<Vec<orbit_core::projects::ProjectMeta>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     orbit_core::projects::list_favourites(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_meta_list_catalogued(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> Result<Vec<orbit_core::projects::ProjectMeta>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    orbit_core::projects::list_catalogued(&conn, limit.unwrap_or(500).clamp(1, 1000))
+        .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------

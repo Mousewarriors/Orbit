@@ -41,6 +41,7 @@ export type AiProviderId =
   | 'ollama'
   | 'agentos-auto'
   | 'openai-compat'
+  | 'openai-responses'
   | 'anthropic';
 
 export interface AiUsage {

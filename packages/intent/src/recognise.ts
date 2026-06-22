@@ -246,6 +246,24 @@ const openProjectFolder: Rule = (t) => {
   });
 };
 
+const openProjectInApplication: Rule = (t) => {
+  const match =
+    /^open\s+(?:the\s+)?(.+?)(?:\s+(?:project|repo|repository))?\s+(?:in|with|using)\s+(.+)$/.exec(
+      t,
+    );
+  if (!match) return null;
+  const projectQuery = cleanProjectQuery(match[1]);
+  const applicationQuery = (match[2] ?? '')
+    .replace(/^(the|my)\s+/, '')
+    .replace(/\s+(app|application|programme|program)$/, '')
+    .trim();
+  if (!projectQuery || !applicationQuery) return null;
+  return make('open_project_in_application', 'open-project-in-application', {
+    confidence: 0.92,
+    slots: { projectQuery, applicationQuery },
+  });
+};
+
 const openProject: Rule = (t) => {
   // "open the Orbit project", "open project Orbit"
   const m1 = /\bopen\b\s+(the\s+)?(.+?)\s+project\b/.exec(t);
@@ -321,6 +339,7 @@ const RULES: readonly Rule[] = [
   continueProject,
   launchAgentOnProject,
   openLatestProject,
+  openProjectInApplication,
   openProjectFolder,
   openProject,
   findNotes,

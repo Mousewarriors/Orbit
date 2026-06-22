@@ -183,6 +183,8 @@ async function buildItems(
         tab: plan.target.tab,
         ...(plan.target.selectProject && project ? { project: project.path } : {}),
         ...(plan.target.sessionStatus ? { sessionStatus: plan.target.sessionStatus } : {}),
+        ...(slots.agentPreference ? { agentPreference: slots.agentPreference } : {}),
+        ...(slots.includeLatestHandoff ? { includeLatestHandoff: true } : {}),
       };
       const subtitle = project ? `${display.subtitle} · ${project.name ?? project.path}` : display.subtitle;
       return [
@@ -238,6 +240,60 @@ async function buildItems(
             title: 'Open Folder',
             run: { kind: 'reveal-path', path: project.path },
             requires: ['files.read'],
+          },
+        },
+      ];
+    }
+
+    case 'open-project-in-application': {
+      const project = bestProject(
+        slots.projectQuery,
+        deps.getProjects() as readonly ProjectCandidate[],
+      );
+      const app = rankApps(slots.applicationQuery ?? '', deps.getApps())[0]?.item ?? null;
+      if (!project || !app) {
+        const missing = [
+          !project ? `project "${slots.projectQuery ?? ''}"` : '',
+          !app ? `application "${slots.applicationQuery ?? ''}"` : '',
+        ]
+          .filter(Boolean)
+          .join(' and ');
+        return [
+          {
+            ...baseItem('intent.open-project-in-application.unresolved', query, {
+              title: display.title,
+              subtitle: `Could not resolve ${missing}`,
+              category: 'Projects',
+              source: SOURCE,
+              icon: icon('app'),
+              confidence: 0.8,
+            }),
+            primaryAction: {
+              id: 'intent.open-project-in-application.scan',
+              title: 'Open Projects',
+              run: controlCenterAction({ tab: 'projects' }),
+            },
+          },
+        ];
+      }
+      return [
+        {
+          ...baseItem('intent.open-project-in-application', query, {
+            title: `Open ${project.name ?? project.path} in ${app.name}`,
+            subtitle: project.path,
+            category: 'Projects',
+            source: SOURCE,
+            icon: icon('app'),
+          }),
+          primaryAction: {
+            id: 'intent.open-project-in-application.open',
+            title: 'Open Project',
+            run: {
+              kind: 'open-project-in-application',
+              applicationId: app.id,
+              projectPath: project.path,
+            },
+            requires: ['apps.launch', 'files.read'],
           },
         },
       ];

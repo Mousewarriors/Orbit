@@ -43,9 +43,24 @@ export interface OllamaProviderOptions {
   readonly fetch?: FetchLike;
   /** Default model when a request omits one. */
   readonly defaultModel?: string;
+  /**
+   * Bearer token for hosted Ollama (Ollama Cloud, https://ollama.com). Sent as
+   * an `Authorization` header; omitted for a local server. Never logged.
+   */
+  readonly apiKey?: string;
 }
 
 const DEFAULT_BASE = 'http://127.0.0.1:11434';
+
+/** True when the endpoint is a loopback host (processing stays on-device). */
+function isLocalBase(base: string): boolean {
+  try {
+    const host = new URL(base).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    return true;
+  }
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -100,17 +115,26 @@ function parseToolCalls(raw: unknown): AiToolCall[] {
 
 export class OllamaProvider implements AiProvider {
   readonly id = 'ollama' as const;
-  readonly local = true;
+  readonly local: boolean;
   private readonly base: string;
   private readonly fetch: FetchLike;
   private readonly defaultModel: string;
+  private readonly apiKey: string;
 
   constructor(opts: OllamaProviderOptions = {}) {
     this.base = (opts.baseUrl ?? DEFAULT_BASE).replace(/\/$/, '');
+    this.local = isLocalBase(this.base);
     const f = opts.fetch ?? (globalThis.fetch as FetchLike | undefined);
     if (!f) throw new AiError('not_configured', 'No fetch implementation available');
     this.fetch = f;
     this.defaultModel = opts.defaultModel ?? 'llama3.1';
+    this.apiKey = opts.apiKey ?? '';
+  }
+
+  private headers(): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
+    return h;
   }
 
   async health(signal?: AbortSignal): Promise<ProviderHealth> {
@@ -156,7 +180,7 @@ export class OllamaProvider implements AiProvider {
       content,
       model: typeof body['model'] === 'string' ? body['model'] : req.model ?? this.defaultModel,
       provider: this.id,
-      local: true,
+      local: this.local,
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       usage: {
         ...(numberOr(body['prompt_eval_count']) !== undefined
@@ -224,7 +248,7 @@ export class OllamaProvider implements AiProvider {
     }
     if (buffer.trim()) handleLine(buffer);
     onChunk({ delta: '', done: true });
-    return { content, model, provider: this.id, local: true, ...(usage ? { usage } : {}) };
+    return { content, model, provider: this.id, local: this.local, ...(usage ? { usage } : {}) };
   }
 
   private chatBody(req: AiRequest, stream: boolean): string {
@@ -265,7 +289,7 @@ export class OllamaProvider implements AiProvider {
     try {
       return await this.fetch(`${this.base}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.headers(),
         ...(body !== undefined ? { body } : {}),
         ...(signal ? { signal } : {}),
       });

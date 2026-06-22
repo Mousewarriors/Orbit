@@ -65,6 +65,15 @@ describe('intent provider — control center navigation', () => {
     }
   });
 
+  it('preserves agent and latest-handoff continuation preferences', async () => {
+    const items = await run('pick up Orbit with Codex and the latest handoff');
+    const run0 = items[0]!.primaryAction.run;
+    if (run0.kind !== 'push-view') throw new Error('expected push-view');
+    const arg = decodeControlCenterArg(String(run0.args!['id']));
+    expect(arg.agentPreference).toBe('codex');
+    expect(arg.includeLatestHandoff).toBe(true);
+  });
+
   it('"show failed sessions" carries the status filter', async () => {
     const items = await run('show failed sessions');
     const run0 = items[0]!.primaryAction.run;
@@ -93,6 +102,21 @@ describe('intent provider — control center navigation', () => {
     expect(items[0]!.primaryAction.run).toEqual({
       kind: 'reveal-path',
       path: 'C:\\Users\\me\\Raycast Clone',
+    });
+  });
+
+  it('"open Orbit in Visual Studio Code" resolves both indexed entities', async () => {
+    const deps = makeDeps({
+      getApps: () => [
+        ...APPS,
+        { id: 'vscode', name: 'Visual Studio Code', path: 'C:\\Code.lnk' },
+      ],
+    });
+    const items = await run('Open Orbit in Visual Studio Code', deps);
+    expect(items[0]!.primaryAction.run).toEqual({
+      kind: 'open-project-in-application',
+      applicationId: 'vscode',
+      projectPath: 'C:\\Users\\me\\Raycast Clone',
     });
   });
 });

@@ -37,7 +37,7 @@ describe('starter library', () => {
 });
 
 describe('createAiCommandProvider', () => {
-  it('emits items that open Quick AI with the rendered prompt + clipboard + autoRun', async () => {
+  it('previews clipboard commands before sending clipboard content', async () => {
     const items = await createAiCommandProvider().search('improve', signal);
     const improve = items.find((i) => i.id === 'ai.cmd.improve')!;
     const run = improve.primaryAction.run;
@@ -47,7 +47,7 @@ describe('createAiCommandProvider', () => {
     const launch = decodeQuickAiArg(String(run.args!['id']));
     expect(launch.prompt).toContain('Improve the writing');
     expect(launch.useClipboard).toBe(true);
-    expect(launch.autoRun).toBe(true);
+    expect(launch.autoRun).toBeUndefined();
   });
 
   it('a clipboard-free command does not pre-attach the clipboard', async () => {
@@ -55,7 +55,9 @@ describe('createAiCommandProvider', () => {
     const json = items.find((i) => i.id === 'ai.cmd.json')!;
     const run = json.primaryAction.run;
     if (run.kind !== 'push-view') throw new Error('expected push-view');
-    expect(decodeQuickAiArg(String(run.args!['id'])).useClipboard).toBeUndefined();
+    const launch = decodeQuickAiArg(String(run.args!['id']));
+    expect(launch.useClipboard).toBeUndefined();
+    expect(launch.autoRun).toBe(true);
   });
 });
 

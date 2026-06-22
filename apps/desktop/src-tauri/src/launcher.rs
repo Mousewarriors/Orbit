@@ -66,6 +66,16 @@ pub mod platform {
         format!("launch failed: {reason} (code {code})")
     }
 
+    fn regular_windows_path(path: &str) -> String {
+        if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+            format!(r"\\{rest}")
+        } else if let Some(rest) = path.strip_prefix(r"\\?\") {
+            rest.to_string()
+        } else {
+            path.to_string()
+        }
+    }
+
     /// Launch an application, file, folder, shortcut, or shell item.
     ///
     /// Returns `Ok(())` only when the OS reports the launch actually started.
@@ -121,6 +131,52 @@ pub mod platform {
         }
     }
 
+    /// Launch an indexed desktop application with one filesystem path argument.
+    /// This is intentionally narrower than arbitrary argv: callers cannot pass
+    /// switches, multiple arguments, or a command line.
+    pub fn launch_with_path(target: &str, path: &str) -> Result<(), String> {
+        let target = target.trim();
+        let path = path.trim();
+        if target.is_empty() || path.is_empty() {
+            return Err("launch target and project path are required".into());
+        }
+        if is_shell_item(target) {
+            return Err("this application type cannot accept a project path".into());
+        }
+        if !Path::new(target).exists() {
+            return Err(format!("launch failed: '{target}' no longer exists"));
+        }
+        let argument = Path::new(path);
+        if !argument.is_absolute() || !argument.is_dir() {
+            return Err("project path must be an existing absolute directory".into());
+        }
+
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let verb = wide("open");
+        let file = wide(target);
+        // Windows paths cannot contain a quote, so one quoted path is an
+        // unambiguous single command-line argument.
+        let parameters = wide(&format!("\"{}\"", regular_windows_path(path)));
+        let hinst = unsafe {
+            ShellExecuteW(
+                HWND::default(),
+                PCWSTR(verb.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR(parameters.as_ptr()),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        let code = hinst.0 as isize;
+        if code > 32 {
+            Ok(())
+        } else {
+            Err(shell_error(code))
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -154,6 +210,28 @@ pub mod platform {
             assert!(shell_error(5).contains("access"));
         }
 
+        #[test]
+        fn project_launch_rejects_missing_target() {
+            let err = launch_with_path(
+                r"C:\orbit\definitely\does\not\exist.lnk",
+                r"C:\orbit",
+            )
+            .unwrap_err();
+            assert!(err.contains("no longer exists"), "unexpected error: {err}");
+        }
+
+        #[test]
+        fn project_arguments_drop_the_verbatim_path_prefix() {
+            assert_eq!(
+                regular_windows_path(r"\\?\C:\Users\Simon\Orbit"),
+                r"C:\Users\Simon\Orbit"
+            );
+            assert_eq!(
+                regular_windows_path(r"\\?\UNC\server\share\Orbit"),
+                r"\\server\share\Orbit"
+            );
+        }
+
         /// Real end-to-end launch — opt-in because it actually opens a window.
         /// Targets `$ORBIT_LAUNCH_TEST_PATH` if set (use it to exercise the
         /// `.lnk`/`ShellExecuteW` branch with a real shortcut), otherwise the
@@ -179,5 +257,9 @@ pub mod platform {
 
     pub fn is_shell_item(_target: &str) -> bool {
         false
+    }
+
+    pub fn launch_with_path(_target: &str, _path: &str) -> Result<(), String> {
+        Err("opening a project in an application is implemented on Windows only".into())
     }
 }

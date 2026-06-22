@@ -43,6 +43,7 @@ describe('dispatchAgentViaRelay', () => {
     const result = await dispatchAgentViaRelay(deps({ executeLaunch }), 'C:/p/orbit', 'codex');
     expect(result.ok).toBe(true);
     expect(result.agentTitle).toBe('Codex');
+    expect(result.sessionId).toBe('s1');
     expect(result.warnings).toContain('dirty worktree');
     // confirm:true must be passed — we never auto-launch unconfirmed.
     expect(executeLaunch).toHaveBeenCalledWith('plan-1', true);
@@ -72,9 +73,15 @@ describe('dispatchAgentViaRelay', () => {
 describe('executeMissionStep', () => {
   function deps(over: Partial<MissionExecutorDeps> = {}): MissionExecutorDeps {
     return {
-      resolveApp: (q) => (q.toLowerCase().includes('calc') ? { name: 'Calculator', path: 'calc.exe' } : null),
+      resolveApp: (q) =>
+        q.toLowerCase().includes('calc')
+          ? { id: 'calc', name: 'Calculator', path: 'calc.exe' }
+          : q.toLowerCase().includes('code')
+            ? { id: 'vscode', name: 'Visual Studio Code', path: 'code.exe' }
+            : null,
       resolveProject: (q) => (q.toLowerCase().includes('orbit') ? { name: 'Orbit', path: 'C:/p/orbit' } : null),
       launchApp: vi.fn().mockResolvedValue(undefined),
+      openProjectInApplication: vi.fn().mockResolvedValue(undefined),
       revealFolder: vi.fn().mockResolvedValue(undefined),
       fileSearch: () => Promise.resolve([{ name: 'a.txt', parent: 'C:/docs' }]),
       noteSearch: () => Promise.resolve([{ title: 'Leonard' }]),
@@ -103,8 +110,26 @@ describe('executeMissionStep', () => {
     expect(out.ok).toBe(false);
   });
 
+  it('opens a resolved project in a resolved application', async () => {
+    const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openProjectInApplication,
+        args: { applicationQuery: 'vs code', projectQuery: 'orbit' },
+      },
+      deps({ openProjectInApplication }),
+    );
+    expect(out.ok).toBe(true);
+    expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/p/orbit');
+  });
+
   it('dispatches an agent through the injected Relay path', async () => {
-    const dispatchAgent = vi.fn().mockResolvedValue({ ok: true, summary: 'Launched Codex', warnings: ['w'] });
+    const dispatchAgent = vi.fn().mockResolvedValue({
+      ok: true,
+      summary: 'Launched Codex',
+      sessionId: 's1',
+      warnings: ['w'],
+    });
     const out = await executeMissionStep(
       { toolId: NATIVE_TOOL_IDS.dispatchAgent, args: { projectQuery: 'orbit', agentPreference: 'best' } },
       deps({ dispatchAgent }),
@@ -112,6 +137,21 @@ describe('executeMissionStep', () => {
     expect(dispatchAgent).toHaveBeenCalledWith('C:/p/orbit', 'best');
     expect(out.ok).toBe(true);
     expect(out.detail).toContain('w');
+    expect(out.navigateTo?.viewId).toBe('control-center');
+  });
+
+  it('does not launch an untasked agent when Relay cannot accept the objective', async () => {
+    const dispatchAgent = vi.fn();
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.dispatchAgent,
+        args: { projectQuery: 'orbit', objective: 'Implement the feature' },
+      },
+      deps({ dispatchAgent }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.detail).toMatch(/No session was launched/);
+    expect(dispatchAgent).not.toHaveBeenCalled();
   });
 
   it('returns a navigation target for a Control Center step', async () => {

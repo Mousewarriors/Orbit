@@ -60,9 +60,17 @@ export function rankProjects(
 ): Array<Scored<ProjectCandidate>> {
   const q = (query ?? '').trim();
   if (!q) return projects.map((item) => ({ item, score: 0 }));
+  const normalizedQuery = normalize(q);
   const out: Array<Scored<ProjectCandidate>> = [];
   for (const item of projects) {
-    const score = scoreText(q, projectDisplayName(item), basename(item.path), item.path);
+    const displayName = projectDisplayName(item);
+    let score = scoreText(q, displayName, basename(item.path), item.path);
+    const canonicalWorkspaceName = normalize(displayName)
+      .replace(/[\s_-]*(?:monorepo|workspace|repository|project)$/, '')
+      .trim();
+    if (canonicalWorkspaceName === normalizedQuery) {
+      score = Math.max(score, 0.999);
+    }
     if (score > 0) out.push({ item, score });
   }
   out.sort((a, b) => b.score - a.score);

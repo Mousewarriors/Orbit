@@ -61,6 +61,13 @@ export async function launchPath(path: string): Promise<void> {
   return invoke('launch_path', { path });
 }
 
+export async function openProjectInApplication(
+  applicationId: string,
+  projectPath: string,
+): Promise<void> {
+  return invoke('open_project_in_application', { applicationId, projectPath });
+}
+
 export async function openUrl(url: string): Promise<void> {
   return invoke('open_url', { url });
 }
@@ -573,6 +580,13 @@ export async function projectMetaUpsert(
   return invoke<ProjectMeta>('project_meta_upsert', { path, name });
 }
 
+export async function projectMetaCatalogue(
+  path: string,
+  name: string | null,
+): Promise<ProjectMeta> {
+  return invoke<ProjectMeta>('project_meta_catalogue', { path, name });
+}
+
 export async function projectMetaTouch(path: string): Promise<void> {
   return invoke('project_meta_touch', { path });
 }
@@ -597,6 +611,10 @@ export async function projectMetaListRecent(limit = 20): Promise<ProjectMeta[]> 
 
 export async function projectMetaListFavourites(): Promise<ProjectMeta[]> {
   return invoke<ProjectMeta[]>('project_meta_list_favourites');
+}
+
+export async function projectMetaListCatalogued(limit = 500): Promise<ProjectMeta[]> {
+  return invoke<ProjectMeta[]>('project_meta_list_catalogued', { limit });
 }
 
 // --- Orbit Relay ---
@@ -636,6 +654,10 @@ export interface RelayExpectedMetadata {
 }
 
 export interface RelayStatus {
+  appVersion: string;
+  buildCommit: string;
+  buildTimestamp: string;
+  executablePath: string | null;
   state: RelaySupervisorState;
   expected: RelayExpectedMetadata;
   userMessage: string;
@@ -846,4 +868,40 @@ export async function secretDelete(key: string): Promise<void> {
 
 export async function secretHas(key: string): Promise<boolean> {
   return invoke<boolean>('secret_has', { key });
+}
+
+// --- OAuth loopback (subscription sign-in) ---
+
+export interface OauthCallbackEvent {
+  requestId: string;
+  code: string | null;
+  state: string | null;
+  error: string | null;
+}
+
+/**
+ * Bind a one-shot loopback HTTP server on `127.0.0.1:port` that captures the
+ * OAuth redirect to `path`. Resolves with the actually-bound port once listening
+ * (bind happens before this resolves, so it's safe to open the browser after).
+ * The captured `code`/`state` arrive on the `oauth-callback` event.
+ */
+export async function oauthListen(
+  requestId: string,
+  port: number,
+  path: string,
+  timeoutMs: number,
+): Promise<number> {
+  return invoke<number>('oauth_listen', { requestId, port, path, timeoutMs });
+}
+
+/** Stop a pending loopback listener (e.g. on timeout / cancel). */
+export async function oauthCancel(requestId: string): Promise<void> {
+  return invoke('oauth_cancel', { requestId });
+}
+
+/** Subscribe to OAuth redirect callbacks (filter by `requestId`). */
+export async function onOauthCallback(
+  handler: (ev: OauthCallbackEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<OauthCallbackEvent>('oauth-callback', (event) => handler(event.payload));
 }

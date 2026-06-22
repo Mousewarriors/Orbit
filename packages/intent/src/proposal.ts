@@ -39,6 +39,7 @@ export type IntentPlan =
       readonly needsProject: boolean;
     }
   | { readonly kind: 'open-project-folder' }
+  | { readonly kind: 'open-project-in-application' }
   | { readonly kind: 'open-application' }
   | { readonly kind: 'find-files' }
   | { readonly kind: 'find-notes' }
@@ -173,6 +174,18 @@ export function proposeIntent(recognised: RecognisedIntent): IntentProposal {
           title: `Open ${slots.projectQuery ?? 'Project'} Folder`,
           subtitle: 'Reveal the project folder in your file manager',
           icon: 'folder',
+        },
+      };
+    case 'open_project_in_application':
+      return {
+        ...base,
+        plan: { kind: 'open-project-in-application' },
+        display: {
+          title: `Open ${slots.projectQuery ?? 'Project'} in ${
+            slots.applicationQuery ?? 'Application'
+          }`,
+          subtitle: 'Open the resolved project in the resolved application',
+          icon: 'app',
         },
       };
     case 'open_application':

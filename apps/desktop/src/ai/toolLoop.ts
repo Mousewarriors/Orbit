@@ -13,7 +13,7 @@
  * pure (provider + execute + confirm are injected) so it is unit-tested headless.
  */
 import { throwIfAborted, type AiMessage, type AiProvider, type AiToolDef } from '@orbit/ai-runtime';
-import type { ToolRecord } from '@orbit/tool-registry';
+import { validateArgs, type ToolRecord } from '@orbit/tool-registry';
 
 export type ToolCallStatus = 'running' | 'done' | 'error' | 'denied' | 'unknown-tool';
 
@@ -51,10 +51,34 @@ export interface ToolLoopDeps {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * Provider-facing function name for a ToolRecord.
+ *
+ * MCP tool names are only unique within their server. Models, however, receive
+ * one flat function namespace. Include the source/server identity plus a short
+ * deterministic hash so two servers can never shadow one another while keeping
+ * the name inside the conservative `[A-Za-z0-9_-]` subset providers accept.
+ */
+export function providerToolName(record: ToolRecord): string {
+  const identity = `${record.source}:${record.serverId ?? 'orbit'}:${record.id}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < identity.length; i++) {
+    hash ^= identity.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  const suffix = (hash >>> 0).toString(36);
+  const source = record.source.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const server = (record.serverId ?? 'orbit').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const name = record.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const prefix = `orbit_${source}_${server}_`;
+  const maxName = Math.max(1, 64 - prefix.length - suffix.length - 1);
+  return `${prefix}${name.slice(0, maxName)}_${suffix}`;
+}
+
 /** Convert a ToolRecord into the provider's tool definition. */
 export function toolRecordToDef(record: ToolRecord): AiToolDef {
   return {
-    name: record.name,
+    name: providerToolName(record),
     description: record.description || record.title,
     parameters: {
       type: 'object',
@@ -83,7 +107,7 @@ export async function runToolLoop(
 ): Promise<ToolLoopResult> {
   const defs = deps.tools.map(toolRecordToDef);
   const byName = new Map<string, ToolRecord>();
-  for (const t of deps.tools) if (!byName.has(t.name)) byName.set(t.name, t);
+  for (const t of deps.tools) byName.set(providerToolName(t), t);
 
   const convo: AiMessage[] = [...baseMessages];
   const maxRounds = deps.maxRounds ?? DEFAULT_MAX_ROUNDS;
@@ -137,8 +161,20 @@ export async function runToolLoop(
         status: 'running',
       };
 
+      const validated = validateArgs(record.inputSchema, call.arguments);
+      if (!validated.ok) {
+        const message = `Invalid tool arguments: ${validated.errors.join('; ')}`;
+        deps.onCard({ ...base, status: 'error', error: message });
+        convo.push({
+          role: 'tool',
+          toolName: call.name,
+          content: `${message}. Correct the arguments before trying again.`,
+        });
+        continue;
+      }
+
       if (record.requiresConfirmation) {
-        const approved = await deps.confirm(record, call.arguments);
+        const approved = await deps.confirm(record, validated.cleaned);
         if (!approved) {
           deps.onCard({ ...base, status: 'denied' });
           convo.push({
@@ -154,7 +190,7 @@ export async function runToolLoop(
       const started = Date.now();
       let outcome: { ok: boolean; content: string };
       try {
-        outcome = await deps.execute(record, call.arguments);
+        outcome = await deps.execute(record, validated.cleaned);
       } catch (e) {
         outcome = { ok: false, content: e instanceof Error ? e.message : String(e) };
       }

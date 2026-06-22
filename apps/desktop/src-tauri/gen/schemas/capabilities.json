@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"Baseline capability for Orbit's webview windows. Grants the core defaults plus the event-system permissions the renderer needs to subscribe to native push events (AI/HTTP token streaming via the `http-stream` event and Relay session/state events). Custom IPC commands defined by the app are always callable and are not affected by this file.","local":true,"windows":["launcher","settings"],"permissions":["core:default","core:event:default","core:event:allow-listen","core:event:allow-unlisten"]}}

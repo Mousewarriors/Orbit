@@ -38,6 +38,24 @@ pub fn upsert(
     })
 }
 
+/// Persist Relay's discovered display name without marking every scanned
+/// repository as recently opened.
+pub fn catalogue(
+    conn: &Connection,
+    path: &str,
+    name: Option<&str>,
+    now_ms: i64,
+) -> Result<ProjectMeta, rusqlite::Error> {
+    conn.execute(
+        "INSERT INTO project_meta (path, name, created_at, last_opened_at)
+         VALUES (?1, ?2, ?3, 0)
+         ON CONFLICT(path) DO UPDATE SET
+           name = COALESCE(?2, name)",
+        params![path, name, now_ms],
+    )?;
+    get(conn, path)?.ok_or(rusqlite::Error::QueryReturnedNoRows)
+}
+
 pub fn get(conn: &Connection, path: &str) -> Result<Option<ProjectMeta>, rusqlite::Error> {
     let mut stmt = conn.prepare(
         "SELECT path, name, favourite, last_opened_at, preferred_agent,
@@ -75,6 +93,25 @@ pub fn list_favourites(
          ORDER BY last_opened_at DESC",
     )?;
     let rows = stmt.query_map([], row_to_meta)?;
+    rows.collect()
+}
+
+pub fn list_catalogued(
+    conn: &Connection,
+    limit: i64,
+) -> Result<Vec<ProjectMeta>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "SELECT path, name, favourite, last_opened_at, preferred_agent,
+                build_brief, docs_path, preview_url, studio_url, created_at
+         FROM project_meta
+         WHERE name IS NOT NULL
+         ORDER BY
+           CASE WHEN last_opened_at > 0 THEN 0 ELSE 1 END,
+           last_opened_at DESC,
+           name COLLATE NOCASE ASC
+         LIMIT ?1",
+    )?;
+    let rows = stmt.query_map(params![limit], row_to_meta)?;
     rows.collect()
 }
 
@@ -177,6 +214,21 @@ mod tests {
     }
 
     #[test]
+    fn catalogue_persists_name_without_marking_recent() {
+        let conn = setup();
+        let meta = catalogue(&conn, "/scan/project", Some("Orbit"), 100).unwrap();
+        assert_eq!(meta.name.as_deref(), Some("Orbit"));
+        assert_eq!(meta.last_opened_at, 0);
+        assert!(list_recent(&conn, 10).unwrap().is_empty());
+
+        touch(&conn, "/scan/project", 200).unwrap();
+        catalogue(&conn, "/scan/project", Some("Orbit Monorepo"), 300).unwrap();
+        let updated = get(&conn, "/scan/project").unwrap().unwrap();
+        assert_eq!(updated.name.as_deref(), Some("Orbit Monorepo"));
+        assert_eq!(updated.last_opened_at, 200);
+    }
+
+    #[test]
     fn recent_projects_ordered_by_last_opened() {
         let conn = setup();
         upsert(&conn, "/old", Some("Old"), 100).unwrap();
@@ -185,6 +237,16 @@ mod tests {
         assert_eq!(recent.len(), 2);
         assert_eq!(recent[0].path, "/new");
         assert_eq!(recent[1].path, "/old");
+    }
+
+    #[test]
+    fn catalogue_list_includes_scanned_projects() {
+        let conn = setup();
+        catalogue(&conn, "/root", Some("orbit-monorepo"), 100).unwrap();
+        catalogue(&conn, "/root/package", Some("@orbit/package"), 100).unwrap();
+        let projects = list_catalogued(&conn, 10).unwrap();
+        assert_eq!(projects.len(), 2);
+        assert!(projects.iter().any(|project| project.path == "/root"));
     }
 
     #[test]
