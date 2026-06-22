@@ -310,7 +310,7 @@
     },
     {
       "id": "V1-MISSION-003",
-      "ownerSlice": "V1-005",
+      "ownerSlice": "V1-019",
       "status": "pending",
       "verifiedBuild": null,
       "evidence": [],
@@ -508,7 +508,7 @@
     },
     {
       "id": "V1-REL-006",
-      "ownerSlice": "V1-012",
+      "ownerSlice": "V1-018",
       "status": "pending",
       "verifiedBuild": null,
       "evidence": [],

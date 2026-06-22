@@ -124,13 +124,12 @@
       "mode": "vertical",
       "priority": "critical",
       "dependsOn": ["V1-002", "V1-003"],
-      "acceptanceIds": ["V1-MISSION-001", "V1-MISSION-002", "V1-MISSION-003"],
+      "acceptanceIds": ["V1-MISSION-001", "V1-MISSION-002"],
       "verifiesAcceptanceIds": [],
       "deliverables": [
         "append-only mission persistence",
         "state-machine recovery",
         "objective-bearing launch guard",
-        "successful bounded mission journey",
         "verification/final-result records"
       ]
     },
@@ -153,12 +152,29 @@
       ]
     },
     {
-      "id": "V1-007",
+      "id": "V1-019",
       "order": 7,
+      "title": "Approved mission execution and verification journey",
+      "mode": "vertical",
+      "priority": "critical",
+      "dependsOn": ["V1-005", "V1-006"],
+      "acceptanceIds": ["V1-MISSION-003"],
+      "verifiesAcceptanceIds": ["V1-MISSION-001", "V1-APPROVAL-003", "V1-TOOLS-006"],
+      "deliverables": [
+        "objective-to-plan mission flow",
+        "native-bound approved tool execution",
+        "bounded output verification",
+        "honest terminal result",
+        "restart recovery of completed mission"
+      ]
+    },
+    {
+      "id": "V1-007",
+      "order": 8,
       "title": "Objective-aware Continue Project and Relay supervision",
       "mode": "vertical",
       "priority": "critical",
-      "dependsOn": ["V1-004", "V1-005", "V1-006"],
+      "dependsOn": ["V1-004", "V1-019"],
       "acceptanceIds": ["V1-PROJ-002", "V1-PROJ-003", "V1-PROJ-004", "V1-PROJ-005", "V1-PROJ-006"],
       "verifiesAcceptanceIds": ["V1-MISSION-002", "V1-APPROVAL-003"],
       "deliverables": [
@@ -172,7 +188,7 @@
     },
     {
       "id": "V1-008",
-      "order": 8,
+      "order": 9,
       "title": "Quick AI and local provider verification",
       "mode": "vertical",
       "priority": "high",
@@ -189,7 +205,7 @@
     },
     {
       "id": "V1-009",
-      "order": 9,
+      "order": 10,
       "title": "Durable Chat and audited tool calls",
       "mode": "vertical",
       "priority": "high",
@@ -206,7 +222,7 @@
     },
     {
       "id": "V1-010",
-      "order": 10,
+      "order": 11,
       "title": "Production extension safety and incremental indexing",
       "mode": "vertical",
       "priority": "critical",
@@ -224,7 +240,7 @@
     },
     {
       "id": "V1-011",
-      "order": 11,
+      "order": 12,
       "title": "Accessibility, recovery and performance budgets",
       "mode": "vertical",
       "priority": "high",
@@ -241,7 +257,7 @@
     },
     {
       "id": "V1-017",
-      "order": 12,
+      "order": 13,
       "title": "Anthropic real-account provider verification",
       "mode": "vertical",
       "priority": "high",
@@ -256,19 +272,12 @@
     },
     {
       "id": "V1-012",
-      "order": 13,
-      "title": "Windows release lifecycle, final global regression, signing and provenance",
+      "order": 14,
+      "title": "Windows release lifecycle, final global regression and provenance",
       "mode": "vertical",
       "priority": "critical",
       "dependsOn": ["V1-007", "V1-009", "V1-010", "V1-011", "V1-017"],
-      "acceptanceIds": [
-        "V1-REL-002",
-        "V1-REL-003",
-        "V1-REL-004",
-        "V1-REL-005",
-        "V1-REL-006",
-        "V1-REL-007"
-      ],
+      "acceptanceIds": ["V1-REL-002", "V1-REL-003", "V1-REL-004", "V1-REL-005", "V1-REL-007"],
       "verifiesAcceptanceIds": [
         "V1-REL-001",
         "V1-CTX-003",
@@ -285,18 +294,34 @@
         "green release CI",
         "MSI/NSIS lifecycle suite",
         "build diagnostics",
-        "fail-closed signing",
-        "trusted-publisher updater",
+        "fail-closed signing configuration",
         "SHA-256/SBOM/scans"
       ]
     },
     {
+      "id": "V1-018",
+      "order": 15,
+      "title": "Trusted production signing and update verification",
+      "mode": "vertical",
+      "priority": "critical",
+      "dependsOn": ["V1-012"],
+      "acceptanceIds": ["V1-REL-006"],
+      "verifiesAcceptanceIds": ["V1-REL-005", "V1-REL-007"],
+      "deliverables": [
+        "trusted Orbit Authenticode publisher chain",
+        "RFC3161 timestamps on every executable and installer",
+        "protected signing provenance",
+        "wrong/revoked/tampered/replayed/downgraded update rejection",
+        "certificate blocker record when unavailable"
+      ]
+    },
+    {
       "id": "V1-013",
-      "order": 14,
+      "order": 16,
       "title": "Documentation truth pass and clean-machine acceptance",
       "mode": "vertical",
       "priority": "high",
-      "dependsOn": ["V1-012"],
+      "dependsOn": ["V1-018"],
       "acceptanceIds": ["V1-DOC-001"],
       "verifiesAcceptanceIds": ["V1-CORE-001", "V1-REL-003", "V1-REL-004"],
       "deliverables": [
@@ -308,7 +333,7 @@
     },
     {
       "id": "V1-014",
-      "order": 15,
+      "order": 17,
       "title": "Full independent audit pass 1 and finding closure",
       "mode": "audit",
       "priority": "critical",
@@ -324,7 +349,7 @@
     },
     {
       "id": "V1-015",
-      "order": 16,
+      "order": 18,
       "title": "Post-audit rebuild and full regression iteration",
       "mode": "vertical",
       "priority": "critical",
@@ -340,7 +365,7 @@
     },
     {
       "id": "V1-016",
-      "order": 17,
+      "order": 19,
       "title": "Full independent audit pass 2",
       "mode": "audit",
       "priority": "critical",

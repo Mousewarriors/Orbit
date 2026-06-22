@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "contractVersion": "1.0.0",
   "updatedAt": "2026-06-22T15:15:00Z",
+  "releaseAnchor": null,
   "slices": [
     {
       "id": "V1-000",
@@ -146,6 +147,23 @@
       "blocker": null
     },
     {
+      "id": "V1-019",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
       "id": "V1-008",
       "status": "pending",
       "workflow": {
@@ -249,6 +267,23 @@
     },
     {
       "id": "V1-013",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-018",
       "status": "pending",
       "workflow": {
         "implement": "pending",

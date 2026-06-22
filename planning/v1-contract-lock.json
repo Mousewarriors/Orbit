@@ -3,14 +3,16 @@
   "contractVersion": "1.0.0",
   "files": {
     "docs/V1_SCOPE.md": "9020e2da601f5e2dbcaf97f9a2047cb501d5e249b603faefb6424378cf86bfc2",
-    "docs/V1_ACCEPTANCE.md": "4bb9ee63add65cce5d1bb433c7088bb34c9358982bde735d7ce28529d1425345",
-    "docs/V1_CHANGELOG.md": "bf8a5492bede58f951f8bc6633f0386fe029800fe754f157707aed3fc934f038",
-    "planning/v1-backlog.json": "c61946f78cbb6cb578882f755603fcb13bc0cf5b4d3b33026f3154f54935784b",
+    "docs/V1_ACCEPTANCE.md": "fb1c7f25f768b3546bc51a17d807a874cfe326c31c3015b1b8556b83b01a54c6",
+    "docs/V1_CHANGELOG.md": "63442ba8c350e2bc11c914690b39629e571b52c76ff4f274d406a0daa1ceb043",
+    "docs/V1_EVIDENCE_SCHEMA.md": "3e1c97cef86698732e1f156da7ddfd4774c37fbcd647aa84b5960b310a8da24e",
+    "planning/v1-backlog.json": "345ce86c2697c6a1ad55fbb619ed20a9d228cf1a3c7ba24122b85300e98eb474",
     "planning/v1-criteria.json": "31236982e3cddb374eaea81f210c5e6767896631bfd4411608f9d0ad18e1136b",
-    "scripts/v1-contract.mjs": "66b94d5766932ad0f8d2fa4d39dcd7b552b75039b140dcbf651bcb3197345069",
+    "planning/v1-review-authorities.json": "e488ea1facdf4a1ce9746e71444cee73639b2c521536d49bfeec0fb2737bb74f",
+    "scripts/v1-contract.mjs": "4f76ad173d903c427635f5752880872f2ef16cff76ed490508c7d09f6ce75935",
     "scripts/validate-v1-backlog.mjs": "7fdee1be4509cfd2708dcdba58ba4bebea13a3b12853d376afc3c680ca06b6f0",
-    "scripts/validate-v1-contract.test.mjs": "b12747aa5655eac5af09f7b0621194b123f81c524a1a8d4b11feee55ef28c5d5",
+    "scripts/validate-v1-contract.test.mjs": "9f80024179475e2a79a68d88c89efd5b6994c416cccd8afc4f2a3c71947649ad",
     "package.json": "58e61a10162de88d9af8f8d693e26a302c9fa2b4b42fb0ad4fe200e60a002633",
-    ".github/workflows/ci.yml": "a940f5164594462ea51e38b574ff83bfb698ce980cd9fc486a0a2deddd452124"
+    ".github/workflows/ci.yml": "8d6dd6b34a15a388b8ae332c89cff12e467e479d471ece931f32d7fdecabacf0"
   }
 }

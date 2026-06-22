@@ -78,7 +78,7 @@ test('nonexistent reports, artifacts and commits cannot forge passing evidence',
   const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-AI-001');
   item.status = 'pass';
   item.verifiedAt = '2026-06-22T15:00:00Z';
-  item.verifier = 'human:self';
+  item.verifier = 'agent:019eefae-a68e-7c01-a14c-36146ac0b03f';
   item.verifiedBuild = {
     artifact: 'artifacts/invented.msi',
     sha256: 'a'.repeat(64),
@@ -95,6 +95,7 @@ test('nonexistent reports, artifacts and commits cannot forge passing evidence',
       artifact: 'artifacts/invented.msi',
       artifactSha256: 'a'.repeat(64),
       environment: 'invented',
+      signatures: [],
     },
   ];
   const result = validateContract(state);
@@ -152,4 +153,96 @@ test('completed phase evidence must be chronological', async () => {
     });
   }
   assert.match(validateContract(state).errors.join('\n'), /phase evidence is out of order/);
+});
+
+test('evidence paths cannot escape dedicated repository roots', async () => {
+  const state = await loadContract(root);
+  const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-GOV-001');
+  item.status = 'pass';
+  item.verifiedAt = '2026-06-22T15:00:00Z';
+  item.verifier = 'agent:019eefae-a68e-7c01-a14c-36146ac0b03f';
+  item.evidence = [
+    {
+      type: 'automated',
+      commit: 'ad781fa2abb10a1dff45c1498ef56efc8fb82b18',
+      recordedAt: '2026-06-22T15:00:00Z',
+      report: '../outside.json',
+      reportSha256: 'a'.repeat(64),
+      signatures: [],
+    },
+  ];
+  assert.match(validateContract(state).errors.join('\n'), /uses an unsafe path/);
+});
+
+test('prose or schema-free JSON cannot masquerade as a passing report', async () => {
+  const state = await loadContract(root);
+  const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-GOV-001');
+  item.status = 'pass';
+  item.verifiedAt = '2026-06-22T15:00:00Z';
+  item.verifier = 'agent:019eefae-a68e-7c01-a14c-36146ac0b03f';
+  item.evidence = [
+    {
+      type: 'automated',
+      commit: 'ad781fa2abb10a1dff45c1498ef56efc8fb82b18',
+      recordedAt: '2026-06-22T15:00:00Z',
+      report: 'evidence/reports/fake.json',
+      reportSha256: 'a'.repeat(64),
+      signatures: [],
+    },
+  ];
+  state.repository.pathSafety[item.evidence[0].report] = true;
+  state.repository.fileHashes[item.evidence[0].report] = 'a'.repeat(64);
+  state.repository.reports[item.evidence[0].report] = { hello: 'world' };
+  assert.match(
+    validateContract(state).errors.join('\n'),
+    /report is not valid schema-version-1 JSON/,
+  );
+});
+
+test('future timestamps are rejected', async () => {
+  const state = await loadContract(root);
+  const progress = state.progress.slices.find((item) => item.id === 'V1-017');
+  progress.status = 'blocked_external';
+  progress.blocker = {
+    type: 'credential',
+    owner: 'human:simon',
+    proof: 'evidence/blockers/anthropic.json',
+    proofSha256: 'a'.repeat(64),
+    lastChecked: '2099-01-01T00:00:00Z',
+    unblockCondition: 'credential supplied',
+    degradedBehavior: 'Anthropic disabled',
+    attempts: [{ at: '2099-01-01T00:00:00Z', action: 'checked', result: 'missing' }],
+    affectedCriterionIds: ['V1-AI-002'],
+    signatures: [],
+  };
+  state.evidence.criteria.find((item) => item.id === 'V1-AI-002').status = 'blocked_external';
+  assert.match(validateContract(state).errors.join('\n'), /cannot be future-dated/);
+});
+
+test('a slice cannot start before every dependency completes', async () => {
+  const state = await loadContract(root);
+  state.progress.slices.find((item) => item.id === 'V1-001').status = 'in_progress';
+  assert.match(
+    validateContract(state).errors.join('\n'),
+    /V1-001 started before dependency V1-000 completed/,
+  );
+});
+
+test('every slice must remain reachable from V1-000', async () => {
+  const state = await loadContract(root);
+  state.backlog.slices.find((item) => item.id === 'V1-002').dependsOn = [];
+  assert.match(validateContract(state).errors.join('\n'), /V1-002 is disconnected from V1-000/);
+});
+
+test('a final release anchor rejects stale criterion evidence', async () => {
+  const state = await loadContract(root);
+  state.progress.releaseAnchor = {
+    commit: 'ad781fa2abb10a1dff45c1498ef56efc8fb82b18',
+    artifact: 'evidence/artifacts/orbit.msi',
+    sha256: 'a'.repeat(64),
+  };
+  assert.match(
+    validateContract(state).errors.join('\n'),
+    /V1-CORE-001 is not fresh on the final release commit/,
+  );
 });

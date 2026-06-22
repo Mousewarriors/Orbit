@@ -45,3 +45,22 @@ Review-round-2 changes requested by Dewey (architecture), Tesla (security) and
 Boyle (product) are captured in
 `docs/audits/V1_CONTRACT_REVIEW_ROUND_2.md`. A fresh exact-commit review is
 required after these corrections.
+
+## 2026-06-22 - Cryptographic evidence and review round 3 response
+
+- Added Ed25519 reviewer authorities and quorum-signed future enrollment.
+- Replaced identity-shaped review trust with signature verification.
+- Restricted evidence paths to canonical repository roots and rejected
+  symlink/junction escapes.
+- Required schema-validated machine reports, real Windows package magic/build
+  manifests and GitHub OIDC artifact attestation for automated evidence.
+- Enforced future-time rejection, strict phase ordering, dependency completion,
+  Git ancestry and root reachability.
+- Bound owned criteria and reviews to each slice's final commit and all release
+  criteria to the post-audit final release anchor.
+- Split approved mission execution after Approval Centre and isolated
+  certificate-dependent signing into its own late slice.
+- Pinned every GitHub Action to an immutable commit.
+
+The exact-commit findings from Carver, Kuhn and Ampere are recorded in
+`docs/audits/V1_CONTRACT_REVIEW_ROUND_3.md`.

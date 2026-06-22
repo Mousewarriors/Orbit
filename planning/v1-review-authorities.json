@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "algorithm": "Ed25519",
+  "enrollmentQuorum": 2,
+  "authorities": [
+    {
+      "identity": "agent:019eefae-a68e-7c01-a14c-36146ac0b03f",
+      "roles": ["architecture"],
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAU+NjWuHsCdhNpYmHbQNi73QGSJfOdylTheAVBT62B3w=",
+      "sha256Fingerprint": "2e4144128b310069fa0736e101c0fbecb96c09ffffec05b66ca5ab1275e0e358"
+    },
+    {
+      "identity": "agent:019eefae-ba90-7a92-98c8-038062e1a2aa",
+      "roles": ["security"],
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEA3n7MQfdf0TC0jaLi1KX3YZ8vpnkZpkWFVhybN2JMAHc=",
+      "sha256Fingerprint": "080e05a6ebf3b49c15f088dae51aa57db999a81131c275086023c8a60e5ae167"
+    },
+    {
+      "identity": "agent:019eefae-ce72-7f53-af46-cc9fc8e336da",
+      "roles": ["product"],
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAbx0J01fzhaZEjCHM3uHcvlF/x1gLMJD3ofmcd5jnrxI=",
+      "sha256Fingerprint": "589a7d504faa81e3ada2c57d799374abc363a36a162b5ffa31bde5cef1765cb8"
+    }
+  ]
+}

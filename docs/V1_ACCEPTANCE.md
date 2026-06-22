@@ -20,11 +20,13 @@ Evidence policies:
 - `packaged_external` has the packaged requirements and may be
   `blocked_external` only for the locked credential/certificate choices.
 
-Reports and artifacts must exist locally or be represented by a verified CI
-attestation. Reviewers use authenticated `agent:<uuid>`, `human:<id>` or
-`ci:<workflow>` identities and cannot equal the implementer. Passing evidence
-becomes stale when a verifying slice changes the relevant capability and must
-be rerun on the final release commit where the backlog says so.
+Reports are schema-validated JSON under `evidence/reports`; packages are real
+`.msi`/`.exe` files under `evidence/artifacts` with validated magic, build
+manifest and SHA-256. Reviewer attestations use Ed25519 keys in the locked
+authority registry (or quorum-signed later enrollment), and reviewers cannot
+equal the implementer. Every slice binds owned criteria to its final commit.
+Every non-governance/non-audit criterion is rerun against the final release
+anchor after audit-1 remediation.
 
 ## Governance
 

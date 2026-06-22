@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { lstat, readFile, realpath } from 'node:fs/promises';
+import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -113,8 +113,10 @@ const LOCKED_FILES = [
   'docs/V1_SCOPE.md',
   'docs/V1_ACCEPTANCE.md',
   'docs/V1_CHANGELOG.md',
+  'docs/V1_EVIDENCE_SCHEMA.md',
   'planning/v1-backlog.json',
   'planning/v1-criteria.json',
+  'planning/v1-review-authorities.json',
   'scripts/v1-contract.mjs',
   'scripts/validate-v1-backlog.mjs',
   'scripts/validate-v1-contract.test.mjs',
@@ -133,6 +135,31 @@ const REVIEWER_IDENTITY_PATTERN =
   /^(agent:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|human:[A-Za-z0-9._-]+)$/i;
 const FULL_COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
+const ALLOWED_REPORT_ROOT = `evidence${sep}reports${sep}`;
+const ALLOWED_ARTIFACT_ROOT = `evidence${sep}artifacts${sep}`;
+const ALLOWED_BLOCKER_ROOT = `evidence${sep}blockers${sep}`;
+const REQUIRED_SECURITY_CHECKS = {
+  'V1-CTX-003': ['whole-process-capture', 'non-loopback-egress-zero'],
+  'V1-TOOLS-005': ['redirect', 'ssrf-private-address', 'dns-rebinding', 'invalid-tls'],
+  'V1-APPROVAL-003': ['mutation-matrix', 'atomic-nonce', 'replay', 'toctou', 'timeout-deny'],
+  'V1-EXT-001': [
+    'install-hook',
+    'update-hook',
+    'migration',
+    'activation',
+    'native-helper',
+    'persisted-worker',
+  ],
+  'V1-REL-006': [
+    'authenticode-chain',
+    'rfc3161',
+    'wrong-root',
+    'revoked',
+    'tamper',
+    'replay',
+    'downgrade',
+  ],
+};
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
@@ -144,6 +171,79 @@ function isText(value) {
 
 function isTimestamp(value) {
   return isText(value) && !Number.isNaN(Date.parse(value));
+}
+
+function validateTimestamp(value, now, label, errors) {
+  if (!isTimestamp(value)) {
+    errors.push(`${label} requires a valid timestamp`);
+    return null;
+  }
+  const parsed = Date.parse(value);
+  if (parsed > now + 5 * 60 * 1000) errors.push(`${label} cannot be future-dated`);
+  return parsed;
+}
+
+function reviewSignaturePayload(review) {
+  return [
+    'orbit-v1-review-v1',
+    review.reviewer,
+    review.role,
+    review.result,
+    review.reviewedCommit,
+    review.reportSha256,
+    review.artifactSha256 ?? '-',
+    review.reviewedAt,
+    String(review.critical),
+    String(review.high),
+  ].join('\n');
+}
+
+function evidenceSignaturePayload(record, subjectId) {
+  return [
+    'orbit-v1-evidence-v1',
+    subjectId,
+    record.type,
+    record.commit,
+    record.reportSha256,
+    record.artifactSha256 ?? '-',
+    record.recordedAt,
+  ].join('\n');
+}
+
+function enrollmentSignaturePayload(enrollment) {
+  return [
+    'orbit-v1-review-enrollment-v1',
+    enrollment.identity,
+    [...enrollment.roles].sort().join(','),
+    enrollment.publicKeySpkiBase64,
+    enrollment.sha256Fingerprint,
+    enrollment.enrolledAt,
+  ].join('\n');
+}
+
+function blockerSignaturePayload(blocker, sliceId) {
+  return [
+    'orbit-v1-blocker-v1',
+    sliceId,
+    blocker.type,
+    blocker.owner,
+    blocker.proofSha256,
+    blocker.lastChecked,
+    [...(blocker.affectedCriterionIds ?? [])].sort().join(','),
+  ].join('\n');
+}
+
+function verifyAuthoritySignature(authority, payload, signature) {
+  try {
+    const publicKey = createPublicKey({
+      key: Buffer.from(authority.publicKeySpkiBase64, 'base64'),
+      format: 'der',
+      type: 'spki',
+    });
+    return verifySignature(null, Buffer.from(payload), publicKey, Buffer.from(signature, 'base64'));
+  } catch {
+    return false;
+  }
 }
 
 function countOccurrences(text, token) {
@@ -164,12 +264,66 @@ function scanForbiddenKeys(value, path, errors) {
   }
 }
 
+function buildAuthorityMap(authorities, enrollments, now, errors) {
+  const map = new Map();
+  if (authorities.schemaVersion !== 1 || authorities.algorithm !== 'Ed25519') {
+    errors.push('review authority registry has an invalid schema or algorithm');
+  }
+  for (const authority of authorities.authorities ?? []) {
+    if (!REVIEWER_IDENTITY_PATTERN.test(authority.identity ?? '')) {
+      errors.push(`invalid review authority identity ${String(authority.identity)}`);
+      continue;
+    }
+    const keyBytes = Buffer.from(authority.publicKeySpkiBase64 ?? '', 'base64');
+    if (sha256(keyBytes) !== authority.sha256Fingerprint) {
+      errors.push(`${authority.identity} review authority fingerprint mismatch`);
+    }
+    if (!Array.isArray(authority.roles) || authority.roles.length === 0) {
+      errors.push(`${authority.identity} review authority has no roles`);
+    }
+    if (map.has(authority.identity))
+      errors.push(`duplicate review authority ${authority.identity}`);
+    map.set(authority.identity, authority);
+  }
+  if (enrollments.schemaVersion !== 1) errors.push('review enrollment schemaVersion must be 1');
+  for (const enrollment of enrollments.enrollments ?? []) {
+    if (map.has(enrollment.identity)) {
+      errors.push(`review enrollment duplicates authority ${enrollment.identity}`);
+      continue;
+    }
+    validateTimestamp(enrollment.enrolledAt, now, `${enrollment.identity} enrollment`, errors);
+    const keyBytes = Buffer.from(enrollment.publicKeySpkiBase64 ?? '', 'base64');
+    if (sha256(keyBytes) !== enrollment.sha256Fingerprint) {
+      errors.push(`${enrollment.identity} enrollment fingerprint mismatch`);
+    }
+    const validSigners = new Set();
+    const payload = enrollmentSignaturePayload(enrollment);
+    for (const signature of enrollment.signatures ?? []) {
+      const signer = map.get(signature.signer);
+      if (
+        signer &&
+        verifyAuthoritySignature(signer, payload, signature.signature) &&
+        signature.signer !== enrollment.identity
+      ) {
+        validSigners.add(signature.signer);
+      }
+    }
+    if (validSigners.size < authorities.enrollmentQuorum) {
+      errors.push(`${enrollment.identity} enrollment lacks authority quorum`);
+      continue;
+    }
+    map.set(enrollment.identity, enrollment);
+  }
+  return map;
+}
+
 function validateFileClaim(path, digest, repository, label, errors) {
   if (!isText(path) || !SHA256_PATTERN.test(digest ?? '')) {
     errors.push(`${label} requires a path and SHA-256`);
     return;
   }
   const actual = repository.fileHashes[path];
+  if (repository.pathSafety[path] !== true) errors.push(`${label} uses an unsafe path: ${path}`);
   if (!actual) errors.push(`${label} file does not exist: ${path}`);
   else if (actual !== digest.toLowerCase()) errors.push(`${label} SHA-256 mismatch: ${path}`);
 }
@@ -182,11 +336,77 @@ function validateCommit(commit, repository, label, errors) {
   }
 }
 
-function validateEvidenceRecord(record, itemId, repository, errors) {
+function validateEvidenceRecord(record, item, definition, repository, authorityMap, now, errors) {
+  const itemId = item.id;
   if (!EVIDENCE_TYPES.has(record.type)) errors.push(`${itemId} has invalid evidence type`);
   validateCommit(record.commit, repository, `${itemId} evidence`, errors);
-  if (!isTimestamp(record.recordedAt)) errors.push(`${itemId} evidence requires recordedAt`);
+  validateTimestamp(record.recordedAt, now, `${itemId} evidence`, errors);
   validateFileClaim(record.report, record.reportSha256, repository, `${itemId} evidence`, errors);
+  const report = repository.reports[record.report];
+  if (!report || report.schemaVersion !== 1) {
+    errors.push(`${itemId} evidence report is not valid schema-version-1 JSON`);
+  } else {
+    if (report.kind !== record.type || report.status !== 'pass') {
+      errors.push(`${itemId} evidence report kind/status mismatch`);
+    }
+    if (report.commit !== record.commit || report.generatedAt !== record.recordedAt) {
+      errors.push(`${itemId} evidence report commit/timestamp mismatch`);
+    }
+    if (!Array.isArray(report.subjectIds) || !report.subjectIds.includes(itemId)) {
+      errors.push(`${itemId} evidence report does not name the criterion`);
+    }
+    if (
+      !Array.isArray(report.checks) ||
+      report.checks.length === 0 ||
+      report.checks.some((check) => !isText(check.id) || check.status !== 'pass')
+    ) {
+      errors.push(`${itemId} evidence report requires non-empty passing checks`);
+    }
+    for (const checkId of REQUIRED_SECURITY_CHECKS[itemId] ?? []) {
+      if (!report.checks?.some((check) => check.id === checkId && check.status === 'pass')) {
+        errors.push(`${itemId} evidence report is missing required check ${checkId}`);
+      }
+    }
+    if (
+      record.type === 'automated' &&
+      definition.area !== 'governance' &&
+      !/^ci:github-actions:[1-9]\d*$/.test(report.producer ?? '')
+    ) {
+      errors.push(`${itemId} automated report must come from a GitHub Actions run`);
+    }
+    if (record.type === 'automated' && definition.area !== 'governance') {
+      if (
+        !report.ci ||
+        report.ci.repository !== 'Mousewarriors/Orbit' ||
+        !/^https:\/\/github\.com\/Mousewarriors\/Orbit\/actions\/runs\/[1-9]\d*$/.test(
+          report.ci.runUrl ?? '',
+        ) ||
+        report.ci.conclusion !== 'success'
+      ) {
+        errors.push(`${itemId} automated report lacks trusted CI run metadata`);
+      }
+      if (repository.githubAttestations[record.report] !== true) {
+        errors.push(`${itemId} automated report lacks verified GitHub OIDC provenance`);
+      }
+    }
+  }
+  const validSigners = new Set();
+  const payload = evidenceSignaturePayload(record, itemId);
+  for (const signature of record.signatures ?? []) {
+    const authority = authorityMap.get(signature.signer);
+    if (
+      authority &&
+      signature.signer !== 'codex:main' &&
+      verifyAuthoritySignature(authority, payload, signature.signature)
+    ) {
+      validSigners.add(signature.signer);
+    }
+  }
+  const requiredSignatures = definition.area === 'governance' ? 2 : 1;
+  if (validSigners.size < requiredSignatures) {
+    errors.push(`${itemId} evidence lacks ${requiredSignatures} trusted reviewer signature(s)`);
+  }
+  if (!validSigners.has(item.verifier)) errors.push(`${itemId} verifier did not sign its evidence`);
   if (record.type === 'packaged') {
     validateFileClaim(
       record.artifact,
@@ -197,20 +417,39 @@ function validateEvidenceRecord(record, itemId, repository, errors) {
     );
     if (!isText(record.environment))
       errors.push(`${itemId} packaged evidence requires environment`);
+    const artifact = repository.artifacts[record.artifact];
+    if (!artifact?.isWindowsPackage) {
+      errors.push(`${itemId} packaged evidence is not a valid Windows .msi/.exe artifact`);
+    } else if (
+      artifact.manifest?.commit !== record.commit ||
+      artifact.manifest?.sha256 !== record.artifactSha256 ||
+      artifact.manifest?.environment !== record.environment
+    ) {
+      errors.push(`${itemId} package build manifest does not match evidence`);
+    }
+    if (
+      report?.artifact?.path !== record.artifact ||
+      report?.artifact?.sha256 !== record.artifactSha256 ||
+      report?.artifact?.commit !== record.commit
+    ) {
+      errors.push(`${itemId} packaged report does not bind the artifact`);
+    }
   }
 }
 
-function validatePassingEvidence(item, definition, repository, errors) {
+function validatePassingEvidence(item, definition, repository, authorityMap, now, errors) {
   if (item.status !== 'pass') return;
-  if (!isTimestamp(item.verifiedAt)) errors.push(`${item.id} pass requires verifiedAt`);
-  if (!IDENTITY_PATTERN.test(item.verifier ?? '')) {
-    errors.push(`${item.id} pass requires an authenticated verifier identity`);
+  validateTimestamp(item.verifiedAt, now, `${item.id} pass`, errors);
+  if (!authorityMap.has(item.verifier)) {
+    errors.push(`${item.id} pass requires a trusted verifier identity`);
   }
   if (!Array.isArray(item.evidence) || item.evidence.length === 0) {
     errors.push(`${item.id} pass requires evidence`);
     return;
   }
-  item.evidence.forEach((record) => validateEvidenceRecord(record, item.id, repository, errors));
+  item.evidence.forEach((record) =>
+    validateEvidenceRecord(record, item, definition, repository, authorityMap, now, errors),
+  );
   const types = new Set(item.evidence.map((record) => record.type));
   if (definition.evidencePolicy === 'automated' && !types.has('automated')) {
     errors.push(`${item.id} requires automated evidence`);
@@ -248,7 +487,16 @@ function validatePassingEvidence(item, definition, repository, errors) {
   }
 }
 
-function validateBlocker(slice, progress, evidenceById, repository, now, errors) {
+function validateBlocker(
+  slice,
+  progress,
+  definitions,
+  evidenceById,
+  repository,
+  authorityMap,
+  now,
+  errors,
+) {
   const isBlocked =
     progress.status === 'blocked_external' || progress.status === 'blocked_decision';
   if (!isBlocked) {
@@ -274,8 +522,13 @@ function validateBlocker(slice, progress, evidenceById, repository, now, errors)
   if (!IDENTITY_PATTERN.test(blocker.owner ?? ''))
     errors.push(`${slice.id} blocker has invalid owner`);
   validateFileClaim(blocker.proof, blocker.proofSha256, repository, `${slice.id} blocker`, errors);
-  if (!isTimestamp(blocker.lastChecked)) errors.push(`${slice.id} blocker requires lastChecked`);
-  else if (now - Date.parse(blocker.lastChecked) > 7 * 24 * 60 * 60 * 1000) {
+  const checkedAt = validateTimestamp(
+    blocker.lastChecked,
+    now,
+    `${slice.id} blocker lastChecked`,
+    errors,
+  );
+  if (checkedAt !== null && now - checkedAt > 7 * 24 * 60 * 60 * 1000) {
     errors.push(`${slice.id} blocker proof is older than seven days`);
   }
   for (const field of ['unblockCondition', 'degradedBehavior']) {
@@ -285,7 +538,11 @@ function validateBlocker(slice, progress, evidenceById, repository, now, errors)
     errors.push(`${slice.id} blocker requires attempted mitigations`);
   }
   for (const attempt of blocker.attempts ?? []) {
-    if (!isTimestamp(attempt.at) || !isText(attempt.action) || !isText(attempt.result)) {
+    if (
+      validateTimestamp(attempt.at, now, `${slice.id} blocker attempt`, errors) === null ||
+      !isText(attempt.action) ||
+      !isText(attempt.result)
+    ) {
       errors.push(`${slice.id} blocker has an invalid attempt record`);
     }
   }
@@ -302,30 +559,94 @@ function validateBlocker(slice, progress, evidenceById, repository, now, errors)
     if (item?.status !== progress.status) {
       errors.push(`${slice.id} blocker criterion ${id} must have status ${progress.status}`);
     }
+    if (
+      progress.status === 'blocked_external' &&
+      definitions.get(id)?.evidencePolicy !== 'packaged_external'
+    ) {
+      errors.push(`${slice.id} can externally block only packaged_external criteria`);
+    }
+  }
+  const proof = repository.documents[blocker.proof];
+  if (
+    !proof ||
+    proof.schemaVersion !== 1 ||
+    proof.kind !== 'blocker' ||
+    proof.status !== progress.status ||
+    proof.sliceId !== slice.id ||
+    proof.type !== blocker.type ||
+    proof.lastChecked !== blocker.lastChecked ||
+    JSON.stringify([...(proof.affectedCriterionIds ?? [])].sort()) !== JSON.stringify(actual)
+  ) {
+    errors.push(`${slice.id} blocker proof content does not match blocker state`);
+  }
+  const validSigners = new Set();
+  const payload = blockerSignaturePayload(blocker, slice.id);
+  for (const signature of blocker.signatures ?? []) {
+    const authority = authorityMap.get(signature.signer);
+    if (authority && verifyAuthoritySignature(authority, payload, signature.signature)) {
+      validSigners.add(signature.signer);
+    }
+  }
+  if (validSigners.size === 0) {
+    errors.push(`${slice.id} blocker lacks a trusted reviewer signature`);
   }
 }
 
-function validateReview(review, slice, implementerIdentity, repository, errors) {
-  if (!REVIEWER_IDENTITY_PATTERN.test(review.reviewer ?? '')) {
-    errors.push(`${slice.id} review requires an authenticated human/agent reviewer`);
-  }
+function validateReview(review, slice, implementerIdentity, repository, authorityMap, now, errors) {
+  const authority = authorityMap.get(review.reviewer);
+  if (!authority) errors.push(`${slice.id} review requires a trusted reviewer`);
   if (review.reviewer === implementerIdentity)
     errors.push(`${slice.id} reviewer cannot be implementer`);
   if (!isText(review.role) || !['pass', 'changes_requested'].includes(review.result)) {
     errors.push(`${slice.id} review has invalid role/result`);
   }
+  if (authority && !authority.roles.includes(review.role)) {
+    errors.push(`${slice.id} reviewer is not authorized for role ${review.role}`);
+  }
   validateCommit(review.reviewedCommit, repository, `${slice.id} review`, errors);
   validateFileClaim(review.report, review.reportSha256, repository, `${slice.id} review`, errors);
-  if (!isTimestamp(review.reviewedAt)) errors.push(`${slice.id} review requires reviewedAt`);
+  validateTimestamp(review.reviewedAt, now, `${slice.id} review`, errors);
   if (!Number.isInteger(review.critical) || !Number.isInteger(review.high)) {
     errors.push(`${slice.id} review requires integer critical/high counts`);
   }
   if (review.result === 'pass' && (review.critical !== 0 || review.high !== 0)) {
     errors.push(`${slice.id} passing review contains critical/high findings`);
   }
+  const report = repository.documents[review.report];
+  if (
+    !report ||
+    report.schemaVersion !== 1 ||
+    report.kind !== 'review' ||
+    report.reviewer !== review.reviewer ||
+    report.role !== review.role ||
+    report.result !== review.result ||
+    report.reviewedCommit !== review.reviewedCommit ||
+    report.reviewedAt !== review.reviewedAt ||
+    report.critical !== review.critical ||
+    report.high !== review.high ||
+    (review.artifactSha256 ?? null) !== (report.artifactSha256 ?? null) ||
+    !Array.isArray(report.findings)
+  ) {
+    errors.push(`${slice.id} review report content does not match the attestation`);
+  }
+  if (
+    !authority ||
+    !verifyAuthoritySignature(authority, reviewSignaturePayload(review), review.signature ?? '')
+  ) {
+    errors.push(`${slice.id} review signature is invalid`);
+  }
 }
 
-function validateCompletedSlice(slice, progress, evidenceById, repository, errors) {
+function validateCompletedSlice(
+  slice,
+  progress,
+  evidenceById,
+  repository,
+  authorityMap,
+  implementerIdentity,
+  now,
+  errors,
+) {
   if (progress.status !== 'completed') return;
   const requiredPhases = REQUIRED_PHASES[slice.mode] ?? [];
   const phaseEvidence = new Map();
@@ -342,8 +663,23 @@ function validateCompletedSlice(slice, progress, evidenceById, repository, error
       `${slice.id}.${record.phase}`,
       errors,
     );
-    if (!isTimestamp(record.occurredAt))
-      errors.push(`${slice.id}.${record.phase} requires occurredAt`);
+    validateTimestamp(record.occurredAt, now, `${slice.id}.${record.phase}`, errors);
+    const report = repository.documents[record.report];
+    if (
+      !report ||
+      report.schemaVersion !== 1 ||
+      report.kind !== 'phase' ||
+      report.status !== 'pass' ||
+      report.sliceId !== slice.id ||
+      report.phase !== record.phase ||
+      report.commit !== record.commit ||
+      report.generatedAt !== record.occurredAt ||
+      !Array.isArray(report.checks) ||
+      report.checks.length === 0 ||
+      report.checks.some((check) => check.status !== 'pass')
+    ) {
+      errors.push(`${slice.id}.${record.phase} report content is invalid`);
+    }
     if (record.phase === 'package' || record.phase === 'live_verify') {
       validateFileClaim(
         record.artifact,
@@ -352,6 +688,9 @@ function validateCompletedSlice(slice, progress, evidenceById, repository, error
         `${slice.id}.${record.phase}`,
         errors,
       );
+      if (!repository.artifacts[record.artifact]?.isWindowsPackage) {
+        errors.push(`${slice.id}.${record.phase} artifact is not a Windows package`);
+      }
     }
   }
   let lastTime = -Infinity;
@@ -364,14 +703,23 @@ function validateCompletedSlice(slice, progress, evidenceById, repository, error
       continue;
     }
     const time = Date.parse(record.occurredAt);
-    if (time < lastTime) errors.push(`${slice.id} phase evidence is out of order at ${phase}`);
+    if (time <= lastTime) errors.push(`${slice.id} phase evidence is out of order at ${phase}`);
     lastTime = time;
   }
+  const commitEvidence = phaseEvidence.get('commit');
   const passingReviews = (progress.reviews ?? []).filter((review) => review.result === 'pass');
   if (passingReviews.length === 0) errors.push(`${slice.id} completed without a passing review`);
   progress.reviews?.forEach((review) =>
-    validateReview(review, slice, 'codex:main', repository, errors),
+    validateReview(review, slice, implementerIdentity, repository, authorityMap, now, errors),
   );
+  for (const review of passingReviews) {
+    if (review.reviewedCommit !== commitEvidence?.commit) {
+      errors.push(`${slice.id} passing review does not target the final slice commit`);
+    }
+    if (Date.parse(review.reviewedAt) < Date.parse(commitEvidence?.occurredAt)) {
+      errors.push(`${slice.id} passing review predates the final slice commit`);
+    }
+  }
   if (slice.mode === 'audit') {
     const roles = new Set(passingReviews.map((review) => review.role));
     for (const role of REQUIRED_AUDIT_ROLES) {
@@ -380,10 +728,23 @@ function validateCompletedSlice(slice, progress, evidenceById, repository, error
     if (new Set(passingReviews.map((review) => review.reviewer)).size !== passingReviews.length) {
       errors.push(`${slice.id} audit reviewers must be distinct`);
     }
+    const auditCriterion = evidenceById.get(slice.acceptanceIds[0]);
+    for (const review of passingReviews) {
+      if (
+        !SHA256_PATTERN.test(review.artifactSha256 ?? '') ||
+        review.artifactSha256 !== auditCriterion?.verifiedBuild?.sha256
+      ) {
+        errors.push(`${slice.id} audit review is not bound to the audited package`);
+      }
+    }
   }
   for (const id of slice.acceptanceIds ?? []) {
-    if (evidenceById.get(id)?.status !== 'pass') {
+    const criterion = evidenceById.get(id);
+    if (criterion?.status !== 'pass') {
       errors.push(`${slice.id} completed while ${id} is not passing`);
+    }
+    if (!criterion?.evidence?.every((record) => record.commit === commitEvidence?.commit)) {
+      errors.push(`${slice.id} criterion ${id} is not bound to the final slice commit`);
     }
   }
 }
@@ -398,6 +759,8 @@ export function validateContract(state) {
     acceptanceText,
     lock,
     attestation,
+    authorities,
+    enrollments,
     lockedFileHashes,
     repository,
     now = Date.now(),
@@ -407,6 +770,7 @@ export function validateContract(state) {
   scanForbiddenKeys(backlog, 'backlog', errors);
   scanForbiddenKeys(progress, 'progress', errors);
   scanForbiddenKeys(evidence, 'evidence', errors);
+  const authorityMap = buildAuthorityMap(authorities, enrollments, now, errors);
   if (backlog.schemaVersion !== 3) errors.push('backlog schemaVersion must be 3');
   if (progress.schemaVersion !== 1) errors.push('progress schemaVersion must be 1');
   if (definitions.schemaVersion !== 1) errors.push('criteria schemaVersion must be 1');
@@ -420,6 +784,8 @@ export function validateContract(state) {
     evidence.contractVersion,
     lock.contractVersion,
     attestation.contractVersion,
+    authorities.contractVersion,
+    enrollments.contractVersion,
   ]);
   if (versions.size !== 1 || versions.has(undefined))
     errors.push('contractVersion differs across files');
@@ -468,7 +834,14 @@ export function validateContract(state) {
     if (!definitionById.has(item.id))
       errors.push(`evidence references unknown criterion ${item.id}`);
     if (!EVIDENCE_STATUSES.has(item.status)) errors.push(`${item.id} has invalid evidence status`);
-    validatePassingEvidence(item, definitionById.get(item.id) ?? {}, repository, errors);
+    validatePassingEvidence(
+      item,
+      definitionById.get(item.id) ?? {},
+      repository,
+      authorityMap,
+      now,
+      errors,
+    );
     if (item.status === 'pending' && (item.verifiedBuild || item.verifiedAt || item.verifier)) {
       errors.push(`${item.id} pending state contains verification claims`);
     }
@@ -530,8 +903,26 @@ export function validateContract(state) {
     for (const id of slice.verifiesAcceptanceIds ?? []) {
       if (!definitionById.has(id)) errors.push(`${slice.id} verifies unknown criterion ${id}`);
     }
-    validateBlocker(slice, item, evidenceById, repository, now, errors);
-    validateCompletedSlice(slice, item, evidenceById, repository, errors);
+    validateBlocker(
+      slice,
+      item,
+      definitionById,
+      evidenceById,
+      repository,
+      authorityMap,
+      now,
+      errors,
+    );
+    validateCompletedSlice(
+      slice,
+      item,
+      evidenceById,
+      repository,
+      authorityMap,
+      backlog.implementerIdentity,
+      now,
+      errors,
+    );
   }
   for (const id of progressById.keys()) {
     if (!sliceById.has(id)) errors.push(`progress references unknown slice ${id}`);
@@ -551,14 +942,37 @@ export function validateContract(state) {
   }
   for (const slice of slices) {
     const item = progressById.get(slice.id);
+    if (slice.id === 'V1-000' && (slice.dependsOn ?? []).length !== 0) {
+      errors.push('V1-000 must be the unique dependency root');
+    }
+    if (slice.id !== 'V1-000' && (slice.dependsOn ?? []).length === 0) {
+      errors.push(`${slice.id} is disconnected from V1-000`);
+    }
     for (const dependency of slice.dependsOn ?? []) {
       const target = sliceById.get(dependency);
       if (!target) errors.push(`${slice.id} depends on missing ${dependency}`);
       else {
         if (target.order >= slice.order)
           errors.push(`${slice.id} dependency ${dependency} is not earlier`);
-        if (item?.status === 'completed' && progressById.get(dependency)?.status !== 'completed') {
-          errors.push(`${slice.id} completed before dependency ${dependency}`);
+        if (item?.status !== 'pending' && progressById.get(dependency)?.status !== 'completed') {
+          errors.push(`${slice.id} started before dependency ${dependency} completed`);
+        }
+        if (item?.status === 'completed') {
+          const dependencyCommit = (progressById.get(dependency)?.evidence ?? []).find(
+            (record) => record.phase === 'commit',
+          );
+          const sliceCommit = (item.evidence ?? []).find((record) => record.phase === 'commit');
+          const firstPhase = (REQUIRED_PHASES[slice.mode] ?? [])
+            .map((phase) => (item.evidence ?? []).find((record) => record.phase === phase))
+            .find(Boolean);
+          if (
+            !repository.ancestry[`${dependencyCommit?.commit ?? ''}..${sliceCommit?.commit ?? ''}`]
+          ) {
+            errors.push(`${slice.id} final commit is not a descendant of ${dependency}`);
+          }
+          if (Date.parse(firstPhase?.occurredAt) <= Date.parse(dependencyCommit?.occurredAt)) {
+            errors.push(`${slice.id} phase chronology overlaps dependency ${dependency}`);
+          }
         }
       }
     }
@@ -574,6 +988,17 @@ export function validateContract(state) {
         }
       }
     }
+  }
+  const reachesRoot = (id, seen = new Set()) => {
+    if (id === 'V1-000') return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return (sliceById.get(id)?.dependsOn ?? []).some((dependency) =>
+      reachesRoot(dependency, new Set(seen)),
+    );
+  };
+  for (const slice of slices) {
+    if (!reachesRoot(slice.id)) errors.push(`${slice.id} is not reachable from V1-000`);
   }
   const active = [...progressById.values()].filter(
     (item) => item.status === 'in_progress' || item.status === 'review',
@@ -656,6 +1081,8 @@ export function validateContract(state) {
         { id: 'contract-attestation' },
         backlog.implementerIdentity,
         repository,
+        authorityMap,
+        now,
         errors,
       );
       if (review.result === 'pass') roles.add(review.role);
@@ -676,6 +1103,49 @@ export function validateContract(state) {
     errors.push('V1-000 cannot complete before exact-commit independent attestation');
   }
 
+  const releaseAnchor = progress.releaseAnchor;
+  if (releaseAnchor !== null) {
+    validateCommit(releaseAnchor.commit, repository, 'release anchor', errors);
+    validateFileClaim(
+      releaseAnchor.artifact,
+      releaseAnchor.sha256,
+      repository,
+      'release anchor',
+      errors,
+    );
+    if (!repository.artifacts[releaseAnchor.artifact]?.isWindowsPackage) {
+      errors.push('release anchor is not a valid Windows package');
+    }
+    const remediationCommit = (progressById.get('V1-015')?.evidence ?? []).find(
+      (record) => record.phase === 'commit',
+    );
+    if (
+      progressById.get('V1-015')?.status !== 'completed' ||
+      remediationCommit?.commit !== releaseAnchor.commit
+    ) {
+      errors.push('release anchor must be the completed V1-015 rebuild commit');
+    }
+    for (const [id, definition] of definitionById) {
+      if (definition.area === 'governance' || definition.area === 'audit') continue;
+      const item = evidenceById.get(id);
+      if (
+        item?.status !== 'pass' ||
+        !item.evidence?.every((record) => record.commit === releaseAnchor.commit)
+      ) {
+        errors.push(`${id} is not fresh on the final release commit`);
+      }
+      if (
+        definition.evidencePolicy.includes('packaged') &&
+        item?.verifiedBuild?.sha256 !== releaseAnchor.sha256
+      ) {
+        errors.push(`${id} is not verified against the final release package`);
+      }
+    }
+  }
+  if (audit2?.status === 'pass' && releaseAnchor === null) {
+    errors.push('audit pass 2 requires a final release anchor');
+  }
+
   const criteriaPassing =
     ledger.length === definitionById.size && ledger.every((item) => item.status === 'pass');
   const slicesCompleted =
@@ -686,6 +1156,7 @@ export function validateContract(state) {
   const complete =
     errors.length === 0 &&
     attestation.status === 'pass' &&
+    releaseAnchor !== null &&
     criteriaPassing &&
     slicesCompleted &&
     auditsClean;
@@ -715,6 +1186,84 @@ async function hashPath(root, relativePath) {
     return sha256(await readFile(resolve(root, relativePath)));
   } catch {
     return null;
+  }
+}
+
+function normalizeEvidencePath(relativePath) {
+  if (!isText(relativePath) || isAbsolute(relativePath)) return null;
+  const normalized = relativePath.replace(/[\\/]+/g, sep);
+  if (normalized.split(sep).includes('..')) return null;
+  if (
+    !normalized.startsWith(ALLOWED_REPORT_ROOT) &&
+    !normalized.startsWith(ALLOWED_ARTIFACT_ROOT) &&
+    !normalized.startsWith(ALLOWED_BLOCKER_ROOT)
+  ) {
+    return null;
+  }
+  return normalized;
+}
+
+async function inspectClaimedPath(root, claimedPath) {
+  const normalized = normalizeEvidencePath(claimedPath);
+  if (!normalized) return { safe: false, hash: null, document: null, artifact: null };
+  const absoluteRoot = await realpath(root);
+  const absolute = resolve(root, normalized);
+  const relativeToRoot = relative(absoluteRoot, absolute);
+  if (relativeToRoot.startsWith('..') || isAbsolute(relativeToRoot)) {
+    return { safe: false, hash: null, document: null, artifact: null };
+  }
+  try {
+    const info = await lstat(absolute);
+    if (!info.isFile() || info.isSymbolicLink()) {
+      return { safe: false, hash: null, document: null, artifact: null };
+    }
+    const actual = await realpath(absolute);
+    const actualRelative = relative(absoluteRoot, actual);
+    if (actualRelative.startsWith('..') || isAbsolute(actualRelative)) {
+      return { safe: false, hash: null, document: null, artifact: null };
+    }
+    const bytes = await readFile(actual);
+    let document = null;
+    if (
+      normalized.startsWith(ALLOWED_REPORT_ROOT) ||
+      normalized.startsWith(ALLOWED_BLOCKER_ROOT) ||
+      extname(normalized).toLowerCase() === '.json'
+    ) {
+      try {
+        document = JSON.parse(bytes.toString('utf8'));
+      } catch {
+        document = null;
+      }
+    }
+    let artifact = null;
+    if (normalized.startsWith(ALLOWED_ARTIFACT_ROOT)) {
+      const extension = extname(normalized).toLowerCase();
+      const isExe = extension === '.exe' && bytes[0] === 0x4d && bytes[1] === 0x5a;
+      const msiMagic = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+      const isMsi = extension === '.msi' && bytes.subarray(0, 8).equals(msiMagic);
+      let manifest = null;
+      const manifestPath = `${absolute}.manifest.json`;
+      try {
+        const manifestInfo = await lstat(manifestPath);
+        if (manifestInfo.isFile() && !manifestInfo.isSymbolicLink()) {
+          manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+        }
+      } catch {
+        manifest = null;
+      }
+      artifact = {
+        isWindowsPackage: isExe || isMsi,
+        manifest:
+          manifest?.schemaVersion === 1 &&
+          ['exe', 'msi'].includes(manifest.packageType) &&
+          manifest.packageType === extension.slice(1)
+            ? manifest
+            : null,
+      };
+    }
+    return { safe: true, hash: sha256(bytes), document, artifact };
+  } catch {
+    return { safe: true, hash: null, document: null, artifact: null };
   }
 }
 
@@ -749,6 +1298,7 @@ function collectClaimedCommits(progress, evidence, attestation) {
       if (review.reviewedCommit) commits.add(review.reviewedCommit);
   }
   if (attestation.reviewedCommit) commits.add(attestation.reviewedCommit);
+  if (progress.releaseAnchor?.commit) commits.add(progress.releaseAnchor.commit);
   for (const review of attestation.reviews ?? []) {
     if (review.reviewedCommit) commits.add(review.reviewedCommit);
   }
@@ -765,6 +1315,8 @@ export async function loadContract(root) {
     acceptanceText: 'docs/V1_ACCEPTANCE.md',
     lock: 'planning/v1-contract-lock.json',
     attestation: 'planning/v1-review-attestation.json',
+    authorities: 'planning/v1-review-authorities.json',
+    enrollments: 'planning/v1-review-enrollments.json',
   };
   const entries = await Promise.all(
     Object.entries(paths).map(async ([key, relativePath]) => [
@@ -782,14 +1334,49 @@ export async function loadContract(root) {
     acceptanceText: raw.acceptanceText,
     lock: JSON.parse(raw.lock),
     attestation: JSON.parse(raw.attestation),
+    authorities: JSON.parse(raw.authorities),
+    enrollments: JSON.parse(raw.enrollments),
   };
   const lockedFileHashes = Object.fromEntries(
     await Promise.all(LOCKED_FILES.map(async (file) => [file, await hashPath(root, file)])),
   );
   const claimedPaths = collectClaimedPaths(parsed.progress, parsed.evidence, parsed.attestation);
-  const fileHashes = Object.fromEntries(
-    await Promise.all([...claimedPaths].map(async (file) => [file, await hashPath(root, file)])),
+  if (parsed.progress.releaseAnchor?.artifact) {
+    claimedPaths.add(parsed.progress.releaseAnchor.artifact);
+  }
+  const inspectedEntries = await Promise.all(
+    [...claimedPaths].map(async (file) => [file, await inspectClaimedPath(root, file)]),
   );
+  const fileHashes = Object.fromEntries(
+    inspectedEntries.map(([file, result]) => [file, result.hash]),
+  );
+  const pathSafety = Object.fromEntries(
+    inspectedEntries.map(([file, result]) => [file, result.safe]),
+  );
+  const documents = Object.fromEntries(
+    inspectedEntries.map(([file, result]) => [file, result.document]),
+  );
+  const artifacts = Object.fromEntries(
+    inspectedEntries.map(([file, result]) => [file, result.artifact]),
+  );
+  const githubAttestations = {};
+  for (const [file, result] of inspectedEntries) {
+    if (
+      result.document?.kind === 'automated' &&
+      /^ci:github-actions:[1-9]\d*$/.test(result.document.producer ?? '')
+    ) {
+      try {
+        await execFileAsync(
+          'gh',
+          ['attestation', 'verify', resolve(root, file), '--repo', 'Mousewarriors/Orbit'],
+          { cwd: root, maxBuffer: 16 * 1024 * 1024 },
+        );
+        githubAttestations[file] = true;
+      } catch {
+        githubAttestations[file] = false;
+      }
+    }
+  }
   const { stdout: commitOutput } = await git(root, ['rev-list', '--all']);
   const commits = commitOutput
     .trim()
@@ -848,6 +1435,11 @@ export async function loadContract(root) {
     repository: {
       commits,
       fileHashes,
+      pathSafety,
+      reports: documents,
+      documents,
+      artifacts,
+      githubAttestations,
       ancestry,
       lockedAtReviewedCommit,
       lockAtReviewedCommit,
