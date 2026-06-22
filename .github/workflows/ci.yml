@@ -18,6 +18,10 @@ jobs:
   js:
     name: JS — lint, typecheck, test, build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -30,6 +34,11 @@ jobs:
       - run: npm run typecheck --workspaces --if-present
       - run: npm test
       - run: npm run build:vite --workspace @orbit/desktop
+      - name: Attest machine-readable evidence reports
+        if: github.event_name == 'push' && hashFiles('evidence/reports/**/*.json') != ''
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
+        with:
+          subject-path: evidence/reports/**/*.json
 
   rust-libs:
     name: Rust — cross-platform library crates
@@ -44,6 +53,10 @@ jobs:
   windows-desktop:
     name: Windows — full workspace check
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -55,3 +68,10 @@ jobs:
       - run: npm ci
       - name: Build production Windows desktop bundles
         run: npm run build --workspace @orbit/desktop
+      - name: Attest Windows packages
+        if: github.event_name == 'push'
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
+        with:
+          subject-path: |
+            target/release/bundle/**/*.msi
+            target/release/bundle/**/*.exe

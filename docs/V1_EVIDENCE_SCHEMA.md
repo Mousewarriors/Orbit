@@ -34,8 +34,11 @@ are rejected.
 ```
 
 Non-governance automated reports require verifiable GitHub artifact
-attestation/OIDC provenance. Security-critical criteria also require the
-specific negative-test IDs encoded by the validator.
+attestation/OIDC provenance bound to the exact source commit, locked CI
+workflow and a GitHub-hosted runner. Security-critical criteria also require
+the specific negative-test IDs encoded by the validator. Each negative check
+records its target, input SHA-256, observed result and a hashed raw-evidence
+file; boolean labels alone are rejected.
 
 Packaged reports use `"kind": "packaged"` and add:
 
@@ -61,6 +64,11 @@ The artifact must have Windows package magic and a sidecar manifest:
   "environment": "Windows 11 x64; WebView2 <version>"
 }
 ```
+
+The validator parses PE section layout or MSI compound-file structure, requires
+the commit/version inside the package, signs the manifest digest and
+environment as part of criterion evidence, and verifies GitHub OIDC provenance
+for the package against the exact source commit.
 
 ## Review report
 
@@ -88,6 +96,11 @@ authorities.
 Passing severity counts are derived from unresolved structured findings. The
 implementer uses a separate locked key and signs each completed slice commit, so
 reviewer independence is checked by key fingerprint.
+
+For audit slices, every critical/high finding from every review remains blocking
+until the original reviewer signs a structured closure tied to a descendant
+remediation commit and passing closure evidence. A separate clean review cannot
+hide another review's open finding.
 
 ## Slice phase report
 

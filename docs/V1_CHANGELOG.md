@@ -93,3 +93,25 @@ window ended. Their public keys were replaced before activation with a fresh
 architecture, security and product panel. No prior failed review was converted
 into a pass, and the replacement panel must review and sign the new exact
 commit.
+
+## 2026-06-22 - Review round 5 trust-edge response
+
+- Canonicalized Ed25519 SPKI before fingerprinting to prevent trailing-byte key
+  aliases.
+- Required criterion evidence signatures from roles appropriate to each
+  acceptance area.
+- Required the final V1-000 commit to descend from the independently reviewed
+  contract commit.
+- Made all critical/high findings across every audit review blocking until the
+  original reviewer signs a descendant-commit closure with evidence.
+- Required criterion evidence to follow the claimed Git commit and verification
+  to follow its evidence.
+- Required all final-release reruns to precede audit pass 2 and its reviews.
+- Strengthened PE/MSI structural parsing and required source-commit-bound GitHub
+  OIDC provenance for reports and packages.
+- Added locked CI artifact attestation generation and exact signer workflow,
+  source digest and GitHub-hosted-runner verification.
+- Required structured security telemetry plus hashed raw evidence.
+
+The findings are recorded in
+`docs/audits/V1_CONTRACT_REVIEW_ROUND_5.md`.

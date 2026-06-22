@@ -168,14 +168,45 @@ const REQUIRED_SECURITY_CHECKS = {
     'downgrade',
   ],
 };
+const EVIDENCE_ROLES_BY_AREA = {
+  governance: ['architecture', 'security'],
+  core: ['product'],
+  natural_language: ['product'],
+  projects: ['product'],
+  ai: ['product'],
+  privacy: ['security'],
+  chat: ['product'],
+  missions: ['architecture'],
+  tools: ['security'],
+  approvals: ['security'],
+  extensions: ['security'],
+  quality: ['product'],
+  release: ['security'],
+  documentation: ['product'],
+  audit: ['architecture'],
+};
 
-function validateSecurityCheck(itemId, check, errors) {
+function validateSecurityCheck(itemId, check, repository, errors) {
   if (!(REQUIRED_SECURITY_CHECKS[itemId] ?? []).includes(check.id)) return;
   const details = check.details;
   if (!details || typeof details !== 'object') {
     errors.push(`${itemId} check ${check.id} requires structured details`);
     return;
   }
+  if (
+    !isText(details.target) ||
+    !SHA256_PATTERN.test(details.inputSha256 ?? '') ||
+    !isText(details.observed)
+  ) {
+    errors.push(`${itemId} check ${check.id} lacks target/input/observed details`);
+  }
+  validateFileClaim(
+    details.rawEvidencePath,
+    details.rawEvidenceSha256,
+    repository,
+    `${itemId} check ${check.id}`,
+    errors,
+  );
   if (itemId === 'V1-CTX-003' && check.id === 'whole-process-capture') {
     if (
       !Array.isArray(details.processes) ||
@@ -308,6 +339,18 @@ function blockerSignaturePayload(blocker, sliceId) {
   return ['orbit-v1-blocker-v1', sliceId, canonicalJson(unsigned)].join('\n');
 }
 
+function closureSignaturePayload(closure) {
+  return [
+    'orbit-v1-finding-closure-v1',
+    closure.findingId,
+    closure.reviewReportSha256,
+    closure.reviewer,
+    closure.remediationCommit,
+    closure.closedAt,
+    closure.evidenceReportSha256,
+  ].join('\n');
+}
+
 function implementerSignaturePayload(attestation) {
   return [
     'orbit-v1-implementation-v1',
@@ -360,7 +403,19 @@ function buildAuthorityMap(authorities, enrollments, now, errors) {
       continue;
     }
     const keyBytes = Buffer.from(authority.publicKeySpkiBase64 ?? '', 'base64');
-    if (sha256(keyBytes) !== authority.sha256Fingerprint) {
+    let canonicalKey = null;
+    try {
+      canonicalKey = createPublicKey({ key: keyBytes, format: 'der', type: 'spki' }).export({
+        format: 'der',
+        type: 'spki',
+      });
+    } catch {
+      errors.push(`${authority.identity} review authority key is invalid`);
+    }
+    if (!canonicalKey?.equals(keyBytes)) {
+      errors.push(`${authority.identity} review authority key is not canonical DER`);
+    }
+    if (sha256(canonicalKey ?? keyBytes) !== authority.sha256Fingerprint) {
       errors.push(`${authority.identity} review authority fingerprint mismatch`);
     }
     if (fingerprints.has(authority.sha256Fingerprint)) {
@@ -382,7 +437,19 @@ function buildAuthorityMap(authorities, enrollments, now, errors) {
     }
     validateTimestamp(enrollment.enrolledAt, now, `${enrollment.identity} enrollment`, errors);
     const keyBytes = Buffer.from(enrollment.publicKeySpkiBase64 ?? '', 'base64');
-    if (sha256(keyBytes) !== enrollment.sha256Fingerprint) {
+    let canonicalKey = null;
+    try {
+      canonicalKey = createPublicKey({ key: keyBytes, format: 'der', type: 'spki' }).export({
+        format: 'der',
+        type: 'spki',
+      });
+    } catch {
+      errors.push(`${enrollment.identity} enrollment key is invalid`);
+    }
+    if (!canonicalKey?.equals(keyBytes)) {
+      errors.push(`${enrollment.identity} enrollment key is not canonical DER`);
+    }
+    if (sha256(canonicalKey ?? keyBytes) !== enrollment.sha256Fingerprint) {
       errors.push(`${enrollment.identity} enrollment fingerprint mismatch`);
     }
     if (fingerprints.has(enrollment.sha256Fingerprint)) {
@@ -422,7 +489,19 @@ function buildImplementerAttestationMap(authority, attestations, repository, now
     return map;
   }
   const keyBytes = Buffer.from(authority.publicKeySpkiBase64 ?? '', 'base64');
-  if (sha256(keyBytes) !== authority.sha256Fingerprint) {
+  let canonicalKey = null;
+  try {
+    canonicalKey = createPublicKey({ key: keyBytes, format: 'der', type: 'spki' }).export({
+      format: 'der',
+      type: 'spki',
+    });
+  } catch {
+    errors.push('implementer authority key is invalid');
+  }
+  if (!canonicalKey?.equals(keyBytes)) {
+    errors.push('implementer authority key is not canonical DER');
+  }
+  if (sha256(canonicalKey ?? keyBytes) !== authority.sha256Fingerprint) {
     errors.push('implementer authority fingerprint mismatch');
   }
   if (attestations.schemaVersion !== 1) {
@@ -504,7 +583,9 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
         errors.push(`${itemId} evidence report is missing required check ${checkId}`);
       }
     }
-    for (const check of report.checks ?? []) validateSecurityCheck(itemId, check, errors);
+    for (const check of report.checks ?? []) {
+      validateSecurityCheck(itemId, check, repository, errors);
+    }
     if (
       record.type === 'automated' &&
       definition.area !== 'governance' &&
@@ -534,6 +615,7 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
     }
   }
   const validSigners = new Set();
+  const validSignerRoles = new Set();
   const payload = evidenceSignaturePayload(record, itemId);
   for (const signature of record.signatures ?? []) {
     const authority = authorityMap.get(signature.signer);
@@ -543,11 +625,18 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
       verifyAuthoritySignature(authority, payload, signature.signature)
     ) {
       validSigners.add(signature.signer);
+      for (const role of authority.roles ?? []) validSignerRoles.add(role);
     }
   }
-  const requiredSignatures = definition.area === 'governance' ? 2 : 1;
+  const requiredRoles = EVIDENCE_ROLES_BY_AREA[definition.area] ?? [];
+  const requiredSignatures = requiredRoles.length;
   if (validSigners.size < requiredSignatures) {
     errors.push(`${itemId} evidence lacks ${requiredSignatures} trusted reviewer signature(s)`);
+  }
+  for (const role of requiredRoles) {
+    if (!validSignerRoles.has(role)) {
+      errors.push(`${itemId} evidence lacks a trusted ${role} signature`);
+    }
   }
   if (!validSigners.has(item.verifier)) errors.push(`${itemId} verifier did not sign its evidence`);
   if (record.type === 'packaged') {
@@ -572,6 +661,9 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
     ) {
       errors.push(`${itemId} package build manifest does not match evidence`);
     }
+    if (repository.githubAttestations[record.artifact] !== true) {
+      errors.push(`${itemId} package lacks source-bound GitHub OIDC provenance`);
+    }
     if (
       report?.artifact?.path !== record.artifact ||
       report?.artifact?.sha256 !== record.artifactSha256 ||
@@ -585,7 +677,7 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
 
 function validatePassingEvidence(item, definition, repository, authorityMap, now, errors) {
   if (item.status !== 'pass') return;
-  validateTimestamp(item.verifiedAt, now, `${item.id} pass`, errors);
+  const verifiedAt = validateTimestamp(item.verifiedAt, now, `${item.id} pass`, errors);
   if (!authorityMap.has(item.verifier)) {
     errors.push(`${item.id} pass requires a trusted verifier identity`);
   }
@@ -596,6 +688,16 @@ function validatePassingEvidence(item, definition, repository, authorityMap, now
   item.evidence.forEach((record) =>
     validateEvidenceRecord(record, item, definition, repository, authorityMap, now, errors),
   );
+  for (const record of item.evidence) {
+    const recordedAt = Date.parse(record.recordedAt);
+    const committedAt = repository.commitTimes[record.commit];
+    if (!Number.isFinite(committedAt) || recordedAt < committedAt) {
+      errors.push(`${item.id} evidence predates its claimed commit`);
+    }
+    if (verifiedAt !== null && verifiedAt < recordedAt) {
+      errors.push(`${item.id} verification predates its evidence`);
+    }
+  }
   const types = new Set(item.evidence.map((record) => record.type));
   if (definition.evidencePolicy === 'automated' && !types.has('automated')) {
     errors.push(`${item.id} requires automated evidence`);
@@ -909,6 +1011,64 @@ function validateCompletedSlice(
         .size !== passingReviews.length
     ) {
       errors.push(`${slice.id} audit reviewers must be distinct`);
+    }
+    const findings = new Map();
+    for (const review of progress.reviews ?? []) {
+      const report = repository.documents[review.report];
+      for (const finding of report?.findings ?? []) {
+        const key = `${review.reportSha256}:${finding.id}`;
+        if (findings.has(key)) errors.push(`${slice.id} contains duplicate finding ${key}`);
+        findings.set(key, { finding, review });
+      }
+    }
+    const validClosures = new Set();
+    for (const closure of progress.findingClosures ?? []) {
+      const key = `${closure.reviewReportSha256}:${closure.findingId}`;
+      const source = findings.get(key);
+      if (!source) {
+        errors.push(`${slice.id} closure references unknown finding ${key}`);
+        continue;
+      }
+      const authority = authorityMap.get(closure.reviewer);
+      validateCommit(closure.remediationCommit, repository, `${slice.id} finding closure`, errors);
+      validateTimestamp(closure.closedAt, now, `${slice.id} finding closure`, errors);
+      validateFileClaim(
+        closure.evidenceReport,
+        closure.evidenceReportSha256,
+        repository,
+        `${slice.id} finding closure`,
+        errors,
+      );
+      const closureReport = repository.documents[closure.evidenceReport];
+      if (
+        closure.reviewer !== source.review.reviewer ||
+        !authority ||
+        !verifyAuthoritySignature(
+          authority,
+          closureSignaturePayload(closure),
+          closure.signature ?? '',
+        ) ||
+        !repository.ancestry[`${source.review.reviewedCommit}..${closure.remediationCommit}`] ||
+        Date.parse(closure.closedAt) <= Date.parse(source.review.reviewedAt) ||
+        closureReport?.schemaVersion !== 1 ||
+        closureReport?.kind !== 'finding-closure' ||
+        closureReport?.status !== 'pass' ||
+        closureReport?.findingId !== closure.findingId ||
+        closureReport?.reviewReportSha256 !== closure.reviewReportSha256 ||
+        closureReport?.remediationCommit !== closure.remediationCommit ||
+        !Array.isArray(closureReport?.checks) ||
+        closureReport.checks.length === 0 ||
+        closureReport.checks.some((check) => check.status !== 'pass')
+      ) {
+        errors.push(`${slice.id} finding closure ${key} is invalid`);
+      } else {
+        validClosures.add(key);
+      }
+    }
+    for (const [key, { finding }] of findings) {
+      if (['critical', 'high'].includes(finding.severity) && !validClosures.has(key)) {
+        errors.push(`${slice.id} has unresolved ${finding.severity} finding ${key}`);
+      }
     }
     const auditCriterion = evidenceById.get(slice.acceptanceIds[0]);
     for (const review of passingReviews) {
@@ -1332,6 +1492,17 @@ export function validateContract(state) {
   if (progressById.get('V1-000')?.status === 'completed' && attestation.status !== 'pass') {
     errors.push('V1-000 cannot complete before exact-commit independent attestation');
   }
+  if (progressById.get('V1-000')?.status === 'completed') {
+    const rootCommit = (progressById.get('V1-000')?.evidence ?? []).find(
+      (record) => record.phase === 'commit',
+    )?.commit;
+    if (
+      rootCommit !== attestation.reviewedCommit &&
+      !repository.ancestry[`${attestation.reviewedCommit}..${rootCommit}`]
+    ) {
+      errors.push('V1-000 final commit is not descended from the reviewed contract commit');
+    }
+  }
 
   if (releaseEvidence.schemaVersion !== 1) {
     errors.push('release evidence schemaVersion must be 1');
@@ -1409,6 +1580,20 @@ export function validateContract(state) {
       ) {
         errors.push(`${id} is not verified against the final release package`);
       }
+    }
+    const releaseTimes = [...releaseById.values()].flatMap((item) => [
+      Date.parse(item.verifiedAt),
+      ...(item.evidence ?? []).map((record) => Date.parse(record.recordedAt)),
+    ]);
+    const latestReleaseTime = Math.max(...releaseTimes);
+    if (
+      audit2?.status === 'pass' &&
+      (Date.parse(audit2.verifiedAt) <= latestReleaseTime ||
+        (progressById.get('V1-016')?.reviews ?? [])
+          .filter((review) => review.result === 'pass')
+          .some((review) => Date.parse(review.reviewedAt) <= latestReleaseTime))
+    ) {
+      errors.push('audit pass 2 must occur after every final release verification');
     }
     if (audit1?.status === 'pass' && audit1.verifiedBuild?.sha256 === releaseAnchor.sha256) {
       errors.push('audit pass 1 must precede and differ from the final release package');
@@ -1527,27 +1712,69 @@ async function inspectClaimedPath(root, claimedPath) {
     if (normalized.startsWith(ALLOWED_ARTIFACT_ROOT)) {
       const extension = extname(normalized).toLowerCase();
       let isExe = false;
-      if (extension === '.exe' && bytes.length >= 1024 && bytes[0] === 0x4d && bytes[1] === 0x5a) {
+      if (
+        extension === '.exe' &&
+        bytes.length >= 65_536 &&
+        bytes[0] === 0x4d &&
+        bytes[1] === 0x5a
+      ) {
         const peOffset = bytes.readUInt32LE(0x3c);
         if (peOffset >= 0x40 && peOffset + 26 < bytes.length) {
           const machine = bytes.readUInt16LE(peOffset + 4);
           const sections = bytes.readUInt16LE(peOffset + 6);
+          const optionalHeaderSize = bytes.readUInt16LE(peOffset + 20);
           const optionalMagic = bytes.readUInt16LE(peOffset + 24);
+          const sectionTable = peOffset + 24 + optionalHeaderSize;
+          const entryRva = bytes.readUInt32LE(peOffset + 24 + 16);
+          let sectionLayoutValid =
+            sections >= 2 &&
+            sections <= 96 &&
+            optionalHeaderSize >= 0x60 &&
+            sectionTable + sections * 40 <= bytes.length;
+          let entryMapped = false;
+          for (let index = 0; sectionLayoutValid && index < sections; index += 1) {
+            const offset = sectionTable + index * 40;
+            const virtualSize = bytes.readUInt32LE(offset + 8);
+            const virtualAddress = bytes.readUInt32LE(offset + 12);
+            const rawSize = bytes.readUInt32LE(offset + 16);
+            const rawPointer = bytes.readUInt32LE(offset + 20);
+            if (rawSize > 0 && (rawPointer < 512 || rawPointer + rawSize > bytes.length)) {
+              sectionLayoutValid = false;
+            }
+            if (
+              entryRva >= virtualAddress &&
+              entryRva < virtualAddress + Math.max(virtualSize, rawSize)
+            ) {
+              entryMapped = true;
+            }
+          }
           isExe =
             bytes.subarray(peOffset, peOffset + 4).equals(Buffer.from('PE\0\0')) &&
             [0x14c, 0x8664, 0xaa64].includes(machine) &&
-            sections > 0 &&
-            [0x10b, 0x20b].includes(optionalMagic);
+            [0x10b, 0x20b].includes(optionalMagic) &&
+            sectionLayoutValid &&
+            entryMapped;
         }
       }
       const msiMagic = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+      const sectorShift = bytes.length >= 34 ? bytes.readUInt16LE(0x1e) : 0;
+      const sectorSize = 2 ** sectorShift;
+      const fatSectors = bytes.length >= 48 ? bytes.readUInt32LE(0x2c) : 0;
+      const firstDirectorySector = bytes.length >= 52 ? bytes.readUInt32LE(0x30) : 0xffffffff;
+      const firstFatSector = bytes.length >= 80 ? bytes.readUInt32LE(0x4c) : 0xffffffff;
+      const sectorCount = sectorSize > 0 ? bytes.length / sectorSize - 1 : 0;
       const isMsi =
         extension === '.msi' &&
-        bytes.length >= 512 &&
+        bytes.length >= 4096 &&
         bytes.subarray(0, 8).equals(msiMagic) &&
         bytes.readUInt16LE(0x1c) === 0xfffe &&
-        [9, 12].includes(bytes.readUInt16LE(0x1e)) &&
-        bytes.readUInt16LE(0x20) === 6;
+        [9, 12].includes(sectorShift) &&
+        bytes.readUInt16LE(0x20) === 6 &&
+        bytes.length % sectorSize === 0 &&
+        fatSectors > 0 &&
+        fatSectors < sectorCount &&
+        firstDirectorySector < sectorCount &&
+        firstFatSector < sectorCount;
       let manifest = null;
       let manifestSha256 = null;
       const manifestPath = `${absolute}.manifest.json`;
@@ -1597,6 +1824,9 @@ function collectClaimedPaths(progress, evidence, attestation, releaseEvidence) {
       if (record.artifact) paths.add(record.artifact);
     }
     for (const review of item.reviews ?? []) if (review.report) paths.add(review.report);
+    for (const closure of item.findingClosures ?? []) {
+      if (closure.evidenceReport) paths.add(closure.evidenceReport);
+    }
     for (const verification of item.verifications ?? []) {
       for (const record of verification.evidence ?? []) {
         if (record.report) paths.add(record.report);
@@ -1625,6 +1855,9 @@ function collectClaimedCommits(progress, evidence, attestation, releaseEvidence)
     for (const record of item.evidence ?? []) if (record.commit) commits.add(record.commit);
     for (const review of item.reviews ?? [])
       if (review.reviewedCommit) commits.add(review.reviewedCommit);
+    for (const closure of item.findingClosures ?? []) {
+      if (closure.remediationCommit) commits.add(closure.remediationCommit);
+    }
     for (const verification of item.verifications ?? []) {
       for (const record of verification.evidence ?? [])
         if (record.commit) commits.add(record.commit);
@@ -1688,9 +1921,24 @@ export async function loadContract(root) {
     parsed.attestation,
     parsed.releaseEvidence,
   );
-  const inspectedEntries = await Promise.all(
+  let inspectedEntries = await Promise.all(
     [...claimedPaths].map(async (file) => [file, await inspectClaimedPath(root, file)]),
   );
+  const rawEvidencePaths = new Set();
+  for (const [, result] of inspectedEntries) {
+    for (const check of result.document?.checks ?? []) {
+      if (check.details?.rawEvidencePath) rawEvidencePaths.add(check.details.rawEvidencePath);
+    }
+  }
+  const newRawPaths = [...rawEvidencePaths].filter((file) => !claimedPaths.has(file));
+  if (newRawPaths.length > 0) {
+    inspectedEntries = [
+      ...inspectedEntries,
+      ...(await Promise.all(
+        newRawPaths.map(async (file) => [file, await inspectClaimedPath(root, file)]),
+      )),
+    ];
+  }
   const fileHashes = Object.fromEntries(
     inspectedEntries.map(([file, result]) => [file, result.hash]),
   );
@@ -1705,9 +1953,14 @@ export async function loadContract(root) {
   );
   const githubAttestations = {};
   for (const [file, result] of inspectedEntries) {
+    const sourceCommit =
+      result.document?.kind === 'automated'
+        ? result.document.commit
+        : result.artifact?.manifest?.commit;
     if (
-      result.document?.kind === 'automated' &&
-      /^ci:github-actions:[1-9]\d*$/.test(result.document.producer ?? '')
+      (result.document?.kind === 'automated' &&
+        /^ci:github-actions:[1-9]\d*$/.test(result.document.producer ?? '')) ||
+      result.artifact?.isWindowsPackage
     ) {
       try {
         await execFileAsync(
@@ -1720,6 +1973,9 @@ export async function loadContract(root) {
             'Mousewarriors/Orbit',
             '--signer-workflow',
             'Mousewarriors/Orbit/.github/workflows/ci.yml',
+            '--source-digest',
+            sourceCommit,
+            '--deny-self-hosted-runners',
           ],
           { cwd: root, maxBuffer: 16 * 1024 * 1024 },
         );
@@ -1729,12 +1985,15 @@ export async function loadContract(root) {
       }
     }
   }
-  const { stdout: commitOutput } = await git(root, ['rev-list', '--all']);
-  const commits = commitOutput
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((commit) => commit.toLowerCase());
+  const { stdout: commitOutput } = await git(root, ['log', '--all', '--format=%H|%cI']);
+  const commitRows = commitOutput.trim().split(/\r?\n/).filter(Boolean);
+  const commits = commitRows.map((row) => row.split('|', 1)[0].toLowerCase());
+  const commitTimes = Object.fromEntries(
+    commitRows.map((row) => {
+      const separator = row.indexOf('|');
+      return [row.slice(0, separator).toLowerCase(), Date.parse(row.slice(separator + 1))];
+    }),
+  );
   const claimedCommits = [
     ...collectClaimedCommits(
       parsed.progress,
@@ -1791,6 +2050,7 @@ export async function loadContract(root) {
     lockedFileHashes,
     repository: {
       commits,
+      commitTimes,
       fileHashes,
       pathSafety,
       reports: documents,

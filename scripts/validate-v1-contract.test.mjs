@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { loadContract, validateContract } from './v1-contract.mjs';
@@ -293,4 +294,94 @@ test('review authorities cannot alias the same public key', async () => {
   duplicate.identity = 'agent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   state.authorities.authorities.push(duplicate);
   assert.match(validateContract(state).errors.join('\n'), /duplicates an existing review key/);
+});
+
+test('noncanonical DER cannot alias an existing review key', async () => {
+  const state = await loadContract(root);
+  const authority = state.authorities.authorities[0];
+  const aliasedBytes = Buffer.concat([
+    Buffer.from(authority.publicKeySpkiBase64, 'base64'),
+    Buffer.from([0]),
+  ]);
+  authority.publicKeySpkiBase64 = aliasedBytes.toString('base64');
+  authority.sha256Fingerprint = createHash('sha256').update(aliasedBytes).digest('hex');
+  assert.match(validateContract(state).errors.join('\n'), /key is not canonical DER/);
+});
+
+test('criterion evidence must follow its claimed commit and use an authorized role', async () => {
+  const state = await loadContract(root);
+  const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-TOOLS-005');
+  const reportPath = 'evidence/reports/security-role.json';
+  item.status = 'pass';
+  item.verifiedAt = '2026-06-22T15:01:00Z';
+  item.verifier = 'agent:019ef142-0941-7da3-a6aa-91543a805b16';
+  item.evidence = [
+    {
+      type: 'automated',
+      commit: '972d687441875731b2c9082a77222658c1e00667',
+      recordedAt: '2020-01-01T00:00:00Z',
+      report: reportPath,
+      reportSha256: 'a'.repeat(64),
+      signatures: [],
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = 'a'.repeat(64);
+  state.repository.reports[reportPath] = {
+    schemaVersion: 1,
+    kind: 'automated',
+    status: 'pass',
+    subjectIds: ['V1-TOOLS-005'],
+    commit: item.evidence[0].commit,
+    generatedAt: item.evidence[0].recordedAt,
+    producer: 'ci:github-actions:1',
+    ci: {
+      repository: 'Mousewarriors/Orbit',
+      runUrl: 'https://github.com/Mousewarriors/Orbit/actions/runs/1',
+      conclusion: 'success',
+      workflow: 'Mousewarriors/Orbit/.github/workflows/ci.yml',
+      commit: item.evidence[0].commit,
+    },
+    checks: [],
+  };
+  const errors = validateContract(state).errors.join('\n');
+  assert.match(errors, /evidence predates its claimed commit/);
+  assert.match(errors, /lacks a trusted security signature/);
+});
+
+test('an audit cannot hide another review open high finding', async () => {
+  const state = await loadContract(root);
+  const progress = state.progress.slices.find((item) => item.id === 'V1-014');
+  const reportPath = 'evidence/reports/audit-open-high.json';
+  progress.status = 'completed';
+  progress.reviews = [
+    {
+      reviewer: 'agent:019ef142-312a-7771-bc42-11fb141b1961',
+      role: 'product',
+      result: 'changes_requested',
+      reviewedCommit: '972d687441875731b2c9082a77222658c1e00667',
+      report: reportPath,
+      reportSha256: 'b'.repeat(64),
+      reviewedAt: '2026-06-22T21:40:58.820Z',
+      critical: 0,
+      high: 1,
+      signature: 'invalid',
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = 'b'.repeat(64);
+  state.repository.documents[reportPath] = {
+    schemaVersion: 1,
+    kind: 'review',
+    reviewer: progress.reviews[0].reviewer,
+    role: 'product',
+    result: 'changes_requested',
+    reviewedCommit: progress.reviews[0].reviewedCommit,
+    reviewedAt: progress.reviews[0].reviewedAt,
+    critical: 0,
+    high: 1,
+    artifactSha256: null,
+    findings: [{ id: 'P-1', title: 'Open high', severity: 'high', status: 'open' }],
+  };
+  assert.match(validateContract(state).errors.join('\n'), /has unresolved high finding/);
 });
