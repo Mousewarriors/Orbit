@@ -100,6 +100,33 @@ describe('executeNativeTool · open_project_in_application', () => {
     expect(openProjectInApplication).not.toHaveBeenCalled();
   });
 
+  it('asks for confirmation on a low-confidence folder match (confidence gate)', async () => {
+    const openProjectInApplication = vi.fn(async () => {});
+    const findFolders = vi.fn(async () => [{ name: 'Research Notes', path: 'C:/Research Notes' }]);
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openProjectInApplication),
+      { applicationQuery: 'vs code', projectQuery: 'research' },
+      // A strict gate makes the strong-but-inexact match uncertain.
+      deps({ openProjectInApplication, findFolders, folderConfidence: 0.99 }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.content).toMatch(/Not confident/);
+    expect(out.content).toContain('Research Notes');
+    expect(openProjectInApplication).not.toHaveBeenCalled();
+  });
+
+  it('opens a low-confidence match when the gate is lowered', async () => {
+    const openProjectInApplication = vi.fn(async () => {});
+    const findFolders = vi.fn(async () => [{ name: 'Research Notes', path: 'C:/Research Notes' }]);
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openProjectInApplication),
+      { applicationQuery: 'vs code', projectQuery: 'research' },
+      deps({ openProjectInApplication, findFolders, folderConfidence: 0 }),
+    );
+    expect(out.ok).toBe(true);
+    expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/Research Notes');
+  });
+
   it('reports clearly when neither a project nor an indexed folder matches', async () => {
     const out = await executeNativeTool(
       rec(NATIVE_TOOL_IDS.openProjectInApplication),

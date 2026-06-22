@@ -11,7 +11,11 @@ import {
 import { addMemory, buildContext, renderContextBlock, type ContextItem } from '@orbit/profile';
 import type { McpClient, ToolRecord } from '@orbit/tool-registry';
 import * as native from '../native.js';
-import { type ProviderInfo } from '../ai/providerConfig.js';
+import {
+  AI_SETTING_KEYS,
+  parseFolderConfidence,
+  type ProviderInfo,
+} from '../ai/providerConfig.js';
 import { loadProviderInfo } from '../ai/providerLoad.js';
 import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 import { buildToolRegistry, DEMO_MCP_SERVER_ID } from '../ai/toolRegistry.js';
@@ -68,6 +72,8 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   const clientsRef = useRef<ReadonlyMap<string, McpClient>>(new Map());
   /** Tool ids approved for the rest of this session (medium-risk only). */
   const sessionApprovedRef = useRef<Set<string>>(new Set());
+  /** Confidence gate for resolving a project name to an indexed folder. */
+  const folderConfidenceRef = useRef<number | undefined>(undefined);
 
   const tauri = native.isTauri();
   const toolsSupported = !!info && TOOL_CAPABLE_PROVIDERS.has(info.provider?.id ?? '');
@@ -82,6 +88,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       const built = await loadProviderInfo();
       setInfo(built);
       if (!tauri) return;
+      folderConfidenceRef.current = parseFolderConfidence(
+        await native.getSetting(AI_SETTING_KEYS.folderConfidence).catch(() => null),
+      );
       await refreshChats();
       // Populate the model list + personal context (both best-effort).
       if (built.provider?.listModels) {
@@ -265,6 +274,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                       path: r.path,
                     })),
                   noteList: (q) => native.noteList(q),
+                  ...(folderConfidenceRef.current !== undefined
+                    ? { folderConfidence: folderConfidenceRef.current }
+                    : {}),
                 });
               }
               const client = clientsRef.current.get(record.serverId ?? '');

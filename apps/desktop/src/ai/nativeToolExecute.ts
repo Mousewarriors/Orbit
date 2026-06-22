@@ -14,7 +14,12 @@
  * no-match returns `ok: false`, so the model can't falsely claim it opened.
  */
 import { NATIVE_TOOL_IDS, type ToolRecord } from '@orbit/tool-registry';
-import { bestProject, resolveProjectMatch, type ProjectCandidate } from '@orbit/intent';
+import {
+  bestProject,
+  projectDisplayName,
+  resolveProjectMatch,
+  type ProjectCandidate,
+} from '@orbit/intent';
 import type { NativeApp } from '../native.js';
 
 /** Native tools AI Chat is allowed to call in this slice. */
@@ -73,6 +78,12 @@ export interface NativeToolDeps {
   /** Search the file index restricted to directories (folders), for project fallback. */
   findFolders(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
   noteList(query: string): Promise<ReadonlyArray<{ title: string }>>;
+  /**
+   * Confidence gate (0..1) for resolving a project name to an indexed folder.
+   * A best match scoring below this is treated as uncertain → Chat asks the user
+   * to confirm rather than opening it. Omitted → the library default.
+   */
+  folderConfidence?: number;
 }
 
 /**
@@ -88,9 +99,11 @@ async function resolveFolderProject(
   deps: NativeToolDeps,
 ): Promise<ReturnType<typeof resolveProjectMatch>> {
   const folders = await deps.findFolders(query).catch(() => []);
+  const candidates = folders.map((f) => ({ path: f.path, name: f.name }));
   return resolveProjectMatch(
     query,
-    folders.map((f) => ({ path: f.path, name: f.name })),
+    candidates,
+    deps.folderConfidence !== undefined ? { confidence: deps.folderConfidence } : {},
   );
 }
 
@@ -166,8 +179,20 @@ export async function executeNativeTool(
           return {
             ok: false,
             content: `Multiple indexed folders match "${projectQuery}":\n${folder.projects
-              .map((p) => p.path)
-              .join('\n')}\nAsk the user which one they mean, then call this tool again with that exact folder name.`,
+              .map((p) => `• ${projectDisplayName(p)} — ${p.path}`)
+              .join(
+                '\n',
+              )}\nAsk the user which one they mean, then call this tool again with that exact folder name.`,
+          };
+        }
+        if (folder.kind === 'uncertain') {
+          return {
+            ok: false,
+            content: `Not confident about "${projectQuery}". The closest indexed folder is "${projectDisplayName(
+              folder.project,
+            )}" (${folder.project.path}), but the name only weakly matches (possible typo or partial match). Ask the user if they mean this folder; if they confirm, call this tool again with projectQuery set to "${projectDisplayName(
+              folder.project,
+            )}".`,
           };
         }
         if (folder.kind === 'match') project = folder.project;

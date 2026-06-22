@@ -88,6 +88,25 @@ describe('resolveProjectMatch', () => {
   it('returns none when nothing scores', () => {
     expect(resolveProjectMatch('zzz-nope', [{ path: 'C:\\foo', name: 'foo' }]).kind).toBe('none');
   });
+
+  it('flags a weak single match as uncertain under the default confidence gate', () => {
+    // "reserch" → "Research Notes": a fuzzy/partial match that scores below 0.8.
+    const res = resolveProjectMatch('reserch', [
+      { path: 'C:\\Research Notes', name: 'Research Notes' },
+    ]);
+    expect(res.kind).toBe('uncertain');
+    if (res.kind === 'uncertain') {
+      expect(res.project.path).toBe('C:\\Research Notes');
+      expect(res.score).toBeLessThan(0.8);
+    }
+  });
+
+  it('honours an explicit confidence threshold both ways', () => {
+    const candidates = [{ path: 'C:\\Research Notes', name: 'Research Notes' }];
+    // A strong-but-not-exact prefix match: confident by default, uncertain if strict.
+    expect(resolveProjectMatch('research', candidates, { confidence: 0 }).kind).toBe('match');
+    expect(resolveProjectMatch('research', candidates, { confidence: 0.99 }).kind).toBe('uncertain');
+  });
 });
 
 describe('rankApps', () => {

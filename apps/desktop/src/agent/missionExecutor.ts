@@ -32,6 +32,7 @@ export interface ResolvedEntity {
  */
 export type FolderResolution =
   | { readonly kind: 'match'; readonly project: ResolvedEntity }
+  | { readonly kind: 'uncertain'; readonly project: ResolvedEntity }
   | { readonly kind: 'choices'; readonly projects: readonly ResolvedEntity[] }
   | { readonly kind: 'none' };
 
@@ -90,8 +91,11 @@ async function resolveStepProject(query: string, deps: MissionExecutorDeps): Pro
   if (catalog) return { status: 'resolved', project: catalog };
   const folder = await deps.resolveProjectFromIndex(query);
   if (folder.kind === 'match') return { status: 'resolved', project: folder.project };
-  if (folder.kind === 'choices') {
-    const chosen = await deps.chooseFolder(query, folder.projects);
+  // An ambiguous set, or a single low-confidence guess, both go to the user: the
+  // picker doubles as a "did you mean this folder?" confirmation for one option.
+  if (folder.kind === 'choices' || folder.kind === 'uncertain') {
+    const choices = folder.kind === 'choices' ? folder.projects : [folder.project];
+    const chosen = await deps.chooseFolder(query, choices);
     return chosen ? { status: 'resolved', project: chosen } : { status: 'cancelled' };
   }
   return { status: 'none' };

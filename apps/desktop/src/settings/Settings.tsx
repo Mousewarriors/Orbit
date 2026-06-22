@@ -9,11 +9,13 @@ import {
   PROVIDER_PRESETS,
   createProvider,
   parseAiSettings,
+  parseFolderConfidence,
   presetById,
   resolvePresetId,
   type ProviderPreset,
   type ProviderPresetId,
 } from '../ai/providerConfig.js';
+import { DEFAULT_PROJECT_CONFIDENCE } from '@orbit/intent';
 import { createNativeFetch } from '../ai/nativeFetch.js';
 import { OAUTH_PROVIDERS, type OAuthProviderConfig, type OAuthTokens } from '@orbit/ai-runtime';
 import { getValidAccessToken, loadTokens, signIn, signOut } from '../ai/oauthFlow.js';
@@ -266,6 +268,8 @@ function AiSection(): JSX.Element {
   const [hasKey, setHasKey] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err' | 'info'; text: string } | null>(null);
+  // Folder-match confidence gate (0..1), as a 0–100 percentage for the slider.
+  const [confidencePct, setConfidencePct] = useState(Math.round(DEFAULT_PROJECT_CONFIDENCE * 100));
 
   const preset = useMemo(() => presetById(presetId) ?? PROVIDER_PRESETS[0]!, [presetId]);
   const modelOptions = useMemo(
@@ -276,14 +280,18 @@ function AiSection(): JSX.Element {
   // Load the persisted selection and reflect it into the form.
   useEffect(() => {
     void (async () => {
-      const [engine, storedPreset, e, m, cb, cm] = await Promise.all([
+      const [engine, storedPreset, e, m, cb, cm, conf] = await Promise.all([
         native.getSetting(AI_SETTING_KEYS.provider),
         native.getSetting(AI_SETTING_KEYS.preset),
         native.getSetting(AI_SETTING_KEYS.endpoint),
         native.getSetting(AI_SETTING_KEYS.model),
         native.getSetting(AI_SETTING_KEYS.cloudBase),
         native.getSetting(AI_SETTING_KEYS.cloudModel),
+        native.getSetting(AI_SETTING_KEYS.folderConfidence),
       ]);
+      setConfidencePct(
+        Math.round((parseFolderConfidence(conf) ?? DEFAULT_PROJECT_CONFIDENCE) * 100),
+      );
       const id =
         (presetById(storedPreset ?? '')?.id ??
           resolvePresetId(engine ?? 'none', (engine === 'openai-compat' ? cb : e) ?? '')) as
@@ -563,6 +571,26 @@ function AiSection(): JSX.Element {
           )}
         </Field>
       )}
+
+      <Field
+        label="Folder match confidence"
+        hint={`${confidencePct}% — when the AI opens a project/folder by name, it opens directly only if the best indexed-folder match is at least this confident. Below it (a typo or only a partial-word match), it asks you to confirm instead of guessing. Higher = asks more often; lower = opens more eagerly.`}
+      >
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={confidencePct}
+          onChange={(ev) => setConfidencePct(Number(ev.target.value))}
+          onPointerUp={() =>
+            void native.setSetting(AI_SETTING_KEYS.folderConfidence, String(confidencePct / 100))
+          }
+          onKeyUp={() =>
+            void native.setSetting(AI_SETTING_KEYS.folderConfidence, String(confidencePct / 100))
+          }
+        />
+      </Field>
 
       {preset.engine !== 'none' && (
         <p className="settings-note">

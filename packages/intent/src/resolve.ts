@@ -86,28 +86,43 @@ export function bestProject(
   return ranked[0]?.item ?? null;
 }
 
-/** A confident single match, an ambiguous shortlist, or nothing. */
+/**
+ * Default confidence gate (0..1). Matches at or above this score open directly;
+ * weaker single matches are returned as `uncertain` so the caller can confirm.
+ * Tuned to the fuzzy scorer: exact/prefix/substring/acronym matches all land
+ * ≥ 0.8, while partial subsequence matches (~0.4–0.79) and typo-rescue (≤ 0.5)
+ * fall below — exactly the "only one word matched / terrible spelling" cases.
+ */
+export const DEFAULT_PROJECT_CONFIDENCE = 0.8;
+
+/** A confident single match, a low-confidence guess, an ambiguous shortlist, or nothing. */
 export type ProjectResolution =
-  | { readonly kind: 'match'; readonly project: ProjectCandidate }
+  | { readonly kind: 'match'; readonly project: ProjectCandidate; readonly score: number }
+  | { readonly kind: 'uncertain'; readonly project: ProjectCandidate; readonly score: number }
   | { readonly kind: 'choices'; readonly projects: readonly ProjectCandidate[] }
   | { readonly kind: 'none' };
 
 /**
- * Resolve a query against candidate projects/folders, distinguishing a confident
- * single match from an *ambiguous* set — several near-equally-strong matches,
- * e.g. folders with the same name in different locations. Callers with an
- * interactive loop (Chat) can ask the user to choose from `choices`; deterministic
- * callers (Mission) can fall back to `bestProject` and take the top match.
+ * Resolve a query against candidate projects/folders into one of four outcomes:
  *
- * "Ambiguous" = more than one candidate within `margin` of the top score.
+ *  - `match`     — one clearly-best candidate scoring at/above `confidence`.
+ *  - `uncertain` — one best candidate, but below `confidence` (a weak partial or
+ *                  misspelled match) → the caller should confirm before acting.
+ *  - `choices`   — several near-equally-strong candidates within `margin` of the
+ *                  top (e.g. same-named folders in different locations) → ask which.
+ *  - `none`      — nothing scored.
+ *
+ * Callers with an interactive loop (Chat) or a picker (Mission) use the gate to
+ * decide when to ask the user instead of opening the wrong folder.
  */
 export function resolveProjectMatch(
   query: string,
   candidates: readonly ProjectCandidate[],
-  opts: { readonly margin?: number; readonly maxChoices?: number } = {},
+  opts: { readonly margin?: number; readonly maxChoices?: number; readonly confidence?: number } = {},
 ): ProjectResolution {
   const margin = opts.margin ?? 0.05;
   const maxChoices = opts.maxChoices ?? 5;
+  const confidence = opts.confidence ?? DEFAULT_PROJECT_CONFIDENCE;
   const ranked = rankProjects(query, candidates);
   const top = ranked[0];
   if (!top || top.score <= 0) return { kind: 'none' };
@@ -115,7 +130,9 @@ export function resolveProjectMatch(
   if (contenders.length > 1) {
     return { kind: 'choices', projects: contenders.slice(0, maxChoices).map((c) => c.item) };
   }
-  return { kind: 'match', project: top.item };
+  return top.score >= confidence
+    ? { kind: 'match', project: top.item, score: top.score }
+    : { kind: 'uncertain', project: top.item, score: top.score };
 }
 
 /**

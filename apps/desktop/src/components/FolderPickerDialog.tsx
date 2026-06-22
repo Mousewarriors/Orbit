@@ -7,11 +7,11 @@ export interface FolderChoice {
 }
 
 /**
- * A modal that asks the user to pick one of several equally-strong folder
- * matches when a mission step's project name is ambiguous. Arrow keys move the
- * selection, Enter chooses it, Escape cancels; the scrim click cancels. Keys are
- * captured at the window level (capture phase) so the launcher's own key handler
- * stays inert while the dialog is open.
+ * A modal that asks the user to confirm a folder before a mission step opens it:
+ * several equally-strong matches (pick one), or a single low-confidence guess
+ * (did you mean this?). Arrow keys move the selection, Enter chooses it, Escape
+ * cancels; the scrim click cancels. Keys are captured at the window level
+ * (capture phase) so the launcher's own key handler stays inert while open.
  */
 export function FolderPickerDialog({
   query,
@@ -25,6 +25,7 @@ export function FolderPickerDialog({
   onCancel: () => void;
 }): JSX.Element {
   const [active, setActive] = useState(0);
+  const single = choices.length === 1;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,9 +61,13 @@ export function FolderPickerDialog({
         aria-label={`Choose a folder for "${query}"`}
         aria-modal="true"
       >
-        <div className="orbit-confirm-title">Which “{query}”?</div>
+        <div className="orbit-confirm-title">
+          {single ? `Did you mean this folder for “${query}”?` : `Which “${query}”?`}
+        </div>
         <div className="orbit-confirm-body">
-          Several indexed folders match. Pick the one to open.
+          {single
+            ? 'This is a low-confidence match (possible typo or partial name). Confirm to open it, or cancel.'
+            : 'Several indexed folders match. Pick the one to open.'}
         </div>
         <ul className="orbit-folder-list">
           {choices.map((choice, i) => (

@@ -198,6 +198,32 @@ describe('executeMissionStep', () => {
     expect(openProjectInApplication).not.toHaveBeenCalled();
   });
 
+  it('asks via the picker for a low-confidence single match, then opens the confirmed folder', async () => {
+    const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
+    const chooseFolder = vi.fn(async (_q: string, choices: readonly { name: string; path: string }[]) =>
+      choices[0] ?? null,
+    );
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openProjectInApplication,
+        args: { applicationQuery: 'vs code', projectQuery: 'reserch' },
+      },
+      deps({
+        openProjectInApplication,
+        chooseFolder,
+        resolveProjectFromIndex: async () => ({
+          kind: 'uncertain',
+          project: { name: 'Research Notes', path: 'C:/Research Notes' },
+        }),
+      }),
+    );
+    expect(chooseFolder).toHaveBeenCalledWith('reserch', [
+      { name: 'Research Notes', path: 'C:/Research Notes' },
+    ]);
+    expect(out.ok).toBe(true);
+    expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/Research Notes');
+  });
+
   it('reveals an indexed folder when the catalog has no project', async () => {
     const revealFolder = vi.fn().mockResolvedValue(undefined);
     const out = await executeMissionStep(

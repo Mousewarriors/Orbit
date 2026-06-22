@@ -11,7 +11,7 @@ import {
 } from '@orbit/mission';
 import type { AiMessage } from '@orbit/ai-runtime';
 import * as native from '../native.js';
-import { type ProviderInfo } from '../ai/providerConfig.js';
+import { AI_SETTING_KEYS, parseFolderConfidence, type ProviderInfo } from '../ai/providerConfig.js';
 import { loadProviderInfo } from '../ai/providerLoad.js';
 import { buildMessages, decodeQuickAiArg, type QuickAiContext } from '../ai/quickAi.js';
 import { buildToolRegistry } from '../ai/toolRegistry.js';
@@ -69,6 +69,7 @@ export function OrbitAgentView({
 
   const apps = useRef<native.NativeApp[]>([]);
   const projects = useRef<ProjectCandidate[]>([]);
+  const folderConfidence = useRef<number | undefined>(undefined);
   const clipboard = useRef<string>('');
   const stoppedRef = useRef(false);
   const confirmResolver = useRef<((ok: boolean) => void) | null>(null);
@@ -97,6 +98,9 @@ export function OrbitAgentView({
           if (!merged.has(p.path)) merged.set(p.path, { path: p.path, name: p.name });
         }
         projects.current = [...merged.values()];
+        folderConfidence.current = parseFolderConfidence(
+          await native.getSetting(AI_SETTING_KEYS.folderConfidence).catch(() => null),
+        );
         setRelayState(status?.state ?? 'unknown');
         clipboard.current = clip[0]?.content ?? '';
       } catch {
@@ -192,9 +196,13 @@ export function OrbitAgentView({
           path: f.path,
           name: f.name as string | null,
         }));
-        const res = resolveProjectMatch(q, folders);
-        if (res.kind === 'match') {
-          return { kind: 'match', project: { name: res.project.name ?? res.project.path, path: res.project.path } };
+        const conf = folderConfidence.current;
+        const res = resolveProjectMatch(q, folders, conf !== undefined ? { confidence: conf } : {});
+        if (res.kind === 'match' || res.kind === 'uncertain') {
+          return {
+            kind: res.kind,
+            project: { name: res.project.name ?? res.project.path, path: res.project.path },
+          };
         }
         if (res.kind === 'choices') {
           return {

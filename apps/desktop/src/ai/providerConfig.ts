@@ -69,7 +69,19 @@ export const AI_SETTING_KEYS = {
   cloudBase: 'ai.cloud.base',
   cloudModel: 'ai.cloud.model',
   recent: 'ai.recent',
+  /** Confidence gate (0..1) for resolving a project name to an indexed folder. */
+  folderConfidence: 'ai.folder_confidence',
 } as const;
+
+/**
+ * Parse the stored folder-confidence setting (a 0..1 decimal string) into a
+ * number, or undefined when unset/invalid so callers use the library default.
+ */
+export function parseFolderConfidence(raw: string | null | undefined): number | undefined {
+  if (raw == null || raw.trim() === '') return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+}
 
 /** Secret names under which provider credentials live in OS secure storage. */
 export const CLOUD_API_KEY_SECRET = 'ai.cloud.apikey';
