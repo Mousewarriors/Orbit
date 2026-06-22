@@ -85,3 +85,11 @@ The exact-commit findings from Carver, Kuhn and Ampere are recorded in
 
 The exact-commit findings from Carver, Kuhn and Ampere are recorded in
 `docs/audits/V1_CONTRACT_REVIEW_ROUND_4.md`.
+
+## 2026-06-22 - Reviewer authority rotation
+
+The prior round's private-key holders expired when the delegated model-usage
+window ended. Their public keys were replaced before activation with a fresh
+architecture, security and product panel. No prior failed review was converted
+into a pass, and the replacement panel must review and sign the new exact
+commit.

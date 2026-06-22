@@ -1,5 +1,12 @@
 {
   "schemaVersion": 1,
   "contractVersion": "1.0.0",
-  "attestations": []
+  "attestations": [
+    {
+      "identity": "codex:main",
+      "commit": "37487f5af8a2dfa70283a1cf65fa3732f0f8edd2",
+      "signedAt": "2026-06-22T14:48:54.235Z",
+      "signature": "17zD6ufVaaBHmk67aDNGr3S/OMclksZwIs9jWT7zJ4Nj0C9dqvPoF3a8VMgymPJJHUB9FXmiyPCxIleA2RXoDA=="
+    }
+  ]
 }
