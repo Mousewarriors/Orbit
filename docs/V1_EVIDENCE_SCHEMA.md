@@ -85,6 +85,10 @@ review payload. Public keys and authorized roles live in the hash-locked
 authority registry. New reviewers require quorum signatures from existing
 authorities.
 
+Passing severity counts are derived from unresolved structured findings. The
+implementer uses a separate locked key and signs each completed slice commit, so
+reviewer independence is checked by key fingerprint.
+
 ## Slice phase report
 
 ```json
@@ -108,5 +112,6 @@ the final slice commit.
 
 After audit pass 1, V1-015 creates the final release anchor. Every
 non-governance/non-audit criterion must be rerun on that exact commit; every
-packaged criterion must reference that exact package SHA-256. Audit pass 2 is
-bound to the same package.
+packaged criterion must reference that exact package SHA-256. These reruns live
+in `planning/v1-release-evidence.json`, preserving historical owner evidence.
+Audit pass 2 is bound to the same final package.

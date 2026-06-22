@@ -25,8 +25,9 @@ Reports are schema-validated JSON under `evidence/reports`; packages are real
 manifest and SHA-256. Reviewer attestations use Ed25519 keys in the locked
 authority registry (or quorum-signed later enrollment), and reviewers cannot
 equal the implementer. Every slice binds owned criteria to its final commit.
-Every non-governance/non-audit criterion is rerun against the final release
-anchor after audit-1 remediation.
+Later slice verification is stored separately from historical owner acceptance.
+Every non-governance/non-audit criterion is then rerun in the final-release
+ledger against the release anchor after audit-1 remediation.
 
 ## Governance
 

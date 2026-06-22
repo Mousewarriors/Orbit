@@ -236,7 +236,7 @@ test('every slice must remain reachable from V1-000', async () => {
 
 test('a final release anchor rejects stale criterion evidence', async () => {
   const state = await loadContract(root);
-  state.progress.releaseAnchor = {
+  state.releaseEvidence.anchor = {
     commit: 'ad781fa2abb10a1dff45c1498ef56efc8fb82b18',
     artifact: 'evidence/artifacts/orbit.msi',
     sha256: 'a'.repeat(64),
@@ -245,4 +245,52 @@ test('a final release anchor rejects stale criterion evidence', async () => {
     validateContract(state).errors.join('\n'),
     /V1-CORE-001 is not fresh on the final release commit/,
   );
+});
+
+test('review severity counts are derived from unresolved findings', async () => {
+  const state = await loadContract(root);
+  const reportPath = 'evidence/reports/fake-review.json';
+  state.attestation.status = 'pass';
+  state.attestation.reviewedCommit = '56d7b533816f4817309f4880b3ae6e7bb8de2df9';
+  state.attestation.reviews = [
+    {
+      reviewer: 'agent:019eefae-a68e-7c01-a14c-36146ac0b03f',
+      role: 'architecture',
+      result: 'pass',
+      reviewedCommit: '56d7b533816f4817309f4880b3ae6e7bb8de2df9',
+      report: reportPath,
+      reportSha256: 'a'.repeat(64),
+      reviewedAt: '2026-06-22T15:00:00Z',
+      critical: 0,
+      high: 0,
+      signature: 'invalid',
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = 'a'.repeat(64);
+  state.repository.documents[reportPath] = {
+    schemaVersion: 1,
+    kind: 'review',
+    reviewer: state.attestation.reviews[0].reviewer,
+    role: 'architecture',
+    result: 'pass',
+    reviewedCommit: state.attestation.reviewedCommit,
+    reviewedAt: '2026-06-22T15:00:00Z',
+    critical: 0,
+    high: 0,
+    artifactSha256: null,
+    findings: [{ id: 'F-1', title: 'Open bypass', severity: 'critical', status: 'open' }],
+  };
+  assert.match(
+    validateContract(state).errors.join('\n'),
+    /review counts\/result do not match unresolved findings/,
+  );
+});
+
+test('review authorities cannot alias the same public key', async () => {
+  const state = await loadContract(root);
+  const duplicate = clone(state.authorities.authorities[0]);
+  duplicate.identity = 'agent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  state.authorities.authorities.push(duplicate);
+  assert.match(validateContract(state).errors.join('\n'), /duplicates an existing review key/);
 });

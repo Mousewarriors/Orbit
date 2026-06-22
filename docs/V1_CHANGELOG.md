@@ -64,3 +64,24 @@ required after these corrections.
 
 The exact-commit findings from Carver, Kuhn and Ampere are recorded in
 `docs/audits/V1_CONTRACT_REVIEW_ROUND_3.md`.
+
+## 2026-06-22 - Reachability and package-binding review round 4 response
+
+- Split historical owner acceptance, later slice verification and final release
+  reruns into distinct evidence records.
+- Bound audit pass 2 to the V1-015 release-anchor package.
+- Canonicalized lock hashes across LF/CRLF checkouts and added `.gitattributes`.
+- Added a distinct Ed25519 implementer key and per-commit attestations.
+- Derived review severity counts from structured unresolved findings.
+- Rejected duplicate reviewer public keys under alias identities.
+- Strengthened PE/MSI structure checks, required commit/version bytes inside the
+  package, and signed the sidecar manifest digest and environment.
+- Added strict telemetry details for privacy, MCP, approval, extension and
+  signing checks.
+- Signed the complete blocker object and constrained GitHub provenance to the
+  exact CI workflow and commit.
+- Removed Anthropic from the release-work dependency chain; it joins only at the
+  final audit.
+
+The exact-commit findings from Carver, Kuhn and Ampere are recorded in
+`docs/audits/V1_CONTRACT_REVIEW_ROUND_4.md`.

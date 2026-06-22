@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "algorithm": "Ed25519",
+  "identity": "codex:main",
+  "publicKeySpkiBase64": "MCowBQYDK2VwAyEAfOAOowTrbr2OACl1Oy4vxoaR4izPRot/QLzo05V9ZJw=",
+  "sha256Fingerprint": "1ce8b7b41e6443ecb57eaf6663067cfd3d0bc6be44dc40af92273937759b2601"
+}

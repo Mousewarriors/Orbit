@@ -276,7 +276,7 @@
       "title": "Windows release lifecycle, final global regression and provenance",
       "mode": "vertical",
       "priority": "critical",
-      "dependsOn": ["V1-007", "V1-009", "V1-010", "V1-011", "V1-017"],
+      "dependsOn": ["V1-007", "V1-009", "V1-010", "V1-011"],
       "acceptanceIds": ["V1-REL-002", "V1-REL-003", "V1-REL-004", "V1-REL-005", "V1-REL-007"],
       "verifiesAcceptanceIds": [
         "V1-REL-001",
@@ -337,7 +337,7 @@
       "title": "Full independent audit pass 1 and finding closure",
       "mode": "audit",
       "priority": "critical",
-      "dependsOn": ["V1-013"],
+      "dependsOn": ["V1-013", "V1-017"],
       "acceptanceIds": ["V1-AUDIT-001"],
       "verifiesAcceptanceIds": [],
       "deliverables": [
