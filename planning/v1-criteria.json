@@ -1,0 +1,503 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "criteria": [
+    {
+      "id": "V1-GOV-001",
+      "area": "governance",
+      "evidencePolicy": "automated",
+      "given": "the checked-out completion-contract files",
+      "when": "the adversarial validator and its mutation tests run",
+      "then": "all structure, ownership, evidence and completion invariants pass"
+    },
+    {
+      "id": "V1-GOV-002",
+      "area": "governance",
+      "evidencePolicy": "automated",
+      "given": "a scope or criterion-definition change",
+      "when": "the contract is validated",
+      "then": "a matching hash lock, rationale and independent review are required"
+    },
+    {
+      "id": "V1-GOV-003",
+      "area": "governance",
+      "evidencePolicy": "automated",
+      "given": "a blocked slice or criterion",
+      "when": "the backlog is validated",
+      "then": "current proof, owner, attempts, affected criteria, degraded behavior and an unblock condition exist and completion remains false"
+    },
+    {
+      "id": "V1-GOV-004",
+      "area": "governance",
+      "evidencePolicy": "automated",
+      "given": "a completed vertical slice",
+      "when": "its state is validated",
+      "then": "implement, test, independent review, fix, package, live verification, documentation and commit phases all have evidence in order"
+    },
+    {
+      "id": "V1-GOV-005",
+      "area": "governance",
+      "evidencePolicy": "packaged",
+      "given": "a clean first full audit",
+      "when": "the second audit begins",
+      "then": "a completed remediation/rebuild iteration and newer package SHA-256 exist"
+    },
+
+    {
+      "id": "V1-CORE-001",
+      "area": "core",
+      "evidencePolicy": "packaged",
+      "given": "a clean Windows install",
+      "when": "Orbit is opened from Start and with Alt+Space",
+      "then": "both open the same installed executable"
+    },
+    {
+      "id": "V1-CORE-002",
+      "area": "core",
+      "evidencePolicy": "packaged",
+      "given": "AI and networking are disabled and the fixed local fixture manifest is loaded",
+      "when": "the app-launch, calculation, Note, Quicklink, snippet, project and indexed-file journeys are each run",
+      "then": "each journey produces its fixture-defined native result within two seconds and its empty/error fixture produces the documented non-success state"
+    },
+    {
+      "id": "V1-CORE-003",
+      "area": "core",
+      "evidencePolicy": "packaged",
+      "given": "a fixture whose native action fails",
+      "when": "the action is invoked",
+      "then": "Orbit stays visible, displays the native error and records no successful usage"
+    },
+    {
+      "id": "V1-NL-001",
+      "area": "natural_language",
+      "evidencePolicy": "packaged",
+      "given": "Visual Studio Code is indexed",
+      "when": "Open Visual Studio Code is submitted",
+      "then": "the indexed executable launches"
+    },
+    {
+      "id": "V1-NL-002",
+      "area": "natural_language",
+      "evidencePolicy": "packaged",
+      "given": "the Orbit fixture project is indexed",
+      "when": "Open Orbit in Visual Studio Code is submitted",
+      "then": "VS Code opens the canonical Orbit repository path"
+    },
+    {
+      "id": "V1-NL-003",
+      "area": "natural_language",
+      "evidencePolicy": "packaged",
+      "given": "a fixed index containing one Leonard document",
+      "when": "Find the document that mentioned Leonard is submitted",
+      "then": "only the real matching indexed document is returned"
+    },
+    {
+      "id": "V1-NL-004",
+      "area": "natural_language",
+      "evidencePolicy": "packaged",
+      "given": "fixed successful and failed Relay sessions",
+      "when": "Show failed agent sessions is submitted",
+      "then": "the session screen opens with only failed sessions"
+    },
+    {
+      "id": "V1-NL-005",
+      "area": "natural_language",
+      "evidencePolicy": "packaged",
+      "given": "unknown, ambiguous and unsupported fixtures",
+      "when": "each request is submitted",
+      "then": "Orbit shows unresolved, choice or unsupported state and never success"
+    },
+
+    {
+      "id": "V1-PROJ-001",
+      "area": "projects",
+      "evidencePolicy": "packaged",
+      "given": "a Relay discovery fixture with opened and unopened projects",
+      "when": "a scan completes and Orbit restarts",
+      "then": "canonical identities persist and only genuinely opened projects have recent-use timestamps"
+    },
+    {
+      "id": "V1-PROJ-002",
+      "area": "projects",
+      "evidencePolicy": "packaged",
+      "given": "a project fixture with git, context, sessions, Build Brief and handoff data",
+      "when": "project details open",
+      "then": "each source-backed field and latest valid handoff is displayed"
+    },
+    {
+      "id": "V1-PROJ-003",
+      "area": "projects",
+      "evidencePolicy": "packaged",
+      "given": "the Orbit project and two available agent fixtures",
+      "when": "Continue Orbit with the best coding agent is submitted",
+      "then": "context, reasoned recommendation, plan, warnings and confirmation are shown before launch"
+    },
+    {
+      "id": "V1-PROJ-004",
+      "area": "projects",
+      "evidencePolicy": "packaged",
+      "given": "a confirmed continuation",
+      "when": "Relay receives the launch request",
+      "then": "the exact objective, project identity and user-selected context/handoff are present"
+    },
+    {
+      "id": "V1-PROJ-005",
+      "area": "projects",
+      "evidencePolicy": "packaged",
+      "given": "Relay returns a new session ID",
+      "when": "launch succeeds",
+      "then": "Orbit opens that ID and shows live progress, terminal status and a working stop action"
+    },
+    {
+      "id": "V1-PROJ-006",
+      "area": "projects",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "forged renderer, model and MCP ownership/stop input",
+      "when": "a protected session action is attempted",
+      "then": "the native Relay boundary rejects it"
+    },
+
+    {
+      "id": "V1-AI-001",
+      "area": "ai",
+      "evidencePolicy": "packaged",
+      "given": "a reachable Ollama fixture model",
+      "when": "a prompt streams and is cancelled",
+      "then": "non-empty tokens arrive and the native request stops within two seconds"
+    },
+    {
+      "id": "V1-AI-002",
+      "area": "ai",
+      "evidencePolicy": "packaged_external",
+      "given": "Anthropic API is selected in the locked release manifest and a permitted real account credential is stored in OS secure storage",
+      "when": "health, model discovery, streaming, cancellation and invalid-auth tests run",
+      "then": "all produce the documented observable result"
+    },
+    {
+      "id": "V1-AI-003",
+      "area": "ai",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "tool-capable and text-only provider fixtures",
+      "when": "the same tool request is made",
+      "then": "only the capable provider can emit a validated tool call and neither can invent execution"
+    },
+    {
+      "id": "V1-AI-004",
+      "area": "ai",
+      "evidencePolicy": "packaged",
+      "given": "known selected text in a test editor",
+      "when": "Improve this is invoked and Copy, denial, cancellation, confirmed Paste and confirmed Replace are exercised",
+      "then": "source, destination and context are previewed; cancellation causes no later mutation; denial leaves text unchanged; Paste targets the declared caret; Replace changes only the selected range; and every mutation occurs only after confirmation"
+    },
+
+    {
+      "id": "V1-CTX-001",
+      "area": "privacy",
+      "evidencePolicy": "packaged",
+      "given": "a request with multiple context sources",
+      "when": "the transmission preview opens",
+      "then": "every item shows source, preview, byte size, sensitivity, destination and removal"
+    },
+    {
+      "id": "V1-CTX-002",
+      "area": "privacy",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "clipboard, selection, screenshot, repository, vault, env, key and credential fixtures",
+      "when": "remote transmission is prepared",
+      "then": "no sensitive item is included without explicit item-level consent"
+    },
+    {
+      "id": "V1-CTX-003",
+      "area": "privacy",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "local-only mode, a whole-process network capture harness and an allowlist containing only loopback-local endpoints",
+      "when": "AI, search, Relay, MCP, extension, diagnostics, crash, export and update journeys run",
+      "then": "every Orbit process emits zero traffic outside the explicit loopback allowlist"
+    },
+    {
+      "id": "V1-CTX-004",
+      "area": "privacy",
+      "evidencePolicy": "packaged",
+      "given": "generated replacement text",
+      "when": "Paste or Replace targets another app",
+      "then": "no target mutation occurs before explicit confirmation"
+    },
+    {
+      "id": "V1-CTX-005",
+      "area": "privacy",
+      "evidencePolicy": "automated",
+      "given": "provider, Relay, MCP, extension, diagnostics, crash and export egress adapters",
+      "when": "policy coverage is enumerated",
+      "then": "every adapter is deny-by-default with destination, retention and deletion rules"
+    },
+    {
+      "id": "V1-CTX-006",
+      "area": "privacy",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "adversarial secret and personal-data fixtures",
+      "when": "renderer, logs, diagnostics, crash reports and exports are inspected",
+      "then": "the fixtures are absent or irreversibly redacted and deletion removes retained copies"
+    },
+
+    {
+      "id": "V1-CHAT-001",
+      "area": "chat",
+      "evidencePolicy": "packaged",
+      "given": "a conversation fixture",
+      "when": "create, rename, search, pin, archive, branch, retry, model switch, delete and export are used across restart",
+      "then": "each operation has the documented durable result"
+    },
+    {
+      "id": "V1-CHAT-002",
+      "area": "chat",
+      "evidencePolicy": "packaged",
+      "given": "successful, denied, cancelled and failed tool calls",
+      "when": "Chat restarts",
+      "then": "cards retain identity, source, canonical parameters, reason, risk, approval, bounded result, duration and error"
+    },
+    {
+      "id": "V1-CHAT-003",
+      "area": "chat",
+      "evidencePolicy": "packaged",
+      "given": "one deterministic native tool and one deterministic MCP tool fixture",
+      "when": "Chat proposes, previews, approves and executes each tool",
+      "then": "the exact approved bounded action runs once, its real result returns to Chat, denial runs nothing, and both audit cards survive restart"
+    },
+    {
+      "id": "V1-MISSION-001",
+      "area": "missions",
+      "evidencePolicy": "packaged",
+      "given": "a mission interrupted at each lifecycle state",
+      "when": "Orbit restarts",
+      "then": "objective, project, plan, steps, tools, approvals, outputs, verification and final result recover consistently"
+    },
+    {
+      "id": "V1-MISSION-002",
+      "area": "missions",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "objective-bearing work and an unavailable or rejecting Relay",
+      "when": "launch is requested",
+      "then": "no untasked agent starts and the unavailability is shown before execution"
+    },
+    {
+      "id": "V1-MISSION-003",
+      "area": "missions",
+      "evidencePolicy": "packaged",
+      "given": "the deterministic local mission fixture and certified Relay v1.1 test sidecar",
+      "when": "an objective is planned, one bounded tool is approved and executed, output is verified and Orbit restarts",
+      "then": "the mission reaches the honest expected terminal result and the exact objective, plan, approval, execution, verification and result recover after restart"
+    },
+
+    {
+      "id": "V1-TOOLS-001",
+      "area": "tools",
+      "evidencePolicy": "automated",
+      "given": "native, Relay, MCP and enabled extension capabilities",
+      "when": "the registry is enumerated",
+      "then": "every capability has a unique stable versioned ID, schema, risk and health state"
+    },
+    {
+      "id": "V1-TOOLS-002",
+      "area": "tools",
+      "evidencePolicy": "automated",
+      "given": "invalid args, duplicate identities, unknown commands and oversized output",
+      "when": "execution is requested",
+      "then": "validation rejects the request without native side effects"
+    },
+    {
+      "id": "V1-TOOLS-003",
+      "area": "tools",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "malicious stdio MCP configurations",
+      "when": "registration or launch is attempted",
+      "then": "arbitrary executables, inline scripts, argv and unapproved working directories are rejected"
+    },
+    {
+      "id": "V1-TOOLS-004",
+      "area": "tools",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "saved provider and MCP credentials",
+      "when": "SQLite, settings, logs, diagnostics and exports are inspected",
+      "then": "no credential material exists outside OS secure storage"
+    },
+    {
+      "id": "V1-TOOLS-005",
+      "area": "tools",
+      "evidencePolicy": "automated",
+      "given": "redirect, loopback, private-address, DNS-rebinding and invalid-TLS MCP fixtures",
+      "when": "HTTP MCP connects",
+      "then": "each forbidden destination or identity is rejected before tool data is sent"
+    },
+    {
+      "id": "V1-TOOLS-006",
+      "area": "tools",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "slow, recursive, expensive and oversized tool fixtures",
+      "when": "limits or cancellation trigger",
+      "then": "native work stops at configured byte, time, step and cost bounds and output cannot authorize another action"
+    },
+
+    {
+      "id": "V1-APPROVAL-001",
+      "area": "approvals",
+      "evidencePolicy": "packaged",
+      "given": "simultaneous local, Relay and MCP approval requests",
+      "when": "Approval Centre opens",
+      "then": "every live request appears once and can be approved, denied or inspected"
+    },
+    {
+      "id": "V1-APPROVAL-002",
+      "area": "approvals",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "low, high and critical request fixtures",
+      "when": "once, mission, project, deny and cancel are selected",
+      "then": "scopes are enforced and high/critical requests remain once-only"
+    },
+    {
+      "id": "V1-APPROVAL-003",
+      "area": "approvals",
+      "evidencePolicy": "automated",
+      "given": "an approved request bound to an atomic single-use nonce",
+      "when": "request ID, tool/version, provider or server instance, executable/package hash, endpoint identity, canonical args, requester, project, destination, working directory, environment, configuration, expiry or uses change, or a replay/TOCTOU race is attempted",
+      "then": "the native boundary atomically consumes the valid nonce once, denies every mutation/replay and defaults timeout to denial before side effects"
+    },
+
+    {
+      "id": "V1-EXT-001",
+      "area": "extensions",
+      "evidencePolicy": "automated_and_packaged",
+      "given": "a production build and hostile third-party/developer packages with install, update, migration, activation, helper and persisted-worker hooks",
+      "when": "every install and runtime lifecycle entry point is exercised under process, filesystem and network monitoring",
+      "then": "extension-controlled code runs only inside tested OS confinement or no extension-controlled code executes at any lifecycle point"
+    },
+    {
+      "id": "V1-EXT-002",
+      "area": "extensions",
+      "evidencePolicy": "automated",
+      "given": "extension execution is enabled, plus tampered packages and traversal, symlink and junction fixtures",
+      "when": "install or permission access is attempted",
+      "then": "integrity or canonical-path enforcement rejects them and permissions remain deny-by-default and revocable; if execution is disabled, install/update/enable controls are absent or fail closed"
+    },
+    {
+      "id": "V1-EXT-003",
+      "area": "extensions",
+      "evidencePolicy": "packaged",
+      "given": "an enabled sandboxed extension or a legacy extension present before production execution was disabled, with data and a secret",
+      "when": "update, disable and uninstall run",
+      "then": "enabled-mode lifecycle is audited and bounded; disabled mode executes no extension code; and uninstall removes executable remnants, temp data and secrets"
+    },
+    {
+      "id": "V1-QUAL-001",
+      "area": "quality",
+      "evidencePolicy": "packaged",
+      "given": "the declared keyboard and screen-reader journey list",
+      "when": "it is run on the package",
+      "then": "focus order, names, roles, shortcuts and visible focus pass with no keyboard trap"
+    },
+    {
+      "id": "V1-QUAL-002",
+      "area": "quality",
+      "evidencePolicy": "packaged",
+      "given": "forced termination during write, stream and mission fixtures",
+      "when": "Orbit restarts",
+      "then": "durable state is consistent, interrupted work is honest and retries are bounded"
+    },
+    {
+      "id": "V1-QUAL-003",
+      "area": "quality",
+      "evidencePolicy": "packaged",
+      "given": "the declared clean-machine dataset",
+      "when": "20 cold starts and 100 local searches run",
+      "then": "p95 cold start is at most 1500 ms and p95 local search is at most 100 ms"
+    },
+    {
+      "id": "V1-QUAL-004",
+      "area": "quality",
+      "evidencePolicy": "packaged",
+      "given": "an indexed fixture directory",
+      "when": "a file is created, changed, renamed and deleted",
+      "then": "each change appears without a full rescan within five seconds"
+    },
+
+    {
+      "id": "V1-REL-001",
+      "area": "release",
+      "evidencePolicy": "automated",
+      "given": "a push or pull request",
+      "when": "CI runs",
+      "then": "contract validation, mutation tests, lint, strict typecheck, JS tests, Rust tests and Windows renderer/native builds are mandatory"
+    },
+    {
+      "id": "V1-REL-002",
+      "area": "release",
+      "evidencePolicy": "automated",
+      "given": "the release commit",
+      "when": "the mandatory CI workflow completes",
+      "then": "every required job passes without allowed failure"
+    },
+    {
+      "id": "V1-REL-003",
+      "area": "release",
+      "evidencePolicy": "packaged",
+      "given": "the declared clean Windows baseline and previous Orbit version",
+      "when": "MSI and NSIS install, upgrade, shortcuts, single instance, launch-at-login, restart and uninstall run",
+      "then": "all pass and retained/deleted user data matches the documented policy"
+    },
+    {
+      "id": "V1-REL-004",
+      "area": "release",
+      "evidencePolicy": "packaged",
+      "given": "the installed app",
+      "when": "diagnostics open",
+      "then": "semantic version, commit, build time, executable path, Relay version/protocol/hash and degraded dependencies match the package"
+    },
+    {
+      "id": "V1-REL-005",
+      "area": "release",
+      "evidencePolicy": "automated",
+      "given": "production release mode",
+      "when": "signing or verified-update credentials/configuration are absent or invalid",
+      "then": "the release job fails before publishing"
+    },
+    {
+      "id": "V1-REL-006",
+      "area": "release",
+      "evidencePolicy": "packaged_external",
+      "given": "protected production signing credentials for the locked Orbit publisher and the update adversarial suite",
+      "when": "every executable and installer is built and wrong, expired, revoked, tampered, replayed or downgraded signatures/metadata are offered",
+      "then": "every artifact validates to the expected trusted Authenticode chain with an RFC3161 timestamp, signing provenance is recorded, and the updater rejects every invalid trust root or update"
+    },
+    {
+      "id": "V1-REL-007",
+      "area": "release",
+      "evidencePolicy": "automated",
+      "given": "a release artifact",
+      "when": "release evidence is inspected",
+      "then": "immutable commit, reproducible build record, SHA-256, SBOM, dependency scan, secret scan and malware scan are present"
+    },
+    {
+      "id": "V1-DOC-001",
+      "area": "documentation",
+      "evidencePolicy": "packaged",
+      "given": "the final package",
+      "when": "README, feature matrix, security model and user guidance are compared",
+      "then": "every described feature and limitation matches installed behavior and foundations are labelled"
+    },
+    {
+      "id": "V1-AUDIT-001",
+      "area": "audit",
+      "evidencePolicy": "packaged",
+      "given": "the completed v1 package and evidence ledger",
+      "when": "independent architecture, security, product and regression reviewers audit them",
+      "then": "the combined report contains zero unresolved critical or high findings"
+    },
+    {
+      "id": "V1-AUDIT-002",
+      "area": "audit",
+      "evidencePolicy": "packaged",
+      "given": "a newer package after the remediation/rebuild iteration",
+      "when": "a fresh independent full audit runs",
+      "then": "the combined report contains zero unresolved critical or high findings and records independent reviewer identities"
+    }
+  ]
+}

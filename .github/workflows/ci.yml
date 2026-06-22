@@ -25,6 +25,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run v1:validate
       - run: npm run lint
       - run: npm run typecheck --workspaces --if-present
       - run: npm test
@@ -52,7 +53,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Build the renderer first so the Tauri build inputs exist.
-      - run: npm run build:vite --workspace @orbit/desktop
-      - name: cargo check (full workspace, incl. orbit-desktop)
-        run: cargo check --workspace
+      - name: Build production Windows desktop bundles
+        run: npm run build --workspace @orbit/desktop

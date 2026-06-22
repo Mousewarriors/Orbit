@@ -1,0 +1,555 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "criteria": [
+    {
+      "id": "V1-GOV-001",
+      "ownerSlice": "V1-000",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-GOV-002",
+      "ownerSlice": "V1-000",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-GOV-003",
+      "ownerSlice": "V1-000",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-GOV-004",
+      "ownerSlice": "V1-000",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-GOV-005",
+      "ownerSlice": "V1-015",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CORE-001",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CORE-002",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CORE-003",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-NL-001",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-NL-002",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-NL-003",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-NL-004",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-NL-005",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-001",
+      "ownerSlice": "V1-004",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-002",
+      "ownerSlice": "V1-007",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-003",
+      "ownerSlice": "V1-007",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-004",
+      "ownerSlice": "V1-007",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-005",
+      "ownerSlice": "V1-007",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-PROJ-006",
+      "ownerSlice": "V1-007",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AI-001",
+      "ownerSlice": "V1-008",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AI-002",
+      "ownerSlice": "V1-017",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AI-003",
+      "ownerSlice": "V1-008",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AI-004",
+      "ownerSlice": "V1-008",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-001",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-002",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-003",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-004",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-005",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CTX-006",
+      "ownerSlice": "V1-003",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CHAT-001",
+      "ownerSlice": "V1-009",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CHAT-002",
+      "ownerSlice": "V1-009",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-CHAT-003",
+      "ownerSlice": "V1-009",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-MISSION-001",
+      "ownerSlice": "V1-005",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-MISSION-002",
+      "ownerSlice": "V1-005",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-MISSION-003",
+      "ownerSlice": "V1-005",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-001",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-002",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-003",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-004",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-005",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-TOOLS-006",
+      "ownerSlice": "V1-002",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-APPROVAL-001",
+      "ownerSlice": "V1-006",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-APPROVAL-002",
+      "ownerSlice": "V1-006",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-APPROVAL-003",
+      "ownerSlice": "V1-006",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-EXT-001",
+      "ownerSlice": "V1-010",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-EXT-002",
+      "ownerSlice": "V1-010",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-EXT-003",
+      "ownerSlice": "V1-010",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-QUAL-001",
+      "ownerSlice": "V1-011",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-QUAL-002",
+      "ownerSlice": "V1-011",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-QUAL-003",
+      "ownerSlice": "V1-011",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-QUAL-004",
+      "ownerSlice": "V1-010",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-001",
+      "ownerSlice": "V1-001",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-002",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-003",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-004",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-005",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-006",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-REL-007",
+      "ownerSlice": "V1-012",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-DOC-001",
+      "ownerSlice": "V1-013",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AUDIT-001",
+      "ownerSlice": "V1-014",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    },
+    {
+      "id": "V1-AUDIT-002",
+      "ownerSlice": "V1-016",
+      "status": "pending",
+      "verifiedBuild": null,
+      "evidence": [],
+      "verifiedAt": null,
+      "verifier": null
+    }
+  ]
+}

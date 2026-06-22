@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": "1.0.0",
+  "updatedAt": "2026-06-22T15:15:00Z",
+  "slices": [
+    {
+      "id": "V1-000",
+      "status": "in_progress",
+      "workflow": {
+        "implement": "in_progress",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "not_applicable",
+        "live_verify": "not_applicable",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [
+        {
+          "type": "commit",
+          "commit": "b2d7655fd01ef6199aa7ef88dd19c9ccd2d575f4",
+          "description": "Known-good implementation checkpoint before the v1 contract"
+        }
+      ],
+      "blocker": null
+    },
+    {
+      "id": "V1-001",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-002",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-003",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-004",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-005",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-006",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-007",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-008",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-009",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-010",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-011",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-017",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-012",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-013",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-014",
+      "status": "pending",
+      "workflow": {
+        "implement": "not_applicable",
+        "test": "not_applicable",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-015",
+      "status": "pending",
+      "workflow": {
+        "implement": "pending",
+        "test": "pending",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    },
+    {
+      "id": "V1-016",
+      "status": "pending",
+      "workflow": {
+        "implement": "not_applicable",
+        "test": "not_applicable",
+        "independent_review": "pending",
+        "fix": "pending",
+        "package": "pending",
+        "live_verify": "pending",
+        "document": "pending",
+        "commit": "pending"
+      },
+      "reviews": [],
+      "evidence": [],
+      "blocker": null
+    }
+  ]
+}
