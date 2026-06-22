@@ -86,6 +86,38 @@ export function bestProject(
   return ranked[0]?.item ?? null;
 }
 
+/** A confident single match, an ambiguous shortlist, or nothing. */
+export type ProjectResolution =
+  | { readonly kind: 'match'; readonly project: ProjectCandidate }
+  | { readonly kind: 'choices'; readonly projects: readonly ProjectCandidate[] }
+  | { readonly kind: 'none' };
+
+/**
+ * Resolve a query against candidate projects/folders, distinguishing a confident
+ * single match from an *ambiguous* set — several near-equally-strong matches,
+ * e.g. folders with the same name in different locations. Callers with an
+ * interactive loop (Chat) can ask the user to choose from `choices`; deterministic
+ * callers (Mission) can fall back to `bestProject` and take the top match.
+ *
+ * "Ambiguous" = more than one candidate within `margin` of the top score.
+ */
+export function resolveProjectMatch(
+  query: string,
+  candidates: readonly ProjectCandidate[],
+  opts: { readonly margin?: number; readonly maxChoices?: number } = {},
+): ProjectResolution {
+  const margin = opts.margin ?? 0.05;
+  const maxChoices = opts.maxChoices ?? 5;
+  const ranked = rankProjects(query, candidates);
+  const top = ranked[0];
+  if (!top || top.score <= 0) return { kind: 'none' };
+  const contenders = ranked.filter((r) => r.score >= top.score - margin);
+  if (contenders.length > 1) {
+    return { kind: 'choices', projects: contenders.slice(0, maxChoices).map((c) => c.item) };
+  }
+  return { kind: 'match', project: top.item };
+}
+
 /**
  * Rank applications by relevance to `query` (matched against the app name).
  * Returns positive matches strongest first.

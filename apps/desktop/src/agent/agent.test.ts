@@ -80,6 +80,14 @@ describe('executeMissionStep', () => {
             ? { id: 'vscode', name: 'Visual Studio Code', path: 'code.exe' }
             : null,
       resolveProject: (q) => (q.toLowerCase().includes('orbit') ? { name: 'Orbit', path: 'C:/p/orbit' } : null),
+      resolveProjectFromIndex: async (q) =>
+        q.toLowerCase().includes('research')
+          ? {
+              kind: 'match',
+              project: { name: 'Personal Research Assistant', path: 'C:/Personal Research Assistant' },
+            }
+          : { kind: 'none' },
+      chooseFolder: async (_q, choices) => choices[0] ?? null,
       launchApp: vi.fn().mockResolvedValue(undefined),
       openProjectInApplication: vi.fn().mockResolvedValue(undefined),
       revealFolder: vi.fn().mockResolvedValue(undefined),
@@ -121,6 +129,83 @@ describe('executeMissionStep', () => {
     );
     expect(out.ok).toBe(true);
     expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/p/orbit');
+  });
+
+  it('falls back to an indexed folder when the catalog has no project', async () => {
+    const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openProjectInApplication,
+        args: { applicationQuery: 'vs code', projectQuery: 'Personal Research Assistant' },
+      },
+      deps({ openProjectInApplication }),
+    );
+    expect(out.ok).toBe(true);
+    expect(openProjectInApplication).toHaveBeenCalledWith(
+      'vscode',
+      'C:/Personal Research Assistant',
+    );
+  });
+
+  it('asks the user to choose among ambiguous indexed folders, then opens the pick', async () => {
+    const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
+    const chooseFolder = vi.fn(async (_q: string, choices: readonly { name: string; path: string }[]) =>
+      choices[1] ?? null,
+    );
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openProjectInApplication,
+        args: { applicationQuery: 'vs code', projectQuery: 'reports' },
+      },
+      deps({
+        openProjectInApplication,
+        chooseFolder,
+        resolveProjectFromIndex: async () => ({
+          kind: 'choices',
+          projects: [
+            { name: 'reports', path: 'C:/Work/reports' },
+            { name: 'reports', path: 'D:/Archive/reports' },
+          ],
+        }),
+      }),
+    );
+    expect(chooseFolder).toHaveBeenCalledOnce();
+    expect(out.ok).toBe(true);
+    expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'D:/Archive/reports');
+  });
+
+  it('does not open anything when the user cancels the folder picker', async () => {
+    const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openProjectInApplication,
+        args: { applicationQuery: 'vs code', projectQuery: 'reports' },
+      },
+      deps({
+        openProjectInApplication,
+        chooseFolder: async () => null,
+        resolveProjectFromIndex: async () => ({
+          kind: 'choices',
+          projects: [
+            { name: 'reports', path: 'C:/Work/reports' },
+            { name: 'reports', path: 'D:/Archive/reports' },
+          ],
+        }),
+      }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.summary).toMatch(/No folder chosen/);
+    expect(openProjectInApplication).not.toHaveBeenCalled();
+  });
+
+  it('reveals an indexed folder when the catalog has no project', async () => {
+    const revealFolder = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      { toolId: NATIVE_TOOL_IDS.openProjectFolder, args: { projectQuery: 'research' } },
+      deps({ revealFolder }),
+    );
+    expect(out.ok).toBe(true);
+    expect(revealFolder).toHaveBeenCalledWith('C:/Personal Research Assistant');
   });
 
   it('dispatches an agent through the injected Relay path', async () => {

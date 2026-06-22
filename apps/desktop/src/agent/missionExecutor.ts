@@ -25,9 +25,33 @@ export interface ResolvedEntity {
   readonly path: string;
 }
 
+/**
+ * Resolving a project name against the indexed file system yields a confident
+ * single folder, an ambiguous shortlist (several folders of the same name), or
+ * nothing. The executor asks the user to choose when it's `choices`.
+ */
+export type FolderResolution =
+  | { readonly kind: 'match'; readonly project: ResolvedEntity }
+  | { readonly kind: 'choices'; readonly projects: readonly ResolvedEntity[] }
+  | { readonly kind: 'none' };
+
 export interface MissionExecutorDeps {
   readonly resolveApp: (query: string) => ResolvedEntity | null;
   readonly resolveProject: (query: string) => ResolvedEntity | null;
+  /**
+   * Fallback project resolution from the indexed file system (folders), used when
+   * the curated catalog has no match. Async because it queries the file index.
+   * Returns a confident match, an ambiguous shortlist, or nothing.
+   */
+  readonly resolveProjectFromIndex: (query: string) => Promise<FolderResolution>;
+  /**
+   * Ask the user to pick one of several equally-strong folder matches. Resolves
+   * to the chosen folder, or null if the user cancelled.
+   */
+  readonly chooseFolder: (
+    query: string,
+    choices: readonly ResolvedEntity[],
+  ) => Promise<ResolvedEntity | null>;
   readonly launchApp: (path: string) => Promise<void>;
   readonly openProjectInApplication: (
     applicationId: string,
@@ -55,6 +79,24 @@ function fail(summary: string, detail?: string): MissionStepOutcome {
   return detail ? { ok: false, summary, detail } : { ok: false, summary };
 }
 
+/** Catalog match → indexed match → ask-the-user on ambiguity → none/cancelled. */
+type StepProject =
+  | { readonly status: 'resolved'; readonly project: ResolvedEntity }
+  | { readonly status: 'none' }
+  | { readonly status: 'cancelled' };
+
+async function resolveStepProject(query: string, deps: MissionExecutorDeps): Promise<StepProject> {
+  const catalog = deps.resolveProject(query);
+  if (catalog) return { status: 'resolved', project: catalog };
+  const folder = await deps.resolveProjectFromIndex(query);
+  if (folder.kind === 'match') return { status: 'resolved', project: folder.project };
+  if (folder.kind === 'choices') {
+    const chosen = await deps.chooseFolder(query, folder.projects);
+    return chosen ? { status: 'resolved', project: chosen } : { status: 'cancelled' };
+  }
+  return { status: 'none' };
+}
+
 export async function executeMissionStep(
   step: MissionStep,
   deps: MissionExecutorDeps,
@@ -71,9 +113,14 @@ export async function executeMissionStep(
 
     case NATIVE_TOOL_IDS.openProjectInApplication: {
       const app = deps.resolveApp(str(args, 'applicationQuery'));
-      const project = deps.resolveProject(str(args, 'projectQuery'));
+      const projectQuery = str(args, 'projectQuery');
       if (!app?.id) return fail(`No installed app matching "${str(args, 'applicationQuery')}"`);
-      if (!project) return fail(`No known project matching "${str(args, 'projectQuery')}"`);
+      const resolved = await resolveStepProject(projectQuery, deps);
+      if (resolved.status === 'cancelled') return fail(`No folder chosen for "${projectQuery}"`);
+      if (resolved.status === 'none') {
+        return fail(`No known project or indexed folder matching "${projectQuery}"`);
+      }
+      const project = resolved.project;
       await deps.openProjectInApplication(app.id, project.path);
       return {
         ok: true,
@@ -83,8 +130,13 @@ export async function executeMissionStep(
     }
 
     case NATIVE_TOOL_IDS.openProjectFolder: {
-      const project = deps.resolveProject(str(args, 'projectQuery'));
-      if (!project) return fail(`No known project matching "${str(args, 'projectQuery')}"`);
+      const projectQuery = str(args, 'projectQuery');
+      const resolved = await resolveStepProject(projectQuery, deps);
+      if (resolved.status === 'cancelled') return fail(`No folder chosen for "${projectQuery}"`);
+      if (resolved.status === 'none') {
+        return fail(`No known project or indexed folder matching "${projectQuery}"`);
+      }
+      const project = resolved.project;
       await deps.revealFolder(project.path);
       return { ok: true, summary: `Revealed ${project.name}`, detail: project.path };
     }

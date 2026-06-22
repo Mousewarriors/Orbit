@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { bestProject, rankApps, type ProjectCandidate } from '@orbit/intent';
+import { bestProject, rankApps, resolveProjectMatch, type ProjectCandidate } from '@orbit/intent';
 import { recommendAgent } from '@orbit/agents';
 import {
   missionStepViews,
@@ -24,6 +24,7 @@ import {
   type MissionExecutorDeps,
 } from '../agent/missionExecutor.js';
 import { ConfirmDialog } from './ConfirmDialog.js';
+import { FolderPickerDialog, type FolderChoice } from './FolderPickerDialog.js';
 import { ToolRegistry } from '@orbit/tool-registry';
 
 type Phase = 'idle' | 'planning' | 'preview' | 'running' | 'done';
@@ -60,6 +61,10 @@ export function OrbitAgentView({
   const [statuses, setStatuses] = useState<MissionStepStatus[]>([]);
   const [outcomes, setOutcomes] = useState<Array<MissionStepOutcome | null>>([]);
   const [confirmIdx, setConfirmIdx] = useState<number | null>(null);
+  const [folderChoice, setFolderChoice] = useState<{
+    query: string;
+    choices: readonly FolderChoice[];
+  } | null>(null);
   const [navTarget, setNavTarget] = useState<{ viewId: string; arg: string | null } | null>(null);
 
   const apps = useRef<native.NativeApp[]>([]);
@@ -67,6 +72,7 @@ export function OrbitAgentView({
   const clipboard = useRef<string>('');
   const stoppedRef = useRef(false);
   const confirmResolver = useRef<((ok: boolean) => void) | null>(null);
+  const folderResolver = useRef<((choice: FolderChoice | null) => void) | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Load registry, provider config, relay state and resolution caches.
@@ -181,6 +187,31 @@ export function OrbitAgentView({
         const p = bestProject(q, projects.current);
         return p ? { name: p.name ?? p.path, path: p.path } : null;
       },
+      resolveProjectFromIndex: async (q) => {
+        const folders = (await native.fileSearch(q, { kind: 'dir' })).map((f) => ({
+          path: f.path,
+          name: f.name as string | null,
+        }));
+        const res = resolveProjectMatch(q, folders);
+        if (res.kind === 'match') {
+          return { kind: 'match', project: { name: res.project.name ?? res.project.path, path: res.project.path } };
+        }
+        if (res.kind === 'choices') {
+          return {
+            kind: 'choices',
+            projects: res.projects.map((p) => ({ name: p.name ?? p.path, path: p.path })),
+          };
+        }
+        return { kind: 'none' };
+      },
+      chooseFolder: (_query, choices) =>
+        new Promise<{ name: string; path: string } | null>((resolve) => {
+          folderResolver.current = resolve;
+          setFolderChoice({
+            query: _query,
+            choices: choices.map((c) => ({ name: c.name, path: c.path })),
+          });
+        }),
       launchApp: (path) => native.launchPath(path),
       openProjectInApplication: (applicationId, projectPath) =>
         native.openProjectInApplication(applicationId, projectPath),
@@ -269,6 +300,7 @@ export function OrbitAgentView({
   const stop = useCallback(() => {
     stoppedRef.current = true;
     confirmResolver.current?.(false);
+    folderResolver.current?.(null);
   }, []);
 
   const hasDispatch = stepViews.some((v) => v.toolId === 'native:dispatch_agent');
@@ -393,6 +425,23 @@ export function OrbitAgentView({
           }}
           onConfirm={() => confirmResolver.current?.(true)}
           onCancel={() => confirmResolver.current?.(false)}
+        />
+      )}
+
+      {folderChoice && (
+        <FolderPickerDialog
+          query={folderChoice.query}
+          choices={folderChoice.choices}
+          onChoose={(choice) => {
+            setFolderChoice(null);
+            folderResolver.current?.(choice);
+            folderResolver.current = null;
+          }}
+          onCancel={() => {
+            setFolderChoice(null);
+            folderResolver.current?.(null);
+            folderResolver.current = null;
+          }}
         />
       )}
     </div>

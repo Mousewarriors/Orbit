@@ -25,6 +25,7 @@ function deps(over: Partial<NativeToolDeps> = {}): NativeToolDeps {
     openProjectInApplication: async () => {},
     recordUsage: async () => {},
     fileSearch: async () => [],
+    findFolders: async () => [],
     noteList: async () => [],
     ...over,
   };
@@ -60,6 +61,53 @@ describe('executeNativeTool · open_project_in_application', () => {
     expect(out.ok).toBe(true);
     expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/projects/orbit');
     expect(out.content).toContain('Opened Orbit in Visual Studio Code');
+  });
+
+  it('falls back to an indexed folder when no catalogued project matches', async () => {
+    const openProjectInApplication = vi.fn(async () => {});
+    const findFolders = vi.fn(async () => [
+      { name: 'Personal Research Assistant', path: 'C:/Personal Research Assistant' },
+      { name: 'Old Research', path: 'C:/Old Research' },
+    ]);
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openProjectInApplication),
+      { applicationQuery: 'vs code', projectQuery: 'Personal Research Assistant' },
+      deps({ openProjectInApplication, findFolders }),
+    );
+    expect(out.ok).toBe(true);
+    expect(findFolders).toHaveBeenCalledWith('Personal Research Assistant');
+    expect(openProjectInApplication).toHaveBeenCalledWith(
+      'vscode',
+      'C:/Personal Research Assistant',
+    );
+  });
+
+  it('asks the user to disambiguate when several indexed folders match equally', async () => {
+    const openProjectInApplication = vi.fn(async () => {});
+    const findFolders = vi.fn(async () => [
+      { name: 'Research', path: 'C:/Work/Research' },
+      { name: 'Research', path: 'D:/Archive/Research' },
+    ]);
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openProjectInApplication),
+      { applicationQuery: 'vs code', projectQuery: 'Research' },
+      deps({ openProjectInApplication, findFolders }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.content).toMatch(/Multiple indexed folders match/);
+    expect(out.content).toContain('C:/Work/Research');
+    expect(out.content).toContain('D:/Archive/Research');
+    expect(openProjectInApplication).not.toHaveBeenCalled();
+  });
+
+  it('reports clearly when neither a project nor an indexed folder matches', async () => {
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openProjectInApplication),
+      { applicationQuery: 'vs code', projectQuery: 'nonexistent thing' },
+      deps(),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.content).toMatch(/No known project or indexed folder matches/);
   });
 
   it('does not claim success when the native launch fails', async () => {

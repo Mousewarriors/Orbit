@@ -73,7 +73,7 @@ export function nativeToolRecords(): ToolRecord[] {
     record(
       NATIVE_TOOL_IDS.openProjectInApplication,
       'Open project in application',
-      'Resolve an installed application and a known project, then open the project in that application.',
+      'Resolve an installed application and a project — a known project or any indexed folder matching the name — then open that folder in the application.',
       obj(
         {
           applicationQuery: { type: 'string', description: 'Application name or alias' },

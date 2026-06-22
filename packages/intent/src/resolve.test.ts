@@ -5,6 +5,7 @@ import {
   projectDisplayName,
   rankApps,
   rankProjects,
+  resolveProjectMatch,
   type AppCandidate,
   type ProjectCandidate,
 } from './resolve.js';
@@ -57,6 +58,35 @@ describe('rankProjects', () => {
       { path: 'C:\\Users\\me\\Raycast Clone', name: 'orbit-monorepo' },
     ];
     expect(bestProject('orbit', candidates)?.path).toBe('C:\\Users\\me\\Raycast Clone');
+  });
+});
+
+describe('resolveProjectMatch', () => {
+  it('returns a confident single match', () => {
+    const res = resolveProjectMatch('Personal Research Assistant', [
+      { path: 'C:\\Personal Research Assistant', name: 'Personal Research Assistant' },
+      { path: 'C:\\Old Notes', name: 'Old Notes' },
+    ]);
+    expect(res.kind).toBe('match');
+    if (res.kind === 'match') expect(res.project.path).toBe('C:\\Personal Research Assistant');
+  });
+
+  it('returns choices when several candidates score near-equally', () => {
+    const res = resolveProjectMatch('research', [
+      { path: 'C:\\Work\\research', name: 'research' },
+      { path: 'D:\\Archive\\research', name: 'research' },
+    ]);
+    expect(res.kind).toBe('choices');
+    if (res.kind === 'choices') {
+      expect(res.projects.map((p) => p.path).sort()).toEqual([
+        'C:\\Work\\research',
+        'D:\\Archive\\research',
+      ]);
+    }
+  });
+
+  it('returns none when nothing scores', () => {
+    expect(resolveProjectMatch('zzz-nope', [{ path: 'C:\\foo', name: 'foo' }]).kind).toBe('none');
   });
 });
 

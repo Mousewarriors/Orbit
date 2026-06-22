@@ -259,6 +259,11 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                     native.openProjectInApplication(applicationId, projectPath),
                   recordUsage: (id) => native.recordCommandUsage(id),
                   fileSearch: (q) => native.fileSearch(q),
+                  findFolders: async (q) =>
+                    (await native.fileSearch(q, { kind: 'dir' })).map((r) => ({
+                      name: r.name,
+                      path: r.path,
+                    })),
                   noteList: (q) => native.noteList(q),
                 });
               }

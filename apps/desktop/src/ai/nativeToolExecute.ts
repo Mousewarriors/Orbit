@@ -14,7 +14,7 @@
  * no-match returns `ok: false`, so the model can't falsely claim it opened.
  */
 import { NATIVE_TOOL_IDS, type ToolRecord } from '@orbit/tool-registry';
-import { bestProject, type ProjectCandidate } from '@orbit/intent';
+import { bestProject, resolveProjectMatch, type ProjectCandidate } from '@orbit/intent';
 import type { NativeApp } from '../native.js';
 
 /** Native tools AI Chat is allowed to call in this slice. */
@@ -70,7 +70,28 @@ export interface NativeToolDeps {
   openProjectInApplication(applicationId: string, projectPath: string): Promise<void>;
   recordUsage(commandId: string): Promise<void>;
   fileSearch(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
+  /** Search the file index restricted to directories (folders), for project fallback. */
+  findFolders(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
   noteList(query: string): Promise<ReadonlyArray<{ title: string }>>;
+}
+
+/**
+ * Resolve a project name against the indexed file system when it isn't in the
+ * curated project catalog: search indexed folders, then rank them by the same
+ * name/path scoring the catalog uses, so "Personal Research Assistant" resolves
+ * to `C:\Personal Research Assistant` once the drive is indexed. Returns a
+ * disambiguation result so an ambiguous query (several folders of the same name)
+ * can be bounced back to the user rather than silently guessing.
+ */
+async function resolveFolderProject(
+  query: string,
+  deps: NativeToolDeps,
+): Promise<ReturnType<typeof resolveProjectMatch>> {
+  const folders = await deps.findFolders(query).catch(() => []);
+  return resolveProjectMatch(
+    query,
+    folders.map((f) => ({ path: f.path, name: f.name })),
+  );
 }
 
 export interface NativeToolOutcome {
@@ -138,9 +159,24 @@ export async function executeNativeTool(
             .join(', ')}. Ask the user which one they mean.`,
         };
       }
-      const project = bestProject(projectQuery, projects);
+      let project: ProjectCandidate | null = bestProject(projectQuery, projects);
       if (!project) {
-        return { ok: false, content: `No known project matches "${projectQuery}".` };
+        const folder = await resolveFolderProject(projectQuery, deps);
+        if (folder.kind === 'choices') {
+          return {
+            ok: false,
+            content: `Multiple indexed folders match "${projectQuery}":\n${folder.projects
+              .map((p) => p.path)
+              .join('\n')}\nAsk the user which one they mean, then call this tool again with that exact folder name.`,
+          };
+        }
+        if (folder.kind === 'match') project = folder.project;
+      }
+      if (!project) {
+        return {
+          ok: false,
+          content: `No known project or indexed folder matches "${projectQuery}". If the folder exists, make sure its drive is indexed (Settings → File index).`,
+        };
       }
       try {
         await deps.openProjectInApplication(app.app.id, project.path);

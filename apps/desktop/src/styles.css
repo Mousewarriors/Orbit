@@ -459,6 +459,45 @@ kbd {
   font-weight: 600;
 }
 
+/* Folder picker (ambiguous project resolution) */
+.orbit-folder-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow: auto;
+}
+.orbit-folder-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: default;
+}
+.orbit-folder-option.is-active {
+  background: var(--row-selected);
+  border-color: var(--separator);
+}
+.orbit-folder-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.orbit-folder-path {
+  font-size: 11px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
 /* Quick AI surface */
 .quick-ai {
   padding-bottom: 12px;
