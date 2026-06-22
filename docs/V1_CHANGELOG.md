@@ -115,3 +115,19 @@ commit.
 
 The findings are recorded in
 `docs/audits/V1_CONTRACT_REVIEW_ROUND_5.md`.
+
+## 2026-06-22 - Review round 6 package and closure response
+
+- Bound every audit finding closure to the audit criterion's exact remediation
+  commit and package SHA-256.
+- Made any critical/high finding in audit pass 2 reset the clean-audit attempt.
+- Required the evidence source commit's CI workflow blob to match the locked
+  workflow and added signer-digest verification.
+- Raised PE/MSI structural and substantive-content requirements while retaining
+  exact-source GitHub OIDC package provenance.
+- Required non-empty, schema-validated and OIDC-attested raw security telemetry.
+- Ordered evidence, reviews, phases and closures after their claimed commits and
+  required phase commit ancestry.
+
+The findings are recorded in
+`docs/audits/V1_CONTRACT_REVIEW_ROUND_6.md`.

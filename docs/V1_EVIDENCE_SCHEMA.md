@@ -40,6 +40,10 @@ the specific negative-test IDs encoded by the validator. Each negative check
 records its target, input SHA-256, observed result and a hashed raw-evidence
 file; boolean labels alone are rejected.
 
+The source commit's actual `.github/workflows/ci.yml` blob must match the
+contract-locked workflow hash. This prevents a temporary malicious workflow
+from generating evidence and then being reverted.
+
 Packaged reports use `"kind": "packaged"` and add:
 
 ```json
@@ -99,8 +103,10 @@ reviewer independence is checked by key fingerprint.
 
 For audit slices, every critical/high finding from every review remains blocking
 until the original reviewer signs a structured closure tied to a descendant
-remediation commit and passing closure evidence. A separate clean review cannot
-hide another review's open finding.
+remediation commit, the exact audited package SHA-256 and passing closure
+evidence. A separate clean review cannot hide another review's open finding.
+Audit pass 2 is strictly clean: discovering any critical/high finding resets the
+release anchor and requires remediation, final reruns and a new pass-2 audit.
 
 ## Slice phase report
 

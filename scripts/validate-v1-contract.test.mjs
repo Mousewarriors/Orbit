@@ -385,3 +385,81 @@ test('an audit cannot hide another review open high finding', async () => {
   };
   assert.match(validateContract(state).errors.join('\n'), /has unresolved high finding/);
 });
+
+test('audit pass 2 is not clean if any review finds a high issue', async () => {
+  const state = await loadContract(root);
+  const progress = state.progress.slices.find((item) => item.id === 'V1-016');
+  const reportPath = 'evidence/reports/audit2-high.json';
+  progress.status = 'completed';
+  progress.reviews = [
+    {
+      reviewer: 'agent:019ef142-312a-7771-bc42-11fb141b1961',
+      role: 'product',
+      result: 'changes_requested',
+      reviewedCommit: '10fd3312b29547eb065a8bfdd5d674baf56e1695',
+      report: reportPath,
+      reportSha256: 'c'.repeat(64),
+      reviewedAt: '2026-06-22T21:52:34.716Z',
+      critical: 0,
+      high: 1,
+      signature: 'invalid',
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = 'c'.repeat(64);
+  state.repository.documents[reportPath] = {
+    schemaVersion: 1,
+    kind: 'review',
+    reviewer: progress.reviews[0].reviewer,
+    role: 'product',
+    result: 'changes_requested',
+    reviewedCommit: progress.reviews[0].reviewedCommit,
+    reviewedAt: progress.reviews[0].reviewedAt,
+    critical: 0,
+    high: 1,
+    artifactSha256: null,
+    findings: [{ id: 'P-2', title: 'Release defect', severity: 'high', status: 'open' }],
+  };
+  assert.match(validateContract(state).errors.join('\n'), /is not a clean audit/);
+});
+
+test('automated evidence cannot use a different historical CI workflow', async () => {
+  const state = await loadContract(root);
+  const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-TOOLS-005');
+  const reportPath = 'evidence/reports/workflow-mismatch.json';
+  item.status = 'pass';
+  item.verifiedAt = '2026-06-22T21:45:00Z';
+  item.verifier = 'agent:019ef142-1d1f-78f1-87d5-353c7ec7eea9';
+  item.evidence = [
+    {
+      type: 'automated',
+      commit: '972d687441875731b2c9082a77222658c1e00667',
+      recordedAt: '2026-06-22T21:44:00Z',
+      report: reportPath,
+      reportSha256: 'd'.repeat(64),
+      signatures: [],
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = 'd'.repeat(64);
+  state.repository.reports[reportPath] = {
+    schemaVersion: 1,
+    kind: 'automated',
+    status: 'pass',
+    subjectIds: ['V1-TOOLS-005'],
+    commit: item.evidence[0].commit,
+    generatedAt: item.evidence[0].recordedAt,
+    producer: 'ci:github-actions:1',
+    ci: {
+      repository: 'Mousewarriors/Orbit',
+      runUrl: 'https://github.com/Mousewarriors/Orbit/actions/runs/1',
+      conclusion: 'success',
+      workflow: 'Mousewarriors/Orbit/.github/workflows/ci.yml',
+      commit: item.evidence[0].commit,
+    },
+    checks: [],
+  };
+  state.repository.githubAttestations[reportPath] = true;
+  state.repository.workflowHashesByCommit[item.evidence[0].commit] = '0'.repeat(64);
+  assert.match(validateContract(state).errors.join('\n'), /used an unlocked CI workflow/);
+});

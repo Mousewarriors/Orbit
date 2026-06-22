@@ -186,7 +186,7 @@ const EVIDENCE_ROLES_BY_AREA = {
   audit: ['architecture'],
 };
 
-function validateSecurityCheck(itemId, check, repository, errors) {
+function validateSecurityCheck(itemId, check, expectedCommit, repository, errors) {
   if (!(REQUIRED_SECURITY_CHECKS[itemId] ?? []).includes(check.id)) return;
   const details = check.details;
   if (!details || typeof details !== 'object') {
@@ -207,6 +207,26 @@ function validateSecurityCheck(itemId, check, repository, errors) {
     `${itemId} check ${check.id}`,
     errors,
   );
+  const raw = repository.documents[details.rawEvidencePath];
+  if (
+    (repository.fileSizes[details.rawEvidencePath] ?? 0) < 64 ||
+    repository.githubAttestations[details.rawEvidencePath] !== true ||
+    raw?.schemaVersion !== 1 ||
+    raw?.kind !== 'security-telemetry' ||
+    raw?.commit !== expectedCommit ||
+    !/^ci:github-actions:[1-9]\d*$/.test(raw?.producer ?? '') ||
+    raw?.ci?.repository !== 'Mousewarriors/Orbit' ||
+    raw?.ci?.workflow !== 'Mousewarriors/Orbit/.github/workflows/ci.yml' ||
+    raw?.ci?.commit !== expectedCommit ||
+    raw?.checkId !== check.id ||
+    raw?.target !== details.target ||
+    raw?.inputSha256 !== details.inputSha256 ||
+    raw?.observed !== details.observed ||
+    !Array.isArray(raw?.measurements) ||
+    raw.measurements.length === 0
+  ) {
+    errors.push(`${itemId} check ${check.id} raw evidence is invalid or unattested`);
+  }
   if (itemId === 'V1-CTX-003' && check.id === 'whole-process-capture') {
     if (
       !Array.isArray(details.processes) ||
@@ -346,6 +366,7 @@ function closureSignaturePayload(closure) {
     closure.reviewReportSha256,
     closure.reviewer,
     closure.remediationCommit,
+    closure.artifactSha256,
     closure.closedAt,
     closure.evidenceReportSha256,
   ].join('\n');
@@ -584,7 +605,7 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
       }
     }
     for (const check of report.checks ?? []) {
-      validateSecurityCheck(itemId, check, repository, errors);
+      validateSecurityCheck(itemId, check, record.commit, repository, errors);
     }
     if (
       record.type === 'automated' &&
@@ -611,6 +632,9 @@ function validateEvidenceRecord(record, item, definition, repository, authorityM
       }
       if (repository.githubAttestations[record.report] !== true) {
         errors.push(`${itemId} automated report lacks verified GitHub OIDC provenance`);
+      }
+      if (repository.workflowHashesByCommit[record.commit] !== repository.lockedWorkflowHash) {
+        errors.push(`${itemId} automated evidence used an unlocked CI workflow`);
       }
     }
   }
@@ -853,7 +877,13 @@ function validateReview(review, slice, implementerIdentity, repository, authorit
   }
   validateCommit(review.reviewedCommit, repository, `${slice.id} review`, errors);
   validateFileClaim(review.report, review.reportSha256, repository, `${slice.id} review`, errors);
-  validateTimestamp(review.reviewedAt, now, `${slice.id} review`, errors);
+  const reviewedAt = validateTimestamp(review.reviewedAt, now, `${slice.id} review`, errors);
+  if (
+    reviewedAt !== null &&
+    reviewedAt < (repository.commitTimes[review.reviewedCommit] ?? Infinity)
+  ) {
+    errors.push(`${slice.id} review predates its reviewed commit`);
+  }
   if (!Number.isInteger(review.critical) || !Number.isInteger(review.high)) {
     errors.push(`${slice.id} review requires integer critical/high counts`);
   }
@@ -935,7 +965,15 @@ function validateCompletedSlice(
       `${slice.id}.${record.phase}`,
       errors,
     );
-    validateTimestamp(record.occurredAt, now, `${slice.id}.${record.phase}`, errors);
+    const occurredAt = validateTimestamp(
+      record.occurredAt,
+      now,
+      `${slice.id}.${record.phase}`,
+      errors,
+    );
+    if (occurredAt !== null && occurredAt < (repository.commitTimes[record.commit] ?? Infinity)) {
+      errors.push(`${slice.id}.${record.phase} predates its claimed commit`);
+    }
     const report = repository.documents[record.report];
     if (
       !report ||
@@ -966,6 +1004,7 @@ function validateCompletedSlice(
     }
   }
   let lastTime = -Infinity;
+  let lastCommit = null;
   for (const phase of requiredPhases) {
     if (progress.workflow?.[phase] !== 'pass')
       errors.push(`${slice.id} completed before ${phase} passed`);
@@ -976,7 +1015,15 @@ function validateCompletedSlice(
     }
     const time = Date.parse(record.occurredAt);
     if (time <= lastTime) errors.push(`${slice.id} phase evidence is out of order at ${phase}`);
+    if (
+      lastCommit &&
+      record.commit !== lastCommit &&
+      !repository.ancestry[`${lastCommit}..${record.commit}`]
+    ) {
+      errors.push(`${slice.id} phase commit history diverges at ${phase}`);
+    }
     lastTime = time;
+    lastCommit = record.commit;
   }
   const commitEvidence = phaseEvidence.get('commit');
   if (!implementerMap.has(commitEvidence?.commit)) {
@@ -1002,6 +1049,7 @@ function validateCompletedSlice(
     }
   }
   if (slice.mode === 'audit') {
+    const auditCriterion = evidenceById.get(slice.acceptanceIds[0]);
     const roles = new Set(passingReviews.map((review) => review.role));
     for (const role of REQUIRED_AUDIT_ROLES) {
       if (!roles.has(role)) errors.push(`${slice.id} audit is missing passing ${role} review`);
@@ -1031,7 +1079,18 @@ function validateCompletedSlice(
       }
       const authority = authorityMap.get(closure.reviewer);
       validateCommit(closure.remediationCommit, repository, `${slice.id} finding closure`, errors);
-      validateTimestamp(closure.closedAt, now, `${slice.id} finding closure`, errors);
+      const closedAt = validateTimestamp(
+        closure.closedAt,
+        now,
+        `${slice.id} finding closure`,
+        errors,
+      );
+      if (
+        closedAt !== null &&
+        closedAt < (repository.commitTimes[closure.remediationCommit] ?? Infinity)
+      ) {
+        errors.push(`${slice.id} finding closure predates its remediation commit`);
+      }
       validateFileClaim(
         closure.evidenceReport,
         closure.evidenceReportSha256,
@@ -1049,6 +1108,8 @@ function validateCompletedSlice(
           closure.signature ?? '',
         ) ||
         !repository.ancestry[`${source.review.reviewedCommit}..${closure.remediationCommit}`] ||
+        closure.remediationCommit !== auditCriterion?.verifiedBuild?.commit ||
+        closure.artifactSha256 !== auditCriterion?.verifiedBuild?.sha256 ||
         Date.parse(closure.closedAt) <= Date.parse(source.review.reviewedAt) ||
         closureReport?.schemaVersion !== 1 ||
         closureReport?.kind !== 'finding-closure' ||
@@ -1056,6 +1117,7 @@ function validateCompletedSlice(
         closureReport?.findingId !== closure.findingId ||
         closureReport?.reviewReportSha256 !== closure.reviewReportSha256 ||
         closureReport?.remediationCommit !== closure.remediationCommit ||
+        closureReport?.artifactSha256 !== closure.artifactSha256 ||
         !Array.isArray(closureReport?.checks) ||
         closureReport.checks.length === 0 ||
         closureReport.checks.some((check) => check.status !== 'pass')
@@ -1066,11 +1128,13 @@ function validateCompletedSlice(
       }
     }
     for (const [key, { finding }] of findings) {
+      if (slice.id === 'V1-016' && ['critical', 'high'].includes(finding.severity)) {
+        errors.push(`${slice.id} is not a clean audit because it found ${key}`);
+      }
       if (['critical', 'high'].includes(finding.severity) && !validClosures.has(key)) {
         errors.push(`${slice.id} has unresolved ${finding.severity} finding ${key}`);
       }
     }
-    const auditCriterion = evidenceById.get(slice.acceptanceIds[0]);
     for (const review of passingReviews) {
       if (
         !SHA256_PATTERN.test(review.artifactSha256 ?? '') ||
@@ -1714,7 +1778,7 @@ async function inspectClaimedPath(root, claimedPath) {
       let isExe = false;
       if (
         extension === '.exe' &&
-        bytes.length >= 65_536 &&
+        bytes.length >= 1_048_576 &&
         bytes[0] === 0x4d &&
         bytes[1] === 0x5a
       ) {
@@ -1724,6 +1788,11 @@ async function inspectClaimedPath(root, claimedPath) {
           const sections = bytes.readUInt16LE(peOffset + 6);
           const optionalHeaderSize = bytes.readUInt16LE(peOffset + 20);
           const optionalMagic = bytes.readUInt16LE(peOffset + 24);
+          const dataDirectoryBase = peOffset + 24 + (optionalMagic === 0x20b ? 112 : 96);
+          const importRva =
+            dataDirectoryBase + 16 <= bytes.length ? bytes.readUInt32LE(dataDirectoryBase + 8) : 0;
+          const importSize =
+            dataDirectoryBase + 16 <= bytes.length ? bytes.readUInt32LE(dataDirectoryBase + 12) : 0;
           const sectionTable = peOffset + 24 + optionalHeaderSize;
           const entryRva = bytes.readUInt32LE(peOffset + 24 + 16);
           let sectionLayoutValid =
@@ -1753,7 +1822,9 @@ async function inspectClaimedPath(root, claimedPath) {
             [0x14c, 0x8664, 0xaa64].includes(machine) &&
             [0x10b, 0x20b].includes(optionalMagic) &&
             sectionLayoutValid &&
-            entryMapped;
+            entryMapped &&
+            importRva > 0 &&
+            importSize > 0;
         }
       }
       const msiMagic = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
@@ -1765,7 +1836,7 @@ async function inspectClaimedPath(root, claimedPath) {
       const sectorCount = sectorSize > 0 ? bytes.length / sectorSize - 1 : 0;
       const isMsi =
         extension === '.msi' &&
-        bytes.length >= 4096 &&
+        bytes.length >= 1_048_576 &&
         bytes.subarray(0, 8).equals(msiMagic) &&
         bytes.readUInt16LE(0x1c) === 0xfffe &&
         [9, 12].includes(sectorShift) &&
@@ -1775,6 +1846,14 @@ async function inspectClaimedPath(root, claimedPath) {
         fatSectors < sectorCount &&
         firstDirectorySector < sectorCount &&
         firstFatSector < sectorCount;
+      const sampleStep = Math.max(1, Math.floor(bytes.length / 65_536));
+      let nonZeroSamples = 0;
+      let sampleCount = 0;
+      for (let index = 0; index < bytes.length; index += sampleStep) {
+        sampleCount += 1;
+        if (bytes[index] !== 0) nonZeroSamples += 1;
+      }
+      const substantiveContent = nonZeroSamples / sampleCount >= 0.1;
       let manifest = null;
       let manifestSha256 = null;
       const manifestPath = `${absolute}.manifest.json`;
@@ -1789,7 +1868,7 @@ async function inspectClaimedPath(root, claimedPath) {
         manifest = null;
       }
       artifact = {
-        isWindowsPackage: isExe || isMsi,
+        isWindowsPackage: (isExe || isMsi) && substantiveContent,
         manifest:
           manifest?.schemaVersion === 1 &&
           ['exe', 'msi'].includes(manifest.packageType) &&
@@ -1953,12 +2032,11 @@ export async function loadContract(root) {
   );
   const githubAttestations = {};
   for (const [file, result] of inspectedEntries) {
-    const sourceCommit =
-      result.document?.kind === 'automated'
-        ? result.document.commit
-        : result.artifact?.manifest?.commit;
+    const sourceCommit = ['automated', 'security-telemetry'].includes(result.document?.kind)
+      ? result.document.commit
+      : result.artifact?.manifest?.commit;
     if (
-      (result.document?.kind === 'automated' &&
+      (['automated', 'security-telemetry'].includes(result.document?.kind) &&
         /^ci:github-actions:[1-9]\d*$/.test(result.document.producer ?? '')) ||
       result.artifact?.isWindowsPackage
     ) {
@@ -1974,6 +2052,8 @@ export async function loadContract(root) {
             '--signer-workflow',
             'Mousewarriors/Orbit/.github/workflows/ci.yml',
             '--source-digest',
+            sourceCommit,
+            '--signer-digest',
             sourceCommit,
             '--deny-self-hosted-runners',
           ],
@@ -2002,6 +2082,18 @@ export async function loadContract(root) {
       parsed.releaseEvidence,
     ),
   ];
+  const workflowHashesByCommit = {};
+  for (const commit of claimedCommits) {
+    if (!FULL_COMMIT_PATTERN.test(commit ?? '')) continue;
+    try {
+      const { stdout } = await git(root, ['show', `${commit}:.github/workflows/ci.yml`], {
+        encoding: 'buffer',
+      });
+      workflowHashesByCommit[commit] = sha256(stdout.toString('utf8').replace(/\r\n/g, '\n'));
+    } catch {
+      workflowHashesByCommit[commit] = null;
+    }
+  }
   const ancestry = {};
   for (const older of claimedCommits) {
     for (const newer of claimedCommits) {
@@ -2051,6 +2143,8 @@ export async function loadContract(root) {
     repository: {
       commits,
       commitTimes,
+      workflowHashesByCommit,
+      lockedWorkflowHash: lockedFileHashes['.github/workflows/ci.yml'],
       fileHashes,
       pathSafety,
       reports: documents,
