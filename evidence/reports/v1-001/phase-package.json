@@ -4,11 +4,11 @@
   "status": "pass",
   "sliceId": "V1-001",
   "phase": "package",
-  "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
-  "generatedAt": "2026-06-25T16:31:00.000Z",
+  "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
+  "generatedAt": "2026-06-25T16:42:20.000Z",
   "artifact": {
     "path": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
-    "sha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
+    "sha256": "fbec40e85ee878ae653681ca1fa90c47ed6a95ecf5daa57bed31e80e1dbbe2d1",
     "source": "target/release/bundle/msi/Orbit_0.1.0_x64_en-US.msi"
   },
   "checks": [
@@ -20,7 +20,7 @@
     {
       "id": "tauri-windows-bundle-build-pass",
       "status": "pass",
-      "details": "npm run build --workspace @orbit/desktop passed and produced MSI and NSIS Windows bundles."
+      "details": "npm run build --workspace @orbit/desktop passed after independent review and produced MSI and NSIS Windows bundles."
     },
     {
       "id": "msi-artifact-captured",

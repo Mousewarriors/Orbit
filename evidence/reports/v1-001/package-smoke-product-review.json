@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "review",
+  "reviewer": "agent:019efed7-eb61-7382-af18-dcf85962e5a9",
+  "role": "product",
+  "result": "pass",
+  "reviewedCommit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
+  "reviewedAt": "2026-06-25T16:38:27.363Z",
+  "critical": 0,
+  "high": 0,
+  "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
+  "findings": []
+}

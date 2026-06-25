@@ -4,17 +4,17 @@
   "status": "pass",
   "sliceId": "V1-001",
   "phase": "live_verify",
-  "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
-  "generatedAt": "2026-06-25T16:31:30.000Z",
+  "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
+  "generatedAt": "2026-06-25T16:42:30.000Z",
   "artifact": {
     "path": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
-    "sha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246"
+    "sha256": "fbec40e85ee878ae653681ca1fa90c47ed6a95ecf5daa57bed31e80e1dbbe2d1"
   },
   "checks": [
     {
       "id": "built-executable-launch-smoke",
       "status": "pass",
-      "details": "target/release/orbit-desktop.exe launched, remained alive after five seconds, and was then stopped by the smoke verifier."
+      "details": "The post-review target/release/orbit-desktop.exe launched, remained alive after five seconds, and was then stopped by the smoke verifier."
     }
   ]
 }
