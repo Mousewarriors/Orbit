@@ -15,7 +15,7 @@
     "scripts/validate-v1-contract.test.mjs": "ce35d7da12ba3198a50d77d17dae6d4898cec8f2f127ba26dc78c3a93452739c",
     "scripts/write-v1-ci-evidence.mjs": "a1e5e91f871049ddd9f6bbd4afed60e205141555f6de97dc7b6fdf9a0b0f37b9",
     "package.json": "58e61a10162de88d9af8f8d693e26a302c9fa2b4b42fb0ad4fe200e60a002633",
-    ".github/workflows/ci.yml": "9acb41408baaf09bb91f498fb947c7d297aae5d93a21ad0054de67f1f9afb49f",
+    ".github/workflows/ci.yml": "872fa47f9a57aff7a2dce236b6a53fbfa5ea5fac49f4bc3aca614be1a1a81a96",
     ".gitattributes": "d60f352d0db1404c70afb4bb8b2ca3fd1c610572aa40720e8a0b7baa7885418c"
   }
 }
