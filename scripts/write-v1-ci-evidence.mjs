@@ -24,9 +24,18 @@ const requiredWorkflowTokens = [
   ['strict-typecheck-in-ci', 'npm run typecheck --workspaces --if-present'],
   ['js-tests-in-ci', 'npm test'],
   ['windows-renderer-build-in-ci', 'npm run build:vite --workspace @orbit/desktop'],
-  ['rust-tests-in-ci', 'cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files'],
+  [
+    'rust-tests-in-ci',
+    'cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files',
+  ],
   ['windows-native-build-in-ci', 'npm run build --workspace @orbit/desktop'],
-  ['evidence-attestation-in-ci', 'actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb'],
+  ['all-mandatory-jobs-needed', 'needs: [js, rust-libs, windows-desktop]'],
+  ['v1-report-written-after-needs', 'node scripts/write-v1-ci-evidence.mjs'],
+  ['v1-report-attested-in-ci', 'subject-path: evidence/reports/v1-001/ci-gates.json'],
+  [
+    'evidence-attestation-in-ci',
+    'actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb',
+  ],
 ];
 
 for (const [id, token] of requiredWorkflowTokens) {

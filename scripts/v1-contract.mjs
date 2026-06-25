@@ -121,6 +121,7 @@ const LOCKED_FILES = [
   'scripts/v1-contract.mjs',
   'scripts/validate-v1-backlog.mjs',
   'scripts/validate-v1-contract.test.mjs',
+  'scripts/write-v1-ci-evidence.mjs',
   'package.json',
   '.github/workflows/ci.yml',
   '.gitattributes',

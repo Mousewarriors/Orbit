@@ -164,3 +164,10 @@ The architecture reviewer finding was `ARCH-V1-000-001`.
 The prior reviewer panel expired before it could review the CI evidence writer
 commit. Its keys were replaced with a fresh architecture, security and product
 panel before re-anchoring V1-000 to the updated locked contract surface.
+
+## 2026-06-25 - V1-001 CI evidence review response
+
+- Moved the `V1-REL-001` evidence report and attestation into a final CI job
+  that depends on JS, Rust and Windows mandatory gate jobs.
+- Added the V1 CI evidence writer script to the locked contract surface so its
+  report semantics cannot change without independent review.

@@ -4,17 +4,18 @@
   "files": {
     "docs/V1_SCOPE.md": "9020e2da601f5e2dbcaf97f9a2047cb501d5e249b603faefb6424378cf86bfc2",
     "docs/V1_ACCEPTANCE.md": "dd673aae6c3bff66205b4843c42a29dd1852d8e85b6bf89eca24407046c599cf",
-    "docs/V1_CHANGELOG.md": "612fb0867af5d4e1f24da8391acbfe22b33a4cc0c7611d43a4ab7796c27f8fcf",
+    "docs/V1_CHANGELOG.md": "d606cdba473c85d61ad4fcb771d538055badc1a45a8171251d3091d38d0b4b95",
     "docs/V1_EVIDENCE_SCHEMA.md": "8c6175ca018c42eb2d3dd22ab926c8e80f1dacbbce79ae738aba3fd7b465e884",
     "planning/v1-backlog.json": "dcb94e7043c262974970e23d024905455ed59518a4077814c71f8753abe2b431",
     "planning/v1-criteria.json": "31236982e3cddb374eaea81f210c5e6767896631bfd4411608f9d0ad18e1136b",
     "planning/v1-implementer-authority.json": "ffc1a4cb35bcbc38e3a2e4b8c4ae2ef42afdd6f023af4a727a5779d808d25b17",
     "planning/v1-review-authorities.json": "367c7836b43b6de996ca5381bbc53399610aea59a1e56cb2efa67ebc7e3dfa01",
-    "scripts/v1-contract.mjs": "cbeb09009ba02489ed4b4310b4d03064f1a8d6f5bce02130cf2c4e1b49a1a0d1",
+    "scripts/v1-contract.mjs": "a2a20908b22cb019a525c25b240950ca95d2d4a16dc68bdfceb38fef4aa562d4",
     "scripts/validate-v1-backlog.mjs": "7fdee1be4509cfd2708dcdba58ba4bebea13a3b12853d376afc3c680ca06b6f0",
     "scripts/validate-v1-contract.test.mjs": "ce35d7da12ba3198a50d77d17dae6d4898cec8f2f127ba26dc78c3a93452739c",
+    "scripts/write-v1-ci-evidence.mjs": "a1e5e91f871049ddd9f6bbd4afed60e205141555f6de97dc7b6fdf9a0b0f37b9",
     "package.json": "58e61a10162de88d9af8f8d693e26a302c9fa2b4b42fb0ad4fe200e60a002633",
-    ".github/workflows/ci.yml": "d2f94ab87d1d8c13f8789502a988e24573d24e72e22a6de502644c90bb5ff506",
+    ".github/workflows/ci.yml": "6b457910afbb7d01b1b4da25474e52e464b9258c940f87fc089e11d9ebfd962e",
     ".gitattributes": "d60f352d0db1404c70afb4bb8b2ca3fd1c610572aa40720e8a0b7baa7885418c"
   }
 }
