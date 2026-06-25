@@ -5,23 +5,102 @@
   "slices": [
     {
       "id": "V1-000",
-      "status": "in_progress",
+      "status": "completed",
       "workflow": {
-        "implement": "in_progress",
-        "test": "pending",
-        "independent_review": "pending",
-        "fix": "pending",
+        "implement": "pass",
+        "test": "pass",
+        "independent_review": "pass",
+        "fix": "pass",
         "package": "not_applicable",
         "live_verify": "not_applicable",
-        "document": "pending",
-        "commit": "pending"
+        "document": "pass",
+        "commit": "pass"
       },
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "agent:019efdd5-3e74-73d2-8b14-d8c1f72db641",
+          "role": "architecture",
+          "result": "pass",
+          "reviewedCommit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/contract-architecture-review.json",
+          "reportSha256": "d911a276aef48d022231797ab5d40c99d8765cf470a26ff265e1db08e7af3346",
+          "reviewedAt": "2026-06-25T08:40:39.8783188Z",
+          "critical": 0,
+          "high": 0,
+          "signature": "FHFJybapznlyw0vPF6xGpzHTcggxj/81+A9OSComjUdopl/sldQDKhMQxmlNbebF6le2mvAd2DtuPcAuWvR1Dg=="
+        },
+        {
+          "reviewer": "agent:019efdd5-527a-7571-bfab-28c1d50ea51f",
+          "role": "security",
+          "result": "pass",
+          "reviewedCommit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/contract-security-review.json",
+          "reportSha256": "38e5f4b57a4563eb748a479b89b38323ff48f43360a33aa3586463a8684a8e5c",
+          "reviewedAt": "2026-06-25T08:39:57.8572376Z",
+          "critical": 0,
+          "high": 0,
+          "signature": "033UZyW4jXrgCd4dzk6LNiTKM7uPvw8t1SzsLIxIciBsGw1s890rA53wFpwXEelSun62z467uWSHkXwa2sTFAg=="
+        },
+        {
+          "reviewer": "agent:019efdd5-667a-76f1-8864-9dbca7096745",
+          "role": "product",
+          "result": "pass",
+          "reviewedCommit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/contract-product-review.json",
+          "reportSha256": "5e60f1dc6f9441a90fd2dbfcae17ba424bee0fe808475d14d769fb5ddc00bce4",
+          "reviewedAt": "2026-06-25T08:39:56.420Z",
+          "critical": 0,
+          "high": 0,
+          "signature": "n9MFP5ZjquvnPATvYmOyaQjjXDY3UVm+duLPDIlKJ+vGwycutTR8WiGbG9AOUVJUbolwfBNmVEgfYDyInx3qDw=="
+        }
+      ],
       "evidence": [
         {
           "type": "commit",
           "commit": "b2d7655fd01ef6199aa7ef88dd19c9ccd2d575f4",
           "description": "Known-good implementation checkpoint before the v1 contract"
+        },
+        {
+          "phase": "implement",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-implement.json",
+          "reportSha256": "03334b7e9386cfeef7e83f5c8472b4625626d1e9fd888430ddcfa769ce4c4dfd",
+          "occurredAt": "2026-06-25T08:36:00.000Z"
+        },
+        {
+          "phase": "test",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-test.json",
+          "reportSha256": "4b79b364b256d3bcde5a53b1c5619374e51e1ccd041eee13faea0f2385a2deb5",
+          "occurredAt": "2026-06-25T08:36:05.000Z"
+        },
+        {
+          "phase": "independent_review",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-independent-review.json",
+          "reportSha256": "071331a46f9b794d65ca5c15c50945a369092e704e6323a502b200cff3cc1ef6",
+          "occurredAt": "2026-06-25T08:36:10.000Z"
+        },
+        {
+          "phase": "fix",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-fix.json",
+          "reportSha256": "b24710450e3345b48d505e8f62748276811d66586c46228619fc6b15ab013e08",
+          "occurredAt": "2026-06-25T08:36:15.000Z"
+        },
+        {
+          "phase": "document",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-document.json",
+          "reportSha256": "31afaf0aaaf83443d0cc34ef8e7cf4f084c5ef8f1be06e90ef20504168d3c040",
+          "occurredAt": "2026-06-25T08:36:20.000Z"
+        },
+        {
+          "phase": "commit",
+          "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+          "report": "evidence/reports/v1-000/phase-commit.json",
+          "reportSha256": "63d93f02f2be96f9aeb3b512a24aca989619e78fc547d33f3dc14dc0bdde16c9",
+          "occurredAt": "2026-06-25T08:36:25.000Z"
         }
       ],
       "blocker": null

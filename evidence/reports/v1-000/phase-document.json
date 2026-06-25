@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-000",
+  "phase": "document",
+  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+  "generatedAt": "2026-06-25T08:36:20.000Z",
+  "checks": [
+    {
+      "id": "changelog-records-review-remediation",
+      "status": "pass",
+      "details": "docs/V1_CHANGELOG.md records the reviewer authority rotation and ARCH-V1-000-001 raw telemetry remediation."
+    }
+  ]
+}

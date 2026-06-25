@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-000",
+  "phase": "implement",
+  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+  "generatedAt": "2026-06-25T08:36:00.000Z",
+  "checks": [
+    {
+      "id": "locked-contract-surface-updated",
+      "status": "pass",
+      "details": "The v1 scope, acceptance criteria, backlog, validator, reviewer authorities and lock hashes are present in the reviewed contract surface."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-000",
+  "phase": "test",
+  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+  "generatedAt": "2026-06-25T08:36:05.000Z",
+  "checks": [
+    {
+      "id": "contract-validator-and-mutation-tests-pass",
+      "status": "pass",
+      "details": "npm run v1:validate and node --test scripts/validate-v1-contract.test.mjs passed, including the raw security telemetry regression test."
+    }
+  ]
+}

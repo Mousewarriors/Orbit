@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-000",
+  "phase": "commit",
+  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+  "generatedAt": "2026-06-25T08:36:25.000Z",
+  "checks": [
+    {
+      "id": "reviewed-commit-has-implementer-attestation",
+      "status": "pass",
+      "details": "The reviewed contract commit is recorded in planning/v1-implementer-attestations.json with a valid codex:main signature."
+    }
+  ]
+}

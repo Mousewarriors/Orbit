@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "kind": "automated",
+  "status": "pass",
+  "subjectIds": ["V1-GOV-001", "V1-GOV-002", "V1-GOV-003", "V1-GOV-004"],
+  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
+  "generatedAt": "2026-06-25T08:36:30.000Z",
+  "producer": "codex:local-contract-validator",
+  "checks": [
+    {
+      "id": "contract-validator-pass",
+      "status": "pass",
+      "details": "npm run v1:validate accepted the checked-in v1 contract."
+    },
+    {
+      "id": "adversarial-validator-tests-pass",
+      "status": "pass",
+      "details": "node --test scripts/validate-v1-contract.test.mjs passed 26 adversarial contract tests."
+    },
+    {
+      "id": "lock-and-review-gate-active",
+      "status": "pass",
+      "details": "The lock covers the required enforcement surface and V1-000 cannot complete without exact-commit independent review attestation."
+    },
+    {
+      "id": "blocked-state-remains-non-complete",
+      "status": "pass",
+      "details": "The validator requires structured blocker proof and keeps blocked slices and criteria out of completed state."
+    },
+    {
+      "id": "slice-phase-evidence-required",
+      "status": "pass",
+      "details": "Completed slices require ordered phase evidence and owned criterion evidence bound to the required commit."
+    }
+  ]
+}
