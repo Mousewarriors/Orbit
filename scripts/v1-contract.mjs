@@ -1742,7 +1742,7 @@ function normalizeEvidencePath(relativePath) {
 
 async function inspectClaimedPath(root, claimedPath) {
   const normalized = normalizeEvidencePath(claimedPath);
-  if (!normalized) return { safe: false, hash: null, document: null, artifact: null };
+  if (!normalized) return { safe: false, hash: null, size: 0, document: null, artifact: null };
   const absoluteRoot = await realpath(root);
   const absolute = resolve(root, normalized);
   const relativeToRoot = relative(absoluteRoot, absolute);
@@ -1752,12 +1752,12 @@ async function inspectClaimedPath(root, claimedPath) {
   try {
     const info = await lstat(absolute);
     if (!info.isFile() || info.isSymbolicLink()) {
-      return { safe: false, hash: null, document: null, artifact: null };
+      return { safe: false, hash: null, size: 0, document: null, artifact: null };
     }
     const actual = await realpath(absolute);
     const actualRelative = relative(absoluteRoot, actual);
     if (actualRelative.startsWith('..') || isAbsolute(actualRelative)) {
-      return { safe: false, hash: null, document: null, artifact: null };
+      return { safe: false, hash: null, size: 0, document: null, artifact: null };
     }
     const bytes = await readFile(actual);
     let document = null;
@@ -1883,9 +1883,9 @@ async function inspectClaimedPath(root, claimedPath) {
           bytes.includes(Buffer.from(manifest.version)),
       };
     }
-    return { safe: true, hash: sha256(bytes), document, artifact };
+    return { safe: true, hash: sha256(bytes), size: bytes.length, document, artifact };
   } catch {
-    return { safe: true, hash: null, document: null, artifact: null };
+    return { safe: true, hash: null, size: 0, document: null, artifact: null };
   }
 }
 
@@ -2024,6 +2024,9 @@ export async function loadContract(root) {
   const pathSafety = Object.fromEntries(
     inspectedEntries.map(([file, result]) => [file, result.safe]),
   );
+  const fileSizes = Object.fromEntries(
+    inspectedEntries.map(([file, result]) => [file, result.size]),
+  );
   const documents = Object.fromEntries(
     inspectedEntries.map(([file, result]) => [file, result.document]),
   );
@@ -2146,6 +2149,7 @@ export async function loadContract(root) {
       workflowHashesByCommit,
       lockedWorkflowHash: lockedFileHashes['.github/workflows/ci.yml'],
       fileHashes,
+      fileSizes,
       pathSafety,
       reports: documents,
       documents,

@@ -463,3 +463,58 @@ test('automated evidence cannot use a different historical CI workflow', async (
   state.repository.workflowHashesByCommit[item.evidence[0].commit] = '0'.repeat(64);
   assert.match(validateContract(state).errors.join('\n'), /used an unlocked CI workflow/);
 });
+
+test('required raw security telemetry evidence is size-checked without crashing', async () => {
+  const state = await loadContract(root);
+  const item = state.evidence.criteria.find((criterion) => criterion.id === 'V1-TOOLS-005');
+  const reportPath = 'evidence/reports/security-raw-telemetry.json';
+  const rawPath = 'evidence/reports/security-raw-telemetry-raw.json';
+  const report = {
+    schemaVersion: 1,
+    kind: 'automated',
+    status: 'pass',
+    subjectIds: ['V1-TOOLS-005'],
+    commit: '972d687441875731b2c9082a77222658c1e00667',
+    generatedAt: '2026-06-22T21:44:00Z',
+    producer: 'ci:github-actions:1',
+    ci: {
+      repository: 'Mousewarriors/Orbit',
+      runUrl: 'https://github.com/Mousewarriors/Orbit/actions/runs/1',
+      conclusion: 'success',
+      workflow: 'Mousewarriors/Orbit/.github/workflows/ci.yml',
+      commit: '972d687441875731b2c9082a77222658c1e00667',
+    },
+    checks: [
+      {
+        id: 'redirect',
+        status: 'pass',
+        details: {
+          target: 'http://127.0.0.1/redirect',
+          inputSha256: 'e'.repeat(64),
+          observed: 'blocked',
+          rawEvidencePath: rawPath,
+          rawEvidenceSha256: 'f'.repeat(64),
+        },
+      },
+    ],
+  };
+  item.status = 'pass';
+  item.verifiedAt = '2026-06-22T21:45:00Z';
+  item.verifier = 'agent:019efdd5-527a-7571-bfab-28c1d50ea51f';
+  item.evidence = [
+    {
+      type: 'automated',
+      commit: report.commit,
+      recordedAt: report.generatedAt,
+      report: reportPath,
+      reportSha256: 'd'.repeat(64),
+      signatures: [],
+    },
+  ];
+  state.repository.pathSafety[reportPath] = true;
+  state.repository.fileHashes[reportPath] = item.evidence[0].reportSha256;
+  state.repository.reports[reportPath] = report;
+  state.repository.documents[reportPath] = report;
+  const errors = validateContract(state).errors.join('\n');
+  assert.match(errors, /check redirect raw evidence is invalid or unattested/);
+});

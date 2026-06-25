@@ -139,3 +139,13 @@ commit. Its public keys were replaced with a fresh architecture, security and
 product panel before V1-000 completion. No stale review result is accepted as
 activation evidence; the replacement panel must review and sign the exact
 commit that activates the contract.
+
+## 2026-06-25 - Review round 7 raw telemetry response
+
+- Fixed the validator repository model so claimed evidence files expose byte
+  sizes to required raw security telemetry checks.
+- Added a regression test proving required security telemetry validation reports
+  structured errors instead of crashing when raw evidence is missing or
+  unattested.
+
+The architecture reviewer finding was `ARCH-V1-000-001`.
