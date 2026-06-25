@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-001",
+  "phase": "package",
+  "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+  "generatedAt": "2026-06-25T16:31:00.000Z",
+  "artifact": {
+    "path": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
+    "sha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
+    "source": "target/release/bundle/msi/Orbit_0.1.0_x64_en-US.msi"
+  },
+  "checks": [
+    {
+      "id": "vite-production-build-pass",
+      "status": "pass",
+      "details": "npm run build:vite --workspace @orbit/desktop passed and produced a production renderer bundle."
+    },
+    {
+      "id": "tauri-windows-bundle-build-pass",
+      "status": "pass",
+      "details": "npm run build --workspace @orbit/desktop passed and produced MSI and NSIS Windows bundles."
+    },
+    {
+      "id": "msi-artifact-captured",
+      "status": "pass",
+      "details": "The freshly built MSI was copied into the V1-001 evidence artifact directory and hashed."
+    }
+  ]
+}

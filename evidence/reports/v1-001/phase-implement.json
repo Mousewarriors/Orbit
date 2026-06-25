@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-001",
+  "phase": "implement",
+  "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+  "generatedAt": "2026-06-25T16:20:00.000Z",
+  "checks": [
+    {
+      "id": "ci-evidence-job-gated-after-mandatory-jobs",
+      "status": "pass",
+      "details": "The V1 CI evidence job depends on js, rust-libs and windows-desktop before writing or attesting evidence/reports/v1-001/ci-gates.json."
+    },
+    {
+      "id": "deterministic-ci-evidence-writer-locked",
+      "status": "pass",
+      "details": "scripts/write-v1-ci-evidence.mjs is present in the locked contract surface and emits commit-bound V1-REL-001 evidence."
+    }
+  ]
+}

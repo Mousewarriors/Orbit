@@ -107,19 +107,59 @@
     },
     {
       "id": "V1-001",
-      "status": "pending",
+      "status": "in_progress",
       "workflow": {
-        "implement": "pending",
-        "test": "pending",
+        "implement": "pass",
+        "test": "pass",
         "independent_review": "pending",
         "fix": "pending",
-        "package": "pending",
-        "live_verify": "pending",
-        "document": "pending",
+        "package": "pass",
+        "live_verify": "pass",
+        "document": "pass",
         "commit": "pending"
       },
       "reviews": [],
-      "evidence": [],
+      "evidence": [
+        {
+          "phase": "implement",
+          "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+          "report": "evidence/reports/v1-001/phase-implement.json",
+          "reportSha256": "5a7aeb5f03d72ea81fe153e41584de48fa1a6d3e7d98f3f201c5ed203643da4e",
+          "occurredAt": "2026-06-25T16:20:00.000Z"
+        },
+        {
+          "phase": "test",
+          "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+          "report": "evidence/reports/v1-001/phase-test.json",
+          "reportSha256": "31ce41aedee09b433312bead992871022d1460065e98b8ad81ee220d7cd71fb4",
+          "occurredAt": "2026-06-25T16:28:00.000Z"
+        },
+        {
+          "phase": "package",
+          "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+          "report": "evidence/reports/v1-001/phase-package.json",
+          "reportSha256": "d1f791165ee2d767701328f8b066e9ec7f32197f21fc2ff6b937cbf511ff61a7",
+          "artifact": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
+          "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
+          "occurredAt": "2026-06-25T16:31:00.000Z"
+        },
+        {
+          "phase": "live_verify",
+          "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+          "report": "evidence/reports/v1-001/phase-live-verify.json",
+          "reportSha256": "9b67b7703ae4a3c375fac3779f277a361cb9340f7675e7521e6e43f9ea1c2354",
+          "artifact": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
+          "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
+          "occurredAt": "2026-06-25T16:31:30.000Z"
+        },
+        {
+          "phase": "document",
+          "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+          "report": "evidence/reports/v1-001/phase-document.json",
+          "reportSha256": "c0ca5fae7b20c08980c9bee49159aeb356861f90b4a3ec075161054f4aa1e924",
+          "occurredAt": "2026-06-25T16:32:00.000Z"
+        }
+      ],
       "blocker": null
     },
     {

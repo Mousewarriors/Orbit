@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-001",
+  "phase": "test",
+  "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
+  "generatedAt": "2026-06-25T16:28:00.000Z",
+  "checks": [
+    {
+      "id": "contract-validation-pass",
+      "status": "pass",
+      "details": "npm run v1:validate passed with 4/61 criteria passing and V1-000 complete."
+    },
+    {
+      "id": "lint-pass",
+      "status": "pass",
+      "details": "npm run lint passed with zero ESLint warnings."
+    },
+    {
+      "id": "typecheck-pass",
+      "status": "pass",
+      "details": "npm run typecheck --workspaces --if-present passed across all configured workspaces."
+    },
+    {
+      "id": "js-and-contract-tests-pass",
+      "status": "pass",
+      "details": "npm test passed 57 Vitest files, 586 tests, and 26 node:test contract mutation tests."
+    },
+    {
+      "id": "rust-crate-tests-pass",
+      "status": "pass",
+      "details": "cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files passed all targeted crate tests."
+    }
+  ]
+}
