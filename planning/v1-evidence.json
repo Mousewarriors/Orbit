@@ -5,38 +5,110 @@
     {
       "id": "V1-GOV-001",
       "ownerSlice": "V1-000",
-      "status": "pending",
+      "status": "pass",
       "verifiedBuild": null,
-      "evidence": [],
-      "verifiedAt": null,
-      "verifier": null
+      "evidence": [
+        {
+          "type": "automated",
+          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "report": "evidence/reports/v1-000/governance-acceptance.json",
+          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "signatures": [
+            {
+              "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
+              "signature": "62OoQ3s0R+idt9XvRvcALNDhSHk2J19EZmq/TVXt/PNmAawJzmtYiHdIhh3G06ArvhmA20S1Vnr05rzw97hVCw=="
+            },
+            {
+              "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+              "signature": "Re3x4rhawhV4u/m1Z1HTI5zunCIAQ4JErxg8cY84bM+SdNYGTglpWOZOmbS3cZQqZO5bMQdKMVFB7YyzL3jmAA=="
+            }
+          ]
+        }
+      ],
+      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
       "id": "V1-GOV-002",
       "ownerSlice": "V1-000",
-      "status": "pending",
+      "status": "pass",
       "verifiedBuild": null,
-      "evidence": [],
-      "verifiedAt": null,
-      "verifier": null
+      "evidence": [
+        {
+          "type": "automated",
+          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "report": "evidence/reports/v1-000/governance-acceptance.json",
+          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "signatures": [
+            {
+              "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
+              "signature": "Ygw2Aus5XF9MXXPQkIV8TBvZ6b0Gp4KrebuA0t7nNQC7X6WAmAB0Pgzy74Qxi7GT5/KIPbN37JDik8OW63PDAw=="
+            },
+            {
+              "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+              "signature": "1ftIU60BTeFPvUtaP7uUg+1zVyoTaS6VFHjvVd2eh6mco9EYFvhvEbbkKOntLxinCCDnSAHL7Njbk+BSzjYuAw=="
+            }
+          ]
+        }
+      ],
+      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
       "id": "V1-GOV-003",
       "ownerSlice": "V1-000",
-      "status": "pending",
+      "status": "pass",
       "verifiedBuild": null,
-      "evidence": [],
-      "verifiedAt": null,
-      "verifier": null
+      "evidence": [
+        {
+          "type": "automated",
+          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "report": "evidence/reports/v1-000/governance-acceptance.json",
+          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "signatures": [
+            {
+              "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
+              "signature": "m3nXLzyQIhwsCxMwAI7tCUtwatZ0IzOqVEvoYyNNEKbn6YycZzr2ovnyVGTwhHjdvuMcGtJR8xya6sOHZetHAA=="
+            },
+            {
+              "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+              "signature": "iCxHzNLLe/2vpqq7FFtEwRfeFBiH+hqz77Q1FMn2YRCV5HDI6uDW5ETGgaqGmBN+wLqKpv7TER3lF0iz/JdnCg=="
+            }
+          ]
+        }
+      ],
+      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
       "id": "V1-GOV-004",
       "ownerSlice": "V1-000",
-      "status": "pending",
+      "status": "pass",
       "verifiedBuild": null,
-      "evidence": [],
-      "verifiedAt": null,
-      "verifier": null
+      "evidence": [
+        {
+          "type": "automated",
+          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "report": "evidence/reports/v1-000/governance-acceptance.json",
+          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "signatures": [
+            {
+              "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
+              "signature": "AXW55WfS8yylkpZliD/ZlOduM4XyT7OcBOEmd5azGpo/FnT89RTozMZRXlzyEpj8jJev54mUxU2jN7oz9zbMCg=="
+            },
+            {
+              "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+              "signature": "1nUMQx0+UvCDnBGDhZ+mp0gx+m1v4MUqptgT7wy+V5tXN45Jh1oqkZxBLUCPelHIicNjEbLVpv+SLDsGe5AuCg=="
+            }
+          ]
+        }
+      ],
+      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
       "id": "V1-GOV-005",

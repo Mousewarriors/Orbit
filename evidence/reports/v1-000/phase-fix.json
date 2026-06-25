@@ -4,13 +4,13 @@
   "status": "pass",
   "sliceId": "V1-000",
   "phase": "fix",
-  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
-  "generatedAt": "2026-06-25T08:36:15.000Z",
+  "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+  "generatedAt": "2026-06-25T15:36:00.000Z",
   "checks": [
     {
       "id": "arch-v1-000-001-remediated",
       "status": "pass",
-      "details": "The validator now records claimed evidence byte sizes and the regression suite covers required raw security telemetry validation without crashing."
+      "details": "The reviewed candidate fixes raw telemetry sizing, locks the V1 CI evidence writer, and gates V1-REL-001 evidence behind all mandatory CI jobs."
     }
   ]
 }

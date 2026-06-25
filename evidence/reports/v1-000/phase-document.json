@@ -4,13 +4,13 @@
   "status": "pass",
   "sliceId": "V1-000",
   "phase": "document",
-  "commit": "143893c8e71603a60a8908bef3c81633493d5028",
-  "generatedAt": "2026-06-25T08:36:20.000Z",
+  "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
+  "generatedAt": "2026-06-25T15:36:20.000Z",
   "checks": [
     {
       "id": "changelog-records-review-remediation",
       "status": "pass",
-      "details": "docs/V1_CHANGELOG.md records the reviewer authority rotation and ARCH-V1-000-001 raw telemetry remediation."
+      "details": "docs/V1_CHANGELOG.md records reviewer authority rotation, raw telemetry remediation and the V1-001 CI evidence review response."
     }
   ]
 }
