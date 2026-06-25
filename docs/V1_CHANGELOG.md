@@ -158,3 +158,9 @@ The architecture reviewer finding was `ARCH-V1-000-001`.
 - Wired the report into the push CI job before the existing GitHub OIDC
   attestation step, so the mandatory gate report can be verified by digest
   against GitHub artifact attestations.
+
+## 2026-06-25 - Reviewer authority rotation for V1-001 contract update
+
+The prior reviewer panel expired before it could review the CI evidence writer
+commit. Its keys were replaced with a fresh architecture, security and product
+panel before re-anchoring V1-000 to the updated locked contract surface.
