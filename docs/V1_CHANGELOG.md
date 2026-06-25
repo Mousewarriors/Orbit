@@ -151,3 +151,10 @@ commit that activates the contract.
   pending or has already been activated.
 
 The architecture reviewer finding was `ARCH-V1-000-001`.
+
+## 2026-06-25 - V1-001 CI evidence writer
+
+- Added a deterministic V1 CI evidence report writer for `V1-REL-001`.
+- Wired the report into the push CI job before the existing GitHub OIDC
+  attestation step, so the mandatory gate report can be verified by digest
+  against GitHub artifact attestations.

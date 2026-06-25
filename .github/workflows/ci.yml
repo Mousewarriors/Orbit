@@ -34,6 +34,9 @@ jobs:
       - run: npm run typecheck --workspaces --if-present
       - run: npm test
       - run: npm run build:vite --workspace @orbit/desktop
+      - name: Write V1 CI evidence report
+        if: github.event_name == 'push'
+        run: node scripts/write-v1-ci-evidence.mjs
       - name: Attest machine-readable evidence reports
         if: github.event_name == 'push' && hashFiles('evidence/reports/**/*.json') != ''
         uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb # v4
