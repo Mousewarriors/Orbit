@@ -4,13 +4,13 @@
   "status": "pass",
   "sliceId": "V1-000",
   "phase": "fix",
-  "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-  "generatedAt": "2026-06-25T15:36:00.000Z",
+  "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+  "generatedAt": "2026-06-25T16:49:10.000Z",
   "checks": [
     {
       "id": "arch-v1-000-001-remediated",
       "status": "pass",
-      "details": "The reviewed candidate fixes raw telemetry sizing, locks the V1 CI evidence writer, and gates V1-REL-001 evidence behind all mandatory CI jobs."
+      "details": "The reviewed candidate fixes raw telemetry sizing, locks the V1 CI evidence writer, gates V1-REL-001 evidence behind all mandatory CI jobs, and fetches full CI history for v1 validation."
     }
   ]
 }

@@ -4,13 +4,13 @@
   "status": "pass",
   "sliceId": "V1-000",
   "phase": "implement",
-  "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-  "generatedAt": "2026-06-25T15:35:00.000Z",
+  "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+  "generatedAt": "2026-06-25T16:48:45.000Z",
   "checks": [
     {
       "id": "locked-contract-surface-updated",
       "status": "pass",
-      "details": "The v1 scope, acceptance criteria, backlog, validator, CI evidence writer, reviewer authorities and lock hashes are present in the reviewed contract surface."
+      "details": "The v1 scope, acceptance criteria, backlog, validator, CI evidence writer, reviewer authorities, CI full-history checkout and lock hashes are present in the reviewed contract surface."
     }
   ]
 }

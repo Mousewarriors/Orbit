@@ -10,23 +10,23 @@
       "evidence": [
         {
           "type": "automated",
-          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+          "recordedAt": "2026-06-25T16:49:18.000Z",
           "report": "evidence/reports/v1-000/governance-acceptance.json",
-          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "reportSha256": "4d5a3a003d09b297397b657b1d5ff5a4172637977697d97f097382640fc97ffd",
           "signatures": [
             {
               "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
-              "signature": "62OoQ3s0R+idt9XvRvcALNDhSHk2J19EZmq/TVXt/PNmAawJzmtYiHdIhh3G06ArvhmA20S1Vnr05rzw97hVCw=="
+              "signature": "HKw/oJtfCYnr8LymWhK1hQlZcxsoeSW7UNIpcLTfUBU2lMPGf7toCIAXx3hzdCUCM6CmH3u7GZJ9Ir/44gUqCQ=="
             },
             {
               "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
-              "signature": "Re3x4rhawhV4u/m1Z1HTI5zunCIAQ4JErxg8cY84bM+SdNYGTglpWOZOmbS3cZQqZO5bMQdKMVFB7YyzL3jmAA=="
+              "signature": "pMURwFwBccwBh/+LRsJbTUP9JUE3QA0+DCWI0hBLQg8TZ/a3jF8nqSos7YHljcBw/zfelBEFVXvxxWuVS0vACA=="
             }
           ]
         }
       ],
-      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifiedAt": "2026-06-25T16:50:10.000Z",
       "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
@@ -37,23 +37,23 @@
       "evidence": [
         {
           "type": "automated",
-          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+          "recordedAt": "2026-06-25T16:49:18.000Z",
           "report": "evidence/reports/v1-000/governance-acceptance.json",
-          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "reportSha256": "4d5a3a003d09b297397b657b1d5ff5a4172637977697d97f097382640fc97ffd",
           "signatures": [
             {
               "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
-              "signature": "Ygw2Aus5XF9MXXPQkIV8TBvZ6b0Gp4KrebuA0t7nNQC7X6WAmAB0Pgzy74Qxi7GT5/KIPbN37JDik8OW63PDAw=="
+              "signature": "0QNdNkFmGNj8mOp17tdBLFR6WH3Zp7D49Xv8Ih12bwskDDFxnc5jqVhPPjv1TwjRnC0tvUjHaKL3tpqeDmblBg=="
             },
             {
               "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
-              "signature": "1ftIU60BTeFPvUtaP7uUg+1zVyoTaS6VFHjvVd2eh6mco9EYFvhvEbbkKOntLxinCCDnSAHL7Njbk+BSzjYuAw=="
+              "signature": "Gxdm/TJdc2ZlwB8zP6Xz1A6wAeO+VmC5E66WINuOWIrl2f4/aadaJ6/7T/qyv4/VOml56POL1urp5XsNWU0kBA=="
             }
           ]
         }
       ],
-      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifiedAt": "2026-06-25T16:50:10.000Z",
       "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
@@ -64,23 +64,23 @@
       "evidence": [
         {
           "type": "automated",
-          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+          "recordedAt": "2026-06-25T16:49:18.000Z",
           "report": "evidence/reports/v1-000/governance-acceptance.json",
-          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "reportSha256": "4d5a3a003d09b297397b657b1d5ff5a4172637977697d97f097382640fc97ffd",
           "signatures": [
             {
               "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
-              "signature": "m3nXLzyQIhwsCxMwAI7tCUtwatZ0IzOqVEvoYyNNEKbn6YycZzr2ovnyVGTwhHjdvuMcGtJR8xya6sOHZetHAA=="
+              "signature": "U6xylGffw298QoI8kZGJIfaVZR1tmCifaL+oyDjoGL5IKSpRJsQK1ihjR8W3MJbqzlTjCaZ4OPrFCep/+GoKCQ=="
             },
             {
               "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
-              "signature": "iCxHzNLLe/2vpqq7FFtEwRfeFBiH+hqz77Q1FMn2YRCV5HDI6uDW5ETGgaqGmBN+wLqKpv7TER3lF0iz/JdnCg=="
+              "signature": "/GUCLnFyotZk15K/rTWjtBa7uQ3pTG8N86ev0wN/84vcJRNVMk5f9LqPlFyb+o+seyqXNYMRe4qEvF1lx/wFCg=="
             }
           ]
         }
       ],
-      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifiedAt": "2026-06-25T16:50:10.000Z",
       "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {
@@ -91,23 +91,23 @@
       "evidence": [
         {
           "type": "automated",
-          "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-          "recordedAt": "2026-06-25T15:36:30.000Z",
+          "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+          "recordedAt": "2026-06-25T16:49:18.000Z",
           "report": "evidence/reports/v1-000/governance-acceptance.json",
-          "reportSha256": "ef8163ef36a06ae1bc9878668e6f60fdd645889b36857fe2919dac0e759e10de",
+          "reportSha256": "4d5a3a003d09b297397b657b1d5ff5a4172637977697d97f097382640fc97ffd",
           "signatures": [
             {
               "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
-              "signature": "AXW55WfS8yylkpZliD/ZlOduM4XyT7OcBOEmd5azGpo/FnT89RTozMZRXlzyEpj8jJev54mUxU2jN7oz9zbMCg=="
+              "signature": "J/ommIXP4ALarlTwys23lB+xsjW7TSrRpQidoEUTLk0XGhie/qicNzRetXonx+INuimD38oC9SD25TKJ2/TNCw=="
             },
             {
               "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
-              "signature": "1nUMQx0+UvCDnBGDhZ+mp0gx+m1v4MUqptgT7wy+V5tXN45Jh1oqkZxBLUCPelHIicNjEbLVpv+SLDsGe5AuCg=="
+              "signature": "SuF0iDfrxq8BW3yvJJ9ifRLhmofxoB5VKBwHZAYVv0YhTalwyOsmt7+rv6+n2YB9F6pNqxLjG3t2QbogziwXAg=="
             }
           ]
         }
       ],
-      "verifiedAt": "2026-06-25T15:39:00.000Z",
+      "verifiedAt": "2026-06-25T16:50:10.000Z",
       "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
     },
     {

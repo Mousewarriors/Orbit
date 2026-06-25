@@ -61,6 +61,12 @@
       "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
       "signedAt": "2026-06-25T15:34:45.116Z",
       "signature": "IIuu+6hPHtXH62x6hHqn5NHikRl5oLFlOiRazaapf5HzjPkDdcJWQpv4HrFQWxyMpdlyiK6fjwiePXX5nYFkAQ=="
+    },
+    {
+      "identity": "codex:main",
+      "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+      "signedAt": "2026-06-25T16:48:42.135Z",
+      "signature": "aRvaiUG2KoqMx5ZfMTVKntPBXh51vdg4OSXEKTOH6SGpV8I1izOvekHylBj3Y8II7CbnB1j6yFMN4cfm5bEDBA=="
     }
   ]
 }

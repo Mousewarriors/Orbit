@@ -3,8 +3,8 @@
   "kind": "automated",
   "status": "pass",
   "subjectIds": ["V1-GOV-001", "V1-GOV-002", "V1-GOV-003", "V1-GOV-004"],
-  "commit": "094bd78ef5cc84bb846b40caff453d69cd33a40f",
-  "generatedAt": "2026-06-25T15:36:30.000Z",
+  "commit": "41a76f3be6647863c57dd090b4ff1898ce4ad0d9",
+  "generatedAt": "2026-06-25T16:49:18.000Z",
   "producer": "codex:local-contract-validator",
   "checks": [
     {
