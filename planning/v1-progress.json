@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractVersion": "1.0.0",
-  "updatedAt": "2026-06-22T15:15:00Z",
+  "updatedAt": "2026-06-25T19:24:30.000Z",
   "slices": [
     {
       "id": "V1-000",
@@ -107,7 +107,7 @@
     },
     {
       "id": "V1-001",
-      "status": "blocked_decision",
+      "status": "completed",
       "workflow": {
         "implement": "pass",
         "test": "pass",
@@ -116,47 +116,44 @@
         "package": "pass",
         "live_verify": "pass",
         "document": "pass",
-        "commit": "pending"
+        "commit": "pass"
       },
       "reviews": [
         {
           "reviewer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
           "role": "architecture",
           "result": "pass",
-          "reviewedCommit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
-          "report": "evidence/reports/v1-001/package-smoke-architecture-review.json",
-          "reportSha256": "d5b83656b14ca2aa10161d55e6a2b49b837fb9f5704cb44f548b5b31a7080408",
-          "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
-          "reviewedAt": "2026-06-25T16:38:47.237Z",
+          "reviewedCommit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+          "report": "evidence/reports/v1-001/final-ci-architecture-review.json",
+          "reportSha256": "f31554f456219a9afb5cfed0640559ec6b428a3820366e5b6ad6e47066ced1c3",
+          "reviewedAt": "2026-06-25T19:22:19.889Z",
           "critical": 0,
           "high": 0,
-          "signature": "j06zAQuK/Ru7ni8UmrmDOoeNzuvTZzXo6+WlUn0sD4IXpzTUTJErrYf8y/UwCGU7mHczURFx5gvA8LWbyPRgDA=="
+          "signature": "LqY4bvF+pUeU9R+DR8clWzQojwkfcj+kYq1TBL0mAjiyagDfNzukdlkwFyQGN2XazMfUqG/d/dFNJrYCyswLDg=="
         },
         {
           "reviewer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
           "role": "security",
           "result": "pass",
-          "reviewedCommit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
-          "report": "evidence/reports/v1-001/package-smoke-security-review.json",
-          "reportSha256": "257ca9dc13b4972c62102c06684873741e418ea2478e4e3dd28859798d67389b",
-          "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
-          "reviewedAt": "2026-06-25T16:39:11.629Z",
+          "reviewedCommit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+          "report": "evidence/reports/v1-001/final-ci-security-review.json",
+          "reportSha256": "312e3e442b58b4d055e6475418e0b460e7eef764111e356bd0ebd82b0f48d27b",
+          "reviewedAt": "2026-06-25T19:22:21.889Z",
           "critical": 0,
           "high": 0,
-          "signature": "+s41bg3XAApucbqh3gpLmrdaX4WWc9wcVjGvJk4I9BcdZNBW/obbd3CBXlCuXEOaJZRN65P9XY/PdIGMk7LWAw=="
+          "signature": "IYuH4CLT0HWSHECjoXhvbQq6RBppOB96tJl3wUpeUA7Qoy5yG3u9OpuTuxo8GvWKs8AkPA1QjU+4C6i8v8UkAw=="
         },
         {
           "reviewer": "agent:019efed7-eb61-7382-af18-dcf85962e5a9",
           "role": "product",
           "result": "pass",
-          "reviewedCommit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
-          "report": "evidence/reports/v1-001/package-smoke-product-review.json",
-          "reportSha256": "f16ca29371d79de1b82c7232098cc5271c9e8e7660fa547b5fcd7ee5a37beb31",
-          "artifactSha256": "2fcfd3ec4ddc367de7928b592700213117c8cdab9b061fe1a89100a77c300246",
-          "reviewedAt": "2026-06-25T16:38:27.363Z",
+          "reviewedCommit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+          "report": "evidence/reports/v1-001/final-ci-product-review.json",
+          "reportSha256": "ec552c3429d0ca90d52468fcdd9bd6433ce64c9f16f624cb657edeab3bcf9fe5",
+          "reviewedAt": "2026-06-25T19:22:23.889Z",
           "critical": 0,
           "high": 0,
-          "signature": "fR7lYH5TdXTi2s43b9V1ysC/L5xdi2U7Xw6hoQ2NYLjBUQdjZygRP/E0H2bkitRrA+xhb8mTNAF7yj2A/lUQCQ=="
+          "signature": "PIkxJwr4U4KtIGchAbOdFmA3Rinw40u8Alrc+xuAWLZqREIAg0zg0du9rMDeGHuImcXqtHgkUDFAVBp8JAGxBA=="
         }
       ],
       "evidence": [
@@ -164,84 +161,91 @@
           "phase": "implement",
           "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
           "report": "evidence/reports/v1-001/phase-implement.json",
-          "reportSha256": "5a7aeb5f03d72ea81fe153e41584de48fa1a6d3e7d98f3f201c5ed203643da4e",
-          "occurredAt": "2026-06-25T16:20:00.000Z"
+          "reportSha256": "0bdd0873e3c81065f3cbc9754ab60e342385b6ac7c47cbbfd764a692540d5e84",
+          "occurredAt": "2026-06-25T16:50:00.000Z"
         },
         {
           "phase": "test",
           "commit": "fe6b635abe3eed66a3f8b8f6462fe962675be529",
           "report": "evidence/reports/v1-001/phase-test.json",
-          "reportSha256": "31ce41aedee09b433312bead992871022d1460065e98b8ad81ee220d7cd71fb4",
-          "occurredAt": "2026-06-25T16:28:00.000Z"
+          "reportSha256": "d01972a455302be1c2552374546b290350258b2e5eaec4f63eee05d7e662865f",
+          "occurredAt": "2026-06-25T16:50:30.000Z"
         },
         {
           "phase": "independent_review",
           "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
           "report": "evidence/reports/v1-001/phase-independent-review.json",
-          "reportSha256": "bd2561ee7443f7aa1b5cd6458ffbf65970a496c16ad00679b089bebf4ee14109",
-          "occurredAt": "2026-06-25T16:39:20.000Z"
+          "reportSha256": "f79b9d9bc19f66d4f5a5905f96986d53dec41ef1d6cc82acb6803856f8b83e36",
+          "occurredAt": "2026-06-25T16:51:00.000Z"
         },
         {
           "phase": "fix",
           "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
           "report": "evidence/reports/v1-001/phase-fix.json",
-          "reportSha256": "e384cec87a64908b52d02c1dfe4a7c1198af764fd6cd88b8c8c9cef97f7255fd",
-          "occurredAt": "2026-06-25T16:39:40.000Z"
+          "reportSha256": "53edcef7288b6e8d4da4e9856893bff5984133ffcbf4a96ba6d8a473ce87f652",
+          "occurredAt": "2026-06-25T16:51:20.000Z"
         },
         {
           "phase": "package",
           "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
           "report": "evidence/reports/v1-001/phase-package.json",
-          "reportSha256": "335013f20cbdde952438dec606af72abeac76c51dab75c5aadd920de78e9b6b0",
+          "reportSha256": "53d296cfe90fea0965c155ac50d303f9efdaeb8c82fa3fdcdcd0a92a0b7b02b5",
           "artifact": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
           "artifactSha256": "fbec40e85ee878ae653681ca1fa90c47ed6a95ecf5daa57bed31e80e1dbbe2d1",
-          "occurredAt": "2026-06-25T16:42:20.000Z"
+          "occurredAt": "2026-06-25T16:51:40.000Z"
         },
         {
           "phase": "live_verify",
           "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
           "report": "evidence/reports/v1-001/phase-live-verify.json",
-          "reportSha256": "93f171a81b2d6ee3f71115ecb3df94b5e9780fbaaa88381074fee865478a06fa",
+          "reportSha256": "4dd9f58509400c83ba357a1c7fff445316d40e85f9655f903284a89a6e157918",
           "artifact": "evidence/artifacts/v1-001/Orbit_0.1.0_x64_en-US.msi",
           "artifactSha256": "fbec40e85ee878ae653681ca1fa90c47ed6a95ecf5daa57bed31e80e1dbbe2d1",
-          "occurredAt": "2026-06-25T16:42:30.000Z"
+          "occurredAt": "2026-06-25T16:52:00.000Z"
         },
         {
           "phase": "document",
           "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
           "report": "evidence/reports/v1-001/phase-document.json",
-          "reportSha256": "7fcb5a25702e8398b62e52682b499b1574ca80d665ad9efebc0059fb2e76e7f8",
-          "occurredAt": "2026-06-25T16:42:35.000Z"
+          "reportSha256": "281fdbb72ec716d3892880ec93d965be7fbc994a1b8fffb86bab559a800532d4",
+          "occurredAt": "2026-06-25T16:52:20.000Z"
+        },
+        {
+          "phase": "commit",
+          "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+          "report": "evidence/reports/v1-001/phase-commit.json",
+          "reportSha256": "3537d8879ce79497717360ce5392b143490d915657bdd12bf26599be63f8c044",
+          "occurredAt": "2026-06-25T19:21:59.889Z"
         }
       ],
-      "blocker": {
-        "type": "product_decision",
-        "owner": "human:Simon-Wood",
-        "proof": "evidence/blockers/v1-001/github-attestation-private-repo.json",
-        "proofSha256": "4947fee426e3a8a0cbeba620a4a01000dfeeaf5957addad20781bfd492e74795",
-        "lastChecked": "2026-06-25T17:14:00.000Z",
-        "unblockCondition": "Choose one: make Mousewarriors/Orbit public, move it to a GitHub owner/plan that supports artifact attestations for private repositories, or approve a reviewed v1 contract change to use a different provenance mechanism.",
-        "degradedBehavior": "V1-001 remains incomplete; local package smoke, independent review, JS/Rust CI and the Windows package build are recorded, but V1-REL-001 cannot pass because GitHub OIDC attestation persistence is unavailable for this user-owned private repository.",
-        "attempts": [
-          {
-            "at": "2026-06-25T16:45:10.000Z",
-            "action": "Ran push CI for f2217c1d7736334f38f03014c48846f20beb4b33.",
-            "result": "CI exposed a shallow-checkout failure in npm run v1:validate; the workflow was fixed to fetch full history for the JS validation job."
-          },
-          {
-            "at": "2026-06-25T16:59:55.000Z",
-            "action": "Ran push CI for 7989ccdb97ee73974c39addc510b7255803d44be after the checkout fix and contract re-anchor.",
-            "result": "JS validation/lint/typecheck/test/build and Rust tests passed; Windows package build passed; actions/attest failed because persisted attestations are unavailable for user-owned private repositories."
-          }
-        ],
-        "affectedCriterionIds": ["V1-REL-001"],
-        "signatures": [
-          {
-            "signer": "agent:019efed7-eb61-7382-af18-dcf85962e5a9",
-            "signature": "sOgwL+naZxHQJUEDwRQF2efgl0lCKBpZKhYVsJzCaIA9NgbhgwMQCL/Z+ZN8u0T0J0cCbishDEkvK/ubaZykBA=="
-          }
-        ]
-      }
+      "blocker": null,
+      "verifications": [
+        {
+          "criterionId": "V1-GOV-001",
+          "verifiedBuild": null,
+          "evidence": [
+            {
+              "type": "automated",
+              "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+              "recordedAt": "2026-06-25T19:22:04.889Z",
+              "report": "evidence/reports/v1-001/governance-verification.json",
+              "reportSha256": "8bc3e87ccecdd8e11e3f63f001312f7aa28116d21df5aec17ef1372245f31334",
+              "signatures": [
+                {
+                  "signer": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c",
+                  "signature": "thvblkk0483V7flKXAwTbZoTn38N02nGjDCRAtR8YyA+i4w5I+ABni6WQG+w1M9D+z7hfV9gGQMCv9dgTLTyDA=="
+                },
+                {
+                  "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+                  "signature": "lU1vv7A4vOkaw1OpscDN0sEFXHd5vOBl18WLr28Xjf3G7XBrjkwQsd6achVY3iBe4E912NDw79nepmA9b4+pDA=="
+                }
+              ]
+            }
+          ],
+          "verifiedAt": "2026-06-25T19:22:09.889Z",
+          "verifier": "agent:019efed7-b459-70a0-9cb9-3580f97cd74c"
+        }
+      ]
     },
     {
       "id": "V1-002",

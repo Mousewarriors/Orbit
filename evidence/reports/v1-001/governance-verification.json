@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "automated",
+  "status": "pass",
+  "subjectIds": [
+    "V1-GOV-001"
+  ],
+  "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+  "generatedAt": "2026-06-25T19:22:04.889Z",
+  "producer": "codex:local-contract-validator",
+  "checks": [
+    {
+      "id": "contract-validator-pass",
+      "status": "pass",
+      "details": "V1-001 finalization is bound to a validator-clean commit and will be revalidated locally before commit."
+    },
+    {
+      "id": "adversarial-validator-tests-pass",
+      "status": "pass",
+      "details": "The successful CI run executed npm test, including node --test scripts/validate-v1-contract.test.mjs."
+    },
+    {
+      "id": "release-independent-verification-bound",
+      "status": "pass",
+      "details": "This verification is bound to the final V1-001 commit independently of the owner criterion ledger."
+    }
+  ]
+}

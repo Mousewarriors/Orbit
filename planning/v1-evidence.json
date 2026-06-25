@@ -536,11 +536,25 @@
     {
       "id": "V1-REL-001",
       "ownerSlice": "V1-001",
-      "status": "blocked_decision",
+      "status": "pass",
       "verifiedBuild": null,
-      "evidence": [],
-      "verifiedAt": null,
-      "verifier": null
+      "evidence": [
+        {
+          "type": "automated",
+          "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+          "recordedAt": "2026-06-25T17:16:21.000Z",
+          "report": "evidence/reports/v1-001/ci-gates.json",
+          "reportSha256": "0a95bd3aff921460ce081cb437fc8596c7c8862500a04549d616cce3adbc5ca8",
+          "signatures": [
+            {
+              "signer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+              "signature": "ZVnie4YJpstLLY1MJlA2AeAv1AShfaYdli4QRp5CniO49tldC8P2o4l+bvXYZE2zeNRYc760p1X/3mlwVitFAw=="
+            }
+          ]
+        }
+      ],
+      "verifiedAt": "2026-06-25T19:22:11.889Z",
+      "verifier": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44"
     },
     {
       "id": "V1-REL-002",

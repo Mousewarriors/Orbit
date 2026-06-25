@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "kind": "automated",
+  "status": "pass",
+  "subjectIds": [
+    "V1-REL-001"
+  ],
+  "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+  "generatedAt": "2026-06-25T17:16:21.000Z",
+  "producer": "ci:github-actions:28187817376",
+  "ci": {
+    "repository": "Mousewarriors/Orbit",
+    "runUrl": "https://github.com/Mousewarriors/Orbit/actions/runs/28187817376",
+    "conclusion": "success",
+    "workflow": "Mousewarriors/Orbit/.github/workflows/ci.yml",
+    "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146"
+  },
+  "checks": [
+    {
+      "id": "contract-validation-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm run v1:validate"
+      }
+    },
+    {
+      "id": "lint-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm run lint"
+      }
+    },
+    {
+      "id": "strict-typecheck-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm run typecheck --workspaces --if-present"
+      }
+    },
+    {
+      "id": "js-tests-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm test"
+      }
+    },
+    {
+      "id": "windows-renderer-build-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm run build:vite --workspace @orbit/desktop"
+      }
+    },
+    {
+      "id": "rust-tests-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "cargo test -p orbit-core -p orbit-search -p orbit-window-manager -p orbit-files"
+      }
+    },
+    {
+      "id": "windows-native-build-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "npm run build --workspace @orbit/desktop"
+      }
+    },
+    {
+      "id": "all-mandatory-jobs-needed",
+      "status": "pass",
+      "details": {
+        "requiredToken": "needs: [js, rust-libs, windows-desktop]"
+      }
+    },
+    {
+      "id": "v1-report-written-after-needs",
+      "status": "pass",
+      "details": {
+        "requiredToken": "node scripts/write-v1-ci-evidence.mjs"
+      }
+    },
+    {
+      "id": "v1-report-attested-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "subject-path: evidence/reports/v1-001/ci-gates.json"
+      }
+    },
+    {
+      "id": "evidence-attestation-in-ci",
+      "status": "pass",
+      "details": {
+        "requiredToken": "actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb"
+      }
+    }
+  ]
+}

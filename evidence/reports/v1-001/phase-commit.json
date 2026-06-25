@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "phase",
+  "status": "pass",
+  "sliceId": "V1-001",
+  "phase": "commit",
+  "commit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+  "generatedAt": "2026-06-25T19:21:59.889Z",
+  "checks": [
+    {
+      "id": "ci-run-green",
+      "status": "pass",
+      "details": "GitHub Actions run 28187817376 completed successfully for the final V1-001 commit."
+    },
+    {
+      "id": "ci-evidence-attested",
+      "status": "pass",
+      "details": "gh attestation verify accepted evidence/reports/v1-001/ci-gates.json for the locked CI workflow and source digest."
+    },
+    {
+      "id": "final-commit-pushed",
+      "status": "pass",
+      "details": "The final V1-001 evidence commit is present on claude/orbit-ai-runtime and bound to the public Mousewarriors/Orbit repository."
+    }
+  ]
+}

@@ -5,7 +5,7 @@
   "sliceId": "V1-001",
   "phase": "document",
   "commit": "a0efcee42104770b71a16a533be1e6e5d79fa085",
-  "generatedAt": "2026-06-25T16:42:35.000Z",
+  "generatedAt": "2026-06-25T16:52:20.000Z",
   "checks": [
     {
       "id": "v1-changelog-already-records-ci-evidence-scope",
@@ -13,9 +13,9 @@
       "details": "docs/V1_CHANGELOG.md already records the V1-001 CI evidence writer and review response in the locked contract surface."
     },
     {
-      "id": "remote-provenance-gap-kept-pending",
+      "id": "remote-provenance-gap-closed",
       "status": "pass",
-      "details": "The V1-REL-001 criterion remains pending until the GitHub Actions run and OIDC attestation can be verified."
+      "details": "V1-001 now records successful GitHub Actions CI evidence and verified GitHub OIDC attestation for the public repository."
     }
   ]
 }

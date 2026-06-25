@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "kind": "review",
+  "reviewer": "agent:019efed7-d77c-7630-acc7-4d892a9fdd44",
+  "role": "security",
+  "result": "pass",
+  "reviewedCommit": "c5f2a6eb039c4337f7338014e75cfa75132ca146",
+  "reviewedAt": "2026-06-25T19:22:21.889Z",
+  "critical": 0,
+  "high": 0,
+  "findings": []
+}
