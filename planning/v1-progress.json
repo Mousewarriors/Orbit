@@ -107,7 +107,7 @@
     },
     {
       "id": "V1-001",
-      "status": "in_progress",
+      "status": "blocked_decision",
       "workflow": {
         "implement": "pass",
         "test": "pass",
@@ -214,7 +214,34 @@
           "occurredAt": "2026-06-25T16:42:35.000Z"
         }
       ],
-      "blocker": null
+      "blocker": {
+        "type": "product_decision",
+        "owner": "human:Simon-Wood",
+        "proof": "evidence/blockers/v1-001/github-attestation-private-repo.json",
+        "proofSha256": "4947fee426e3a8a0cbeba620a4a01000dfeeaf5957addad20781bfd492e74795",
+        "lastChecked": "2026-06-25T17:14:00.000Z",
+        "unblockCondition": "Choose one: make Mousewarriors/Orbit public, move it to a GitHub owner/plan that supports artifact attestations for private repositories, or approve a reviewed v1 contract change to use a different provenance mechanism.",
+        "degradedBehavior": "V1-001 remains incomplete; local package smoke, independent review, JS/Rust CI and the Windows package build are recorded, but V1-REL-001 cannot pass because GitHub OIDC attestation persistence is unavailable for this user-owned private repository.",
+        "attempts": [
+          {
+            "at": "2026-06-25T16:45:10.000Z",
+            "action": "Ran push CI for f2217c1d7736334f38f03014c48846f20beb4b33.",
+            "result": "CI exposed a shallow-checkout failure in npm run v1:validate; the workflow was fixed to fetch full history for the JS validation job."
+          },
+          {
+            "at": "2026-06-25T16:59:55.000Z",
+            "action": "Ran push CI for 7989ccdb97ee73974c39addc510b7255803d44be after the checkout fix and contract re-anchor.",
+            "result": "JS validation/lint/typecheck/test/build and Rust tests passed; Windows package build passed; actions/attest failed because persisted attestations are unavailable for user-owned private repositories."
+          }
+        ],
+        "affectedCriterionIds": ["V1-REL-001"],
+        "signatures": [
+          {
+            "signer": "agent:019efed7-eb61-7382-af18-dcf85962e5a9",
+            "signature": "sOgwL+naZxHQJUEDwRQF2efgl0lCKBpZKhYVsJzCaIA9NgbhgwMQCL/Z+ZN8u0T0J0cCbishDEkvK/ubaZykBA=="
+          }
+        ]
+      }
     },
     {
       "id": "V1-002",

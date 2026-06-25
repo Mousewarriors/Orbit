@@ -536,7 +536,7 @@
     {
       "id": "V1-REL-001",
       "ownerSlice": "V1-001",
-      "status": "pending",
+      "status": "blocked_decision",
       "verifiedBuild": null,
       "evidence": [],
       "verifiedAt": null,

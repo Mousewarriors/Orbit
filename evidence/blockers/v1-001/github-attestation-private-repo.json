@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "blocker",
+  "status": "blocked_decision",
+  "sliceId": "V1-001",
+  "type": "product_decision",
+  "lastChecked": "2026-06-25T17:14:00.000Z",
+  "affectedCriterionIds": ["V1-REL-001"],
+  "summary": "GitHub artifact attestation persistence failed for the user-owned private repository.",
+  "observedIn": {
+    "repository": "Mousewarriors/Orbit",
+    "workflowRun": "https://github.com/Mousewarriors/Orbit/actions/runs/28186854125",
+    "job": "Windows — full workspace check",
+    "step": "Attest Windows packages"
+  },
+  "evidence": [
+    {
+      "source": "GitHub Actions job log",
+      "message": "Failed to persist attestation: Feature not available for user-owned private repositories. To enable this feature, please make this repository public."
+    }
+  ]
+}
