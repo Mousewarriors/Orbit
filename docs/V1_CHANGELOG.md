@@ -131,3 +131,11 @@ The findings are recorded in
 
 The findings are recorded in
 `docs/audits/V1_CONTRACT_REVIEW_ROUND_6.md`.
+
+## 2026-06-25 - Reviewer authority rotation before activation
+
+The previous reviewer panel expired before it could audit the exact activation
+commit. Its public keys were replaced with a fresh architecture, security and
+product panel before V1-000 completion. No stale review result is accepted as
+activation evidence; the replacement panel must review and sign the exact
+commit that activates the contract.

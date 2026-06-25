@@ -5,22 +5,22 @@
   "enrollmentQuorum": 2,
   "authorities": [
     {
-      "identity": "agent:019ef142-0941-7da3-a6aa-91543a805b16",
+      "identity": "agent:019efdd5-3e74-73d2-8b14-d8c1f72db641",
       "roles": ["architecture"],
-      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAHNUEdUahU21t8QF6nDuqh86am4bKhuQYu8r3Uq5MapM=",
-      "sha256Fingerprint": "f5ba89e989c54268c7c6b4b885f691bde239c4e62d1392ebf9a42c87fc2c86a5"
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAhSIiIameZ/vatSUG+RIdjftymliof+Pzj6kMFSqSklg=",
+      "sha256Fingerprint": "6e33ecfef58b01806ed3aad0813e5ca20c25f8f3466240c7e0b6111afa162392"
     },
     {
-      "identity": "agent:019ef142-1d1f-78f1-87d5-353c7ec7eea9",
+      "identity": "agent:019efdd5-527a-7571-bfab-28c1d50ea51f",
       "roles": ["security"],
-      "publicKeySpkiBase64": "MCowBQYDK2VwAyEA8fGyt3fFMWUODpeMG8Aye4SLKNp0W4VDCqxCbqwavV8=",
-      "sha256Fingerprint": "f711769985d489c92148c695a27b5a42244e95aed8fe667181d78805a9bb0020"
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAW/zV2uuw53VsQrAHZQob5X56S3mgc/bUubl5KDW5Pas=",
+      "sha256Fingerprint": "5c9e7f76b2eb08cad5a5a2d435e55bc3ab9ece1b3bc324480266fb8724b5d155"
     },
     {
-      "identity": "agent:019ef142-312a-7771-bc42-11fb141b1961",
+      "identity": "agent:019efdd5-667a-76f1-8864-9dbca7096745",
       "roles": ["product"],
-      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAbcmu9ClDauvtrkvJY2ompJAtPBmUAGs+H/hZ9nfzJ88=",
-      "sha256Fingerprint": "1f99b879239b62dc545325d7b308719450a32f88a3e2c89e66dab451b1a43aec"
+      "publicKeySpkiBase64": "MCowBQYDK2VwAyEAlDmV4WtIO5XiBGRjhJG0mfQ0WqHmfrFClHaKSZTr9wo=",
+      "sha256Fingerprint": "af13a9d6a2eff11e9c6a5b481544d0904a957fceda9e201c95b1839309708760"
     }
   ]
 }
