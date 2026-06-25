@@ -147,5 +147,7 @@ commit that activates the contract.
 - Added a regression test proving required security telemetry validation reports
   structured errors instead of crashing when raw evidence is missing or
   unattested.
+- Made bootstrap-state adversarial tests independent of whether V1-000 is still
+  pending or has already been activated.
 
 The architecture reviewer finding was `ARCH-V1-000-001`.

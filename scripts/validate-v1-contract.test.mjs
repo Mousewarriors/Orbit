@@ -40,7 +40,11 @@ test('duplicate criterion ownership is rejected', async () => {
 
 test('a completed slice without phase and criterion evidence is rejected', async () => {
   const state = await loadContract(root);
-  state.progress.slices[0].status = 'completed';
+  const progress = state.progress.slices[0];
+  progress.status = 'completed';
+  progress.workflow.test = 'pending';
+  progress.evidence = progress.evidence.filter((record) => !record.phase);
+  state.evidence.criteria.find((item) => item.id === 'V1-GOV-001').status = 'pending';
   assert.match(validateContract(state).errors.join('\n'), /completed before test passed/);
   assert.match(
     validateContract(state).errors.join('\n'),
@@ -126,7 +130,7 @@ test('self-review and a refreshed mutable lock cannot activate the contract', as
   state.lock.files['docs/V1_SCOPE.md'] = 'c'.repeat(64);
   const errors = validateContract(state).errors.join('\n');
   assert.match(errors, /commit not present in Git/);
-  assert.match(errors, /lock differs from the independently reviewed commit/);
+  assert.match(errors, /locked file changed after independent review/);
   assert.match(errors, /missing passing security review/);
 });
 
@@ -222,10 +226,10 @@ test('future timestamps are rejected', async () => {
 
 test('a slice cannot start before every dependency completes', async () => {
   const state = await loadContract(root);
-  state.progress.slices.find((item) => item.id === 'V1-001').status = 'in_progress';
+  state.progress.slices.find((item) => item.id === 'V1-002').status = 'in_progress';
   assert.match(
     validateContract(state).errors.join('\n'),
-    /V1-001 started before dependency V1-000 completed/,
+    /V1-002 started before dependency V1-001 completed/,
   );
 });
 
