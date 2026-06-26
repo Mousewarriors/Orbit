@@ -17,9 +17,12 @@ import {
 import type { McpToolDescriptor } from './protocol.js';
 
 const ALLOWED_PROP_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array']);
+export const MCP_TOOL_RECORD_VERSION = '1.0.0';
 
 /** Coerce an untrusted JSON-schema-ish object into our minimal ToolInputSchema. */
-export function sanitizeSchema(raw: Readonly<Record<string, unknown>> | undefined): ToolInputSchema {
+export function sanitizeSchema(
+  raw: Readonly<Record<string, unknown>> | undefined,
+): ToolInputSchema {
   const props: Record<string, ToolPropertySchema> = {};
   const rawProps =
     raw && typeof raw['properties'] === 'object' && raw['properties'] !== null
@@ -32,7 +35,9 @@ export function sanitizeSchema(raw: Readonly<Record<string, unknown>> | undefine
     const description = v && typeof v['description'] === 'string' ? v['description'] : undefined;
     const enumValues =
       v && Array.isArray(v['enum'])
-        ? v['enum'].filter((e): e is string | number => typeof e === 'string' || typeof e === 'number')
+        ? v['enum'].filter(
+            (e): e is string | number => typeof e === 'string' || typeof e === 'number',
+          )
         : undefined;
     props[key] = {
       type: safeType,
@@ -64,7 +69,12 @@ export function inferSideEffects(
   const effects = new Set<ToolSideEffect>();
   // Tokenise on non-alphanumerics so snake_case / kebab-case / paths split too
   // (a word-boundary regex won't split on "_", which is a word character).
-  const tokens = new Set(tool.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const tokens = new Set(
+    tool.name
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
   const has = (...words: string[]) => words.some((w) => tokens.has(w));
 
   if (a.openWorldHint) effects.add('network');
@@ -94,6 +104,7 @@ export interface McpToolMapOptions {
   readonly projectScope?: readonly string[];
   readonly availability?: ToolRecord['availability'];
   readonly health?: ToolRecord['health'];
+  readonly version?: string;
   /** Only for caller-owned catalogues; never enable for arbitrary servers. */
   readonly trustReadOnlyHint?: boolean;
 }
@@ -108,6 +119,7 @@ export function mcpToolToRecord(
   const risk = deriveRisk(sideEffects);
   return {
     id: `mcp:${serverId}:${tool.name}`,
+    version: options.version ?? MCP_TOOL_RECORD_VERSION,
     name: tool.name,
     title: tool.annotations?.title ?? tool.name,
     description: tool.description ?? '',
@@ -131,5 +143,7 @@ export function mcpToolsToRecords(
   options: McpToolMapOptions = {},
 ): ToolRecord[] {
   const allow = options.allowlist ? new Set(options.allowlist) : null;
-  return tools.filter((t) => !allow || allow.has(t.name)).map((t) => mcpToolToRecord(serverId, t, options));
+  return tools
+    .filter((t) => !allow || allow.has(t.name))
+    .map((t) => mcpToolToRecord(serverId, t, options));
 }

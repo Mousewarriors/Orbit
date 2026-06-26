@@ -71,8 +71,14 @@ describe('isPublicHttpsMcpEndpoint', () => {
     expect(isPublicHttpsMcpEndpoint('https://172.16.0.2/rpc')).toBe(false);
     expect(isPublicHttpsMcpEndpoint('https://192.168.1.2/rpc')).toBe(false);
     expect(isPublicHttpsMcpEndpoint('https://169.254.169.254/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://192.0.0.1/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://198.18.0.1/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://198.19.255.255/rpc')).toBe(false);
     expect(isPublicHttpsMcpEndpoint('https://[::1]/rpc')).toBe(false);
     expect(isPublicHttpsMcpEndpoint('https://[fc00::1]/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://[::ffff:192.168.1.1]/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://[::ffff:c0a8:101]/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://8.8.8.8/rpc')).toBe(true);
   });
 });
 

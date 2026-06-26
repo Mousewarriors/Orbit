@@ -67,6 +67,8 @@ export type ToolHealth = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
  */
 export interface ToolRecord {
   readonly id: string;
+  /** Semantic version of this capability contract; together with `id` forms the stable versioned identity. */
+  readonly version: string;
   /** The tool's own name within its source (e.g. the MCP tool name). */
   readonly name: string;
   readonly title: string;

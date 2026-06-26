@@ -112,7 +112,8 @@ function isForbiddenIpv4(host: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 192 && b === 0 && (octets[2] === 0 || octets[2] === 2)) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 88 && octets[2] === 99) ||
     (a === 198 && (b === 18 || b === 19)) ||
     (a === 203 && b === 0 && octets[2] === 113)
   );
@@ -121,17 +122,31 @@ function isForbiddenIpv4(host: string): boolean {
 function isForbiddenIpv6(host: string): boolean {
   const h = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
   if (!h.includes(':')) return false;
-  if (h === '::' || h === '::1' || h.startsWith('::ffff:127.') || h.startsWith('::ffff:10.')) {
+  const mappedDotted = h.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mappedDotted) return isForbiddenIpv4(mappedDotted[1]!);
+  const mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) {
+    const high = Number.parseInt(mappedHex[1]!, 16);
+    const low = Number.parseInt(mappedHex[2]!, 16);
+    if (Number.isFinite(high) && Number.isFinite(low)) {
+      return isForbiddenIpv4(
+        `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`,
+      );
+    }
+  }
+  if (h === '::' || h === '::1') {
     return true;
   }
   const first = h.split(':').find(Boolean) ?? '';
   const firstValue = Number.parseInt(first, 16);
   if (!Number.isFinite(firstValue)) return false;
   return (
+    firstValue === 0x0100 ||
     (firstValue & 0xfe00) === 0xfc00 ||
     (firstValue & 0xffc0) === 0xfe80 ||
     firstValue === 0xff00 ||
-    h.startsWith('2001:db8:')
+    h.startsWith('2001:db8:') ||
+    (firstValue === 0x2001 && Number.parseInt(h.split(':')[1] || '0', 16) <= 0x01ff)
   );
 }
 

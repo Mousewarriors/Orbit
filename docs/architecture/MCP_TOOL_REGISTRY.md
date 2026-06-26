@@ -14,7 +14,9 @@ faked capability.
 
 - **One vocabulary.** `ToolRecord` describes any invokable tool regardless of
   source (`native`, `relay`, `agentos`, `extension`, `mcp`, `ai-provider`). The
-  source is always carried and shown.
+  source is always carried and shown. Every record has a stable `id` plus a
+  semantic `version`, making the capability contract explicitly versioned
+  without changing the lookup id.
 - **Risk from side effects, not trust.** A tool declares effects (`read`,
   `write-file`, `delete-file`, `network`, `send-message`, `run-command`,
   `git-push`, `deploy`, `publish`, `spend`, `system-change`). `policy.ts`
@@ -30,7 +32,9 @@ faked capability.
   write.
 - **Unified registry.** `ToolRegistry` merges records from every source, dedupes
   by id, bounds its size, scopes tools to the active project, and is the single
-  lookup used by mission/chat tool execution.
+  lookup used by mission/chat tool execution. It rejects malformed records that
+  lack semantic versions, object schemas, recognised risk values or health
+  states.
 - **Argument validation.** `validateArgs` checks tool-call arguments against the
   tool schema before any native or MCP execution.
 

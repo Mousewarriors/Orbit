@@ -1,16 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MockProvider, type AiRequest } from '@orbit/ai-runtime';
 import type { ToolRecord } from '@orbit/tool-registry';
-import {
-  providerToolName,
-  runToolLoop,
-  toolRecordToDef,
-  type ToolCallCard,
-} from './toolLoop.js';
+import { providerToolName, runToolLoop, toolRecordToDef, type ToolCallCard } from './toolLoop.js';
 
 function tool(partial: Partial<ToolRecord> & { name: string }): ToolRecord {
   return {
     id: `mcp:agentos:${partial.name}`,
+    version: '1.0.0',
     title: partial.name,
     description: '',
     source: 'mcp',
@@ -40,7 +36,10 @@ describe('toolRecordToDef', () => {
     const def = toolRecordToDef(record);
     expect(def.name).toBe(providerToolName(record));
     expect(def.description).toBe('Search the vault');
-    expect(def.parameters).toMatchObject({ type: 'object', properties: { query: { type: 'string' } } });
+    expect(def.parameters).toMatchObject({
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    });
   });
 
   it('namespaces identical tool names from different servers', () => {
@@ -98,7 +97,14 @@ describe('runToolLoop', () => {
 
     const result = await runToolLoop([{ role: 'user', content: 'remember this' }], {
       provider,
-      tools: [tool({ name: 'save_memory', risk: 'medium', requiresConfirmation: true, sideEffects: ['write-file'] })],
+      tools: [
+        tool({
+          name: 'save_memory',
+          risk: 'medium',
+          requiresConfirmation: true,
+          sideEffects: ['write-file'],
+        }),
+      ],
       execute,
       confirm,
       onCard: (c) => cards.push(c),

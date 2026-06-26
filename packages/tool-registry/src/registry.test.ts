@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ToolRegistry } from './registry.js';
+import { isValidToolRecord, ToolRegistry } from './registry.js';
 import { nativeToolRecords, NATIVE_TOOL_IDS } from './nativeTools.js';
 import { mcpToolsToRecords } from './mcp/mapToRecords.js';
 import { validateArgs } from './validateArgs.js';
@@ -23,6 +23,20 @@ describe('ToolRegistry', () => {
     expect(reg.size).toBe(before);
     expect(reg.get('mcp:fs:read_file')).toBeDefined();
     expect(reg.get(NATIVE_TOOL_IDS.dispatchAgent)?.source).toBe('relay');
+  });
+
+  it('requires stable versioned records with schema, risk and health', () => {
+    const native = nativeToolRecords();
+    expect(native.every((t) => isValidToolRecord(t))).toBe(true);
+    expect(native.every((t) => /^\d+\.\d+\.\d+$/.test(t.version))).toBe(true);
+
+    const [mcp] = mcpToolsToRecords('fs', [{ name: 'read_file' }]);
+    expect(mcp?.version).toBe('1.0.0');
+    expect(mcp ? isValidToolRecord(mcp) : false).toBe(true);
+
+    const reg = new ToolRegistry();
+    reg.register([{ ...native[0]!, version: '' }]);
+    expect(reg.size).toBe(0);
   });
 
   it("removes a server's tools on disable", () => {

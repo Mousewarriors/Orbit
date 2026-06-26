@@ -91,6 +91,9 @@ fn ipv4_is_forbidden(ip: Ipv4Addr) -> bool {
         || ip.octets()[0] == 0
         || ip.octets()[0] == 100 && (64..=127).contains(&ip.octets()[1])
         || ip.octets()[0] == 169 && ip.octets()[1] == 254
+        || ip.octets()[0] == 192 && ip.octets()[1] == 0
+        || ip.octets()[0] == 192 && ip.octets()[1] == 88 && ip.octets()[2] == 99
+        || ip.octets()[0] == 198 && (ip.octets()[1] == 18 || ip.octets()[1] == 19)
         || ip.octets()[0] >= 240
 }
 
@@ -106,17 +109,24 @@ fn ipv6_is_documentation(ip: Ipv6Addr) -> bool {
     ip.segments()[0] == 0x2001 && ip.segments()[1] == 0x0db8
 }
 
+fn ipv6_is_special_purpose(ip: Ipv6Addr) -> bool {
+    ip.segments()[0] == 0x0100 || (ip.segments()[0] == 0x2001 && ip.segments()[1] <= 0x01ff)
+}
+
 fn ip_is_forbidden(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ip) => ipv4_is_forbidden(ip),
         IpAddr::V6(ip) => {
+            if let Some(mapped) = ip.to_ipv4_mapped() {
+                return ipv4_is_forbidden(mapped);
+            }
             ip.is_unspecified()
                 || ip.is_loopback()
                 || ip.is_multicast()
                 || ipv6_is_unique_local(ip)
                 || ipv6_is_unicast_link_local(ip)
                 || ipv6_is_documentation(ip)
-                || ip.to_ipv4_mapped().map(ipv4_is_forbidden).unwrap_or(false)
+                || ipv6_is_special_purpose(ip)
         }
     }
 }
@@ -345,18 +355,34 @@ mod tests {
         assert!(validate_http_mcp_url("https://172.16.0.8/mcp").is_err());
         assert!(validate_http_mcp_url("https://192.168.1.8/mcp").is_err());
         assert!(validate_http_mcp_url("https://169.254.169.254/mcp").is_err());
+        assert!(validate_http_mcp_url("https://192.0.0.1/mcp").is_err());
+        assert!(validate_http_mcp_url("https://198.18.0.1/mcp").is_err());
+        assert!(validate_http_mcp_url("https://198.19.255.255/mcp").is_err());
         assert!(validate_http_mcp_url("https://[::1]/mcp").is_err());
         assert!(validate_http_mcp_url("https://[fc00::1]/mcp").is_err());
+        assert!(validate_http_mcp_url("https://[::ffff:192.168.1.1]/mcp").is_err());
+        assert!(validate_http_mcp_url("https://[::ffff:c0a8:101]/mcp").is_err());
+        assert!(validate_http_mcp_url("https://8.8.8.8/mcp").is_ok());
         assert!(validate_http_mcp_url("https://mcp.example.com/rpc").is_ok());
     }
 
     #[test]
-    fn http_mcp_dns_resolution_rejects_forbidden_addresses() {
-        let parsed = validate_http_mcp_url("https://127.0.0.1/mcp");
-        assert!(
-            parsed.is_err(),
-            "direct loopback must be rejected before DNS"
-        );
+    fn http_mcp_address_classifier_rejects_non_public_dns_results() {
+        for ip in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "100.64.0.1",
+            "169.254.169.254",
+            "172.16.0.1",
+            "192.0.0.1",
+            "192.168.0.1",
+            "198.18.0.1",
+            "198.19.255.255",
+            "203.0.113.1",
+        ] {
+            assert!(ip_is_forbidden(ip.parse::<IpAddr>().expect(ip)), "{ip} must be forbidden");
+        }
+        assert!(!ip_is_forbidden("8.8.8.8".parse::<IpAddr>().unwrap()));
         let parsed = validate_http_mcp_url("https://mcp.example.com/rpc").expect("shape valid");
         // This assertion documents the preflight DNS hook without depending on a
         // live network result in CI; direct forbidden hosts are rejected above.

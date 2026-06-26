@@ -12,6 +12,8 @@
 import { approvalScopesFor, deriveRisk, requiresConfirmation } from './policy.js';
 import type { ToolInputSchema, ToolRecord, ToolSideEffect } from './types.js';
 
+export const NATIVE_TOOL_VERSION = '1.0.0';
+
 /** Stable ids the Mission engine maps to its step kinds. */
 export const NATIVE_TOOL_IDS = {
   openApplication: 'native:open_application',
@@ -45,6 +47,7 @@ function record(
   const risk = deriveRisk(sideEffects);
   return {
     id,
+    version: NATIVE_TOOL_VERSION,
     name: id.split(':').pop() ?? id,
     title,
     description,

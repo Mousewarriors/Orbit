@@ -7,10 +7,29 @@
  * it is, and whether it's in scope for the active project. Pure + deterministic:
  * registration is idempotent by id, queries never mutate.
  */
-import type { ToolRecord, ToolSource } from './types.js';
+import type { ToolHealth, ToolRecord, ToolRisk, ToolSource } from './types.js';
 
 /** Hard cap so a noisy MCP server can't unbound the registry. */
 export const MAX_TOOLS = 2000;
+export const TOOL_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+
+const VALID_RISKS = new Set<ToolRisk>(['safe', 'low', 'medium', 'high', 'critical']);
+const VALID_HEALTH = new Set<ToolHealth>(['healthy', 'degraded', 'unhealthy', 'unknown']);
+
+export function isValidToolRecord(record: ToolRecord): boolean {
+  return (
+    typeof record.id === 'string' &&
+    record.id.length > 0 &&
+    TOOL_VERSION_PATTERN.test(record.version) &&
+    typeof record.name === 'string' &&
+    record.name.length > 0 &&
+    typeof record.title === 'string' &&
+    typeof record.description === 'string' &&
+    record.inputSchema?.type === 'object' &&
+    VALID_RISKS.has(record.risk) &&
+    VALID_HEALTH.has(record.health)
+  );
+}
 
 export class ToolRegistry {
   private readonly tools = new Map<string, ToolRecord>();
@@ -18,6 +37,7 @@ export class ToolRegistry {
   /** Register/replace records by id. Later registration of an id wins. */
   register(records: readonly ToolRecord[]): void {
     for (const record of records) {
+      if (!isValidToolRecord(record)) continue;
       if (this.tools.size >= MAX_TOOLS && !this.tools.has(record.id)) continue;
       this.tools.set(record.id, record);
     }
