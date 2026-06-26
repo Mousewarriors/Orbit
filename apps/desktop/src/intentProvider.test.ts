@@ -195,6 +195,38 @@ describe('intent provider — direct + find', () => {
     });
   });
 
+  it('uses AI query rewrite only after a direct indexed-file search misses', async () => {
+    const fileSearch = vi.fn(async (q: string) =>
+      q === 'kht accounts rules'
+        ? [
+            {
+              path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
+              name: 'KHT Congregation Accounts Instructions.pdf',
+              parent: 'C:\\docs',
+              kind: 'file',
+            },
+          ]
+        : [],
+    );
+    const rewriteFileQuery = vi.fn(async () => ['kht accounts rules']);
+    const items = await run(
+      'find the file about where the kht money rules are',
+      makeDeps({ fileSearch, rewriteFileQuery }),
+    );
+
+    expect(fileSearch).toHaveBeenNthCalledWith(1, 'where kht money rules are', 20);
+    expect(rewriteFileQuery).toHaveBeenCalledWith(
+      'where kht money rules are',
+      expect.any(AbortSignal),
+    );
+    expect(fileSearch).toHaveBeenNthCalledWith(2, 'kht accounts rules', 20);
+    expect(items[0]!.subtitle).toContain('AI search: "kht accounts rules"');
+    expect(items[0]!.primaryAction.run).toEqual({
+      kind: 'open-path',
+      path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
+    });
+  });
+
   it('find notes queries the note index', async () => {
     const noteSearch = vi.fn(async () => [{ id: 'n1', title: 'Onboarding', body: 'hi' }]);
     const items = await run('find notes about onboarding', makeDeps({ noteSearch }));

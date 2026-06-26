@@ -22,6 +22,8 @@ import {
 } from './providers.js';
 import { createIntentProvider } from './intentProvider.js';
 import { createAiCommandProvider } from './ai/aiCommands.js';
+import { rewriteFileQueryWithAi } from './ai/fileQueryRewrite.js';
+import { loadProviderInfo } from './ai/providerLoad.js';
 import { executeAction, type EffectResult, type ExecuteOutcome } from './execute.js';
 import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
@@ -118,6 +120,11 @@ export function App(): JSX.Element {
         getApps: () => appsRef.current,
         getProjects: () => projectsRef.current,
         fileSearch: async (q, limit) => (native.isTauri() ? native.fileSearch(q, { limit }) : []),
+        rewriteFileQuery: async (q, signal) => {
+          const info = await loadProviderInfo();
+          if (!info.configured || !info.provider) return [];
+          return rewriteFileQueryWithAi(q, info.provider, signal);
+        },
         noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
       }),
       createAiCommandProvider(),

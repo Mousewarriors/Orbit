@@ -8,7 +8,9 @@
  *   3. emits a SearchItem whose primaryAction is an existing, audited ActionToken
  *      (navigate the Control Center, open a path, run a narrow built-in, …).
  *
- * Known local requests never call a model. AI-assisted intents are recognised
+ * Known local requests run deterministically first. File requests may call a
+ * configured AI provider for alternative search terms only after direct indexed
+ * search misses. AI-assisted intents are recognised
  * but returned honestly as "not available yet" with a useful web fallback —
  * never as a fake success. The provider is thin glue over the pure pipeline so
  * all routing decisions stay unit-tested in @orbit/intent.
@@ -65,6 +67,15 @@ export interface IntentProviderDeps {
   readonly getProjects: () => ReadonlyArray<IntentProject>;
   /** Search the local file index (find-file and open-file-in-application intents). */
   readonly fileSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentFile>>;
+  /**
+   * Optional AI-assisted query rewrite. Used only after a direct indexed-file
+   * search returns no hits; returned strings are searched against the local
+   * index, never executed or trusted as paths.
+   */
+  readonly rewriteFileQuery?: (
+    query: string,
+    signal?: AbortSignal,
+  ) => Promise<ReadonlyArray<string>>;
   /** Search notes (only called for find-notes intents). */
   readonly noteSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentNote>>;
 }
@@ -110,6 +121,32 @@ function controlCenterAction(arg: Parameters<typeof encodeControlCenterArg>[0]):
   return { kind: 'push-view', viewId: 'control-center', args: { id: encodeControlCenterArg(arg) } };
 }
 
+async function searchFilesWithRewrite(
+  deps: IntentProviderDeps,
+  term: string,
+  limit: number,
+  signal?: AbortSignal,
+  accept: (file: IntentFile) => boolean = () => true,
+): Promise<{ files: ReadonlyArray<IntentFile>; matchedQuery: string; usedRewrite: boolean }> {
+  const direct = (await deps.fileSearch(term, limit)).filter(accept);
+  if (direct.length > 0 || !deps.rewriteFileQuery) {
+    return { files: direct, matchedQuery: term, usedRewrite: false };
+  }
+
+  const seen = new Set([term.trim().toLowerCase()]);
+  const suggestions = await deps.rewriteFileQuery(term, signal).catch(() => []);
+  for (const suggestion of suggestions) {
+    const q = suggestion.trim();
+    const key = q.toLowerCase();
+    if (!q || seen.has(key)) continue;
+    seen.add(key);
+    const files = (await deps.fileSearch(q, limit)).filter(accept);
+    if (files.length > 0) return { files, matchedQuery: q, usedRewrite: true };
+  }
+
+  return { files: [], matchedQuery: term, usedRewrite: false };
+}
+
 /**
  * Build the items for a recognised + proposed intent. Async because find-file /
  * find-notes query native; everything else resolves from cached lists.
@@ -119,6 +156,7 @@ async function buildItems(
   recognised: NonNullable<ReturnType<typeof recogniseIntent>>,
   proposal: IntentProposal,
   deps: IntentProviderDeps,
+  signal?: AbortSignal,
 ): Promise<SearchItem[]> {
   const { plan, display } = proposal;
   const { slots } = recognised;
@@ -331,7 +369,8 @@ async function buildItems(
           },
         ];
       }
-      const files = (await deps.fileSearch(term, 10)).filter((f) => f.kind !== 'dir');
+      const search = await searchFilesWithRewrite(deps, term, 10, signal, (f) => f.kind !== 'dir');
+      const { files } = search;
       if (files.length === 0) {
         return [
           {
@@ -354,7 +393,9 @@ async function buildItems(
       return files.slice(0, 3).map((f, i) => ({
         ...baseItem(`intent.open-file-in-application.${f.path}`, query, {
           title: `Open ${f.name} in ${app.name}`,
-          subtitle: `${f.parent} · ${app.name}`,
+          subtitle: `${f.parent} · ${app.name}${
+            search.usedRewrite ? ` · AI search: "${search.matchedQuery}"` : ''
+          }`,
           category: 'Files',
           source: 'file',
           icon: icon('file'),
@@ -419,7 +460,8 @@ async function buildItems(
     case 'find-files': {
       const term = (slots.fileQuery ?? '').trim();
       if (!term) return [];
-      const files = await deps.fileSearch(term, 20);
+      const search = await searchFilesWithRewrite(deps, term, 20, signal);
+      const { files } = search;
       if (files.length === 0) {
         return [
           {
@@ -444,7 +486,9 @@ async function buildItems(
         return {
           ...baseItem(`intent.find-file.${f.path}`, query, {
             title: f.name,
-            subtitle: `${isDir ? 'Folder' : 'File'} — ${f.parent}`,
+            subtitle: `${isDir ? 'Folder' : 'File'} — ${f.parent}${
+              search.usedRewrite ? ` · AI search: "${search.matchedQuery}"` : ''
+            }`,
             category: isDir ? 'Folders' : 'Files',
             source: 'file',
             icon: icon(isDir ? 'folder' : 'file'),
@@ -540,11 +584,11 @@ export function createIntentProvider(deps: IntentProviderDeps): SearchProvider {
     id: 'intent',
     source: SOURCE,
     canHandle: (q) => q.trim().length >= 3,
-    async search(query): Promise<SearchItem[]> {
+    async search(query, signal): Promise<SearchItem[]> {
       const recognised = recogniseIntent(query);
       if (!recognised) return [];
       const proposal = proposeIntent(recognised);
-      return buildItems(query, recognised, proposal, deps);
+      return buildItems(query, recognised, proposal, deps, signal);
     },
   };
 }

@@ -39,6 +39,22 @@ For open-with-app:
 - Chat/Mission native-tool execution refuses to guess when multiple indexed
   files match; it returns a shortlist and asks for a narrower file query.
 
+### AI-assisted query rewrite
+
+When a recognised file request produces no direct index hits, Orbit may ask the
+configured AI provider (local Ollama, Ollama Cloud, or another configured
+provider) for a few alternative search terms. This is deliberately narrow:
+
+- deterministic file search always runs first;
+- the model returns only JSON search terms, never file paths or actions;
+- suggestions that look like paths, URLs or shell snippets are discarded;
+- Orbit searches those terms against the local file index and still only opens
+  paths returned by the index/native validation.
+
+This lets remembered descriptions like "where the KHT money rules are" recover
+files whose indexed name is closer to "KHT congregation accounts instructions"
+without handing launch authority to the model.
+
 ## PowerShell / OS natural-language entry
 
 Orbit can receive a natural-language command from a second desktop process and
