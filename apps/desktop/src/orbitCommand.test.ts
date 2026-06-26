@@ -12,6 +12,8 @@ import {
   type OrbitCommandBridgeDeps,
 } from './orbitCommand.js';
 import { createIntentProvider } from './intentProvider.js';
+import { createAgentProvider } from './agent/agentProvider.js';
+import { decodeQuickAiArg } from './ai/quickAi.js';
 import type { OrbitCommandPayload } from './native.js';
 
 function payload(query: string): OrbitCommandPayload {
@@ -235,5 +237,25 @@ describe('external Orbit command runner', () => {
       kind: 'open-path',
       path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
     });
+  });
+
+  it('proves a PowerShell sentence can open Orbit Agent prefilled with an agent mission', async () => {
+    const executed: RankedItem[] = [];
+    const result = await runExternalOrbitCommand(payload('agent: launch an agent on Orbit'), {
+      providers: [createAgentProvider()],
+      signals: signals(),
+      execute: async (ranked) => {
+        executed.push(ranked);
+        return { hide: false, pushView: 'orbit-agent' };
+      },
+      requestConfirmation: vi.fn(),
+    });
+
+    expect(result.status).toBe('executed');
+    const run = executed[0]?.item.primaryAction.run;
+    expect(run?.kind).toBe('push-view');
+    if (run?.kind !== 'push-view') throw new Error('expected push-view');
+    expect(run.viewId).toBe('orbit-agent');
+    expect(decodeQuickAiArg(String(run.args?.['id'])).prompt).toBe('launch an agent on Orbit');
   });
 });

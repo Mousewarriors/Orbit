@@ -5,7 +5,7 @@ Agent view, all built and unit-tested (60 new tests). Deterministic planning,
 agent dispatch and step execution are real; multi-step AI planning needs a
 configured provider; model routing preview needs the AgentOS Gateway.**
 
-This is the surface behind *"tell Orbit what you want done and it does it"*. It is
+This is the surface behind _"tell Orbit what you want done and it does it"_. It is
 built to the security spine of the master spec (§20/§26/§30): the model proposes,
 **Orbit validates**, the user approves, and Orbit's audited executor runs the
 steps. The model never touches the OS.
@@ -24,7 +24,7 @@ goal (plain language)
 
 A **plan is a list of steps, and every step references a tool id that already
 exists in the Tool Registry** (Phase 8) with arguments validated against that
-tool's schema. A planner — deterministic *or* a model — can therefore only ever
+tool's schema. A planner — deterministic _or_ a model — can therefore only ever
 assemble a mission from Orbit's existing safe capabilities. It cannot emit a
 shell string, an arbitrary path, a new action name, or an unvalidated argument
 (`parseMissionPlan` drops any step that fails this, mirroring `classify.ts`).
@@ -40,7 +40,7 @@ provider's `complete`).
 
 ## Launching agents is real (via Relay)
 
-The headline capability — *launch an agent to do something* — runs through Orbit
+The headline capability — _launch an agent to do something_ — runs through Orbit
 Relay's existing, audited flow, not a mock:
 
 1. `relayListAgents` → `chooseAgent(agents, preference)` (pure: a named preference
@@ -64,13 +64,19 @@ fully unit-tested headless.
 
 ## The Orbit Agent view
 
-Reachable from the **"Orbit Agent"** command and from natural language ("agent:
-…", "have an agent …", "ask orbit to …", "… for me", "do …"). It shows the active
-provider (on-device / leaves-device / none), warns when a dispatch step needs
-Relay and Relay isn't ready, renders the plan with per-step risk + rationale,
-gates every consequential step through the confirmation dialog (Approve / Skip),
-executes sequentially with a Stop button, shows bounded per-step results, and
-offers an "Open result" navigation when a step targets the Control Center.
+Reachable from the **"Orbit Agent"** command, from Root Search natural language
+("agent: …", "have an agent …", "ask orbit to …", "… for me", "do …"), and from
+the external shell entry (`Orbit.exe --orbit-query "agent: launch an agent on
+Orbit"`). Generic launch phrasing such as "launch an agent on Orbit" maps to the
+best available Relay agent; named phrasing such as "launch Codex on Orbit"
+preserves that preference.
+
+The view shows the active provider (on-device / leaves-device / none), warns
+when a dispatch step needs Relay and Relay isn't ready, renders the plan with
+per-step risk + rationale, gates every consequential step through the
+confirmation dialog (Approve / Skip), executes sequentially with a Stop button,
+shows bounded per-step results, and offers an "Open result" navigation when a
+step targets the Control Center.
 
 ## Honest gaps / deferred
 

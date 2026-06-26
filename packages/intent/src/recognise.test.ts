@@ -135,11 +135,21 @@ describe('recogniseIntent — projects', () => {
     expect(recogniseIntent('continue')).toBeNull();
   });
 
+  it('does not mistake generic agent status wording for launch', () => {
+    expect(recogniseIntent('get agent status for Orbit')?.intent).not.toBe(
+      'launch_agent_on_project',
+    );
+  });
+
   it('launch agent on project', () => {
     const r = expectIntent('Launch Codex on Orbit', 'launch_agent_on_project');
     expect(r.slots.agentPreference).toBe('codex');
     expect(r.slots.projectQuery).toBe('orbit');
     expect(r.requiresConfirmation).toBe(true);
+
+    const generic = expectIntent('Launch an agent on Orbit', 'launch_agent_on_project');
+    expect(generic.slots.agentPreference).toBe('best');
+    expect(generic.slots.projectQuery).toBe('orbit');
 
     const r2 = expectIntent('run Claude on the website project', 'launch_agent_on_project');
     expect(r2.slots.agentPreference).toBe('claude');

@@ -75,6 +75,16 @@ describe('intent provider — control center navigation', () => {
     expect(arg.includeLatestHandoff).toBe(true);
   });
 
+  it('"launch an agent on Orbit" deep-links into Launch with best-agent preference', async () => {
+    const items = await run('launch an agent on Orbit');
+    const run0 = items[0]!.primaryAction.run;
+    if (run0.kind !== 'push-view') throw new Error('expected push-view');
+    const arg = decodeControlCenterArg(String(run0.args!['id']));
+    expect(arg.tab).toBe('launch');
+    expect(arg.project).toBe('C:\\Users\\me\\Raycast Clone');
+    expect(arg.agentPreference).toBe('best');
+  });
+
   it('"show failed sessions" carries the status filter', async () => {
     const items = await run('show failed sessions');
     const run0 = items[0]!.primaryAction.run;

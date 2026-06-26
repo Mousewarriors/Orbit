@@ -27,6 +27,16 @@ describe('planDeterministically', () => {
     expect(plan?.steps[0]?.args['agentPreference']).toBe('best');
   });
 
+  it('maps "Launch an agent on Orbit" to best-agent dispatch (no AI)', () => {
+    const plan = planDeterministically('Launch an agent on Orbit', reg);
+    expect(plan?.source).toBe('deterministic');
+    expect(plan?.steps[0]?.toolId).toBe(NATIVE_TOOL_IDS.dispatchAgent);
+    expect(plan?.steps[0]?.args).toEqual({
+      projectQuery: 'orbit',
+      agentPreference: 'best',
+    });
+  });
+
   it('maps "Restart Relay" to the restart tool', () => {
     expect(planDeterministically('Restart Relay', reg)?.steps[0]?.toolId).toBe(
       NATIVE_TOOL_IDS.restartRelay,

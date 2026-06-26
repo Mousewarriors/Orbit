@@ -253,7 +253,10 @@ const continueProject: Rule = (t) => {
 
 const launchAgentOnProject: Rule = (t) => {
   if (!/^(launch|start|run|fire up|spin up|ask|use|get|tell)\b/.test(t)) return null;
-  const agent = detectAgent(t);
+  const explicitAgent = detectAgent(t);
+  const genericAgent =
+    !explicitAgent && /^(launch|start|run|fire up|spin up)\b/.test(t) && /\bagents?\b/.test(t);
+  const agent = explicitAgent ?? (genericAgent ? 'best' : undefined);
   if (!agent) return null;
   // The project follows "on"/"for"/"against"/"in"/"to work on".
   const pm = /\b(?:on|for|against|in|onto|to\s+work\s+on)\s+(.+)$/.exec(t);
