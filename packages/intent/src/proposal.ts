@@ -40,6 +40,7 @@ export type IntentPlan =
     }
   | { readonly kind: 'open-project-folder' }
   | { readonly kind: 'open-project-in-application' }
+  | { readonly kind: 'open-file-in-application' }
   | { readonly kind: 'open-application' }
   | { readonly kind: 'find-files' }
   | { readonly kind: 'find-notes' }
@@ -84,55 +85,91 @@ export function proposeIntent(recognised: RecognisedIntent): IntentProposal {
       return {
         ...base,
         plan: { kind: 'run-builtin', action: 'restart-relay' },
-        display: { title: 'Restart Relay', subtitle: 'Restart the Relay sidecar process', icon: 'refresh-cw' },
+        display: {
+          title: 'Restart Relay',
+          subtitle: 'Restart the Relay sidecar process',
+          icon: 'refresh-cw',
+        },
       };
     case 'scan_projects':
       return {
         ...base,
         plan: cc('projects', false, false),
-        display: { title: 'Scan Projects', subtitle: 'Open Projects to scan for repositories', icon: 'agentos' },
+        display: {
+          title: 'Scan Projects',
+          subtitle: 'Open Projects to scan for repositories',
+          icon: 'agentos',
+        },
       };
     case 'validate_handoff':
       return {
         ...base,
         plan: cc('handoffs', false, false),
-        display: { title: 'Validate Handoff', subtitle: 'Open Handoffs → Validate', icon: 'agentos' },
+        display: {
+          title: 'Validate Handoff',
+          subtitle: 'Open Handoffs → Validate',
+          icon: 'agentos',
+        },
       };
     case 'show_handoffs':
       return {
         ...base,
         plan: cc('handoffs', false, false),
-        display: { title: 'Show Handoffs', subtitle: 'Open the Handoffs workspace', icon: 'agentos' },
+        display: {
+          title: 'Show Handoffs',
+          subtitle: 'Open the Handoffs workspace',
+          icon: 'agentos',
+        },
       };
     case 'show_failed_sessions':
       return {
         ...base,
         plan: cc('sessions', false, false, 'failed'),
-        display: { title: 'Failed Sessions', subtitle: 'Sessions filtered to failed/errored', icon: 'agentos' },
+        display: {
+          title: 'Failed Sessions',
+          subtitle: 'Sessions filtered to failed/errored',
+          icon: 'agentos',
+        },
       };
     case 'show_active_sessions':
       return {
         ...base,
         plan: cc('sessions', false, false),
-        display: { title: 'Active Sessions', subtitle: 'View running agent sessions', icon: 'agentos' },
+        display: {
+          title: 'Active Sessions',
+          subtitle: 'View running agent sessions',
+          icon: 'agentos',
+        },
       };
     case 'show_recent_activity':
       return {
         ...base,
         plan: cc('activity', false, false),
-        display: { title: 'Recent Activity', subtitle: 'Open the live Relay activity feed', icon: 'agentos' },
+        display: {
+          title: 'Recent Activity',
+          subtitle: 'Open the live Relay activity feed',
+          icon: 'agentos',
+        },
       };
     case 'show_approvals':
       return {
         ...base,
         plan: cc('approvals', false, false),
-        display: { title: 'Approvals', subtitle: 'See anything waiting for your approval', icon: 'agentos' },
+        display: {
+          title: 'Approvals',
+          subtitle: 'See anything waiting for your approval',
+          icon: 'agentos',
+        },
       };
     case 'open_latest_project':
       return {
         ...base,
         plan: cc('projects', true, true),
-        display: { title: 'Open Latest Project', subtitle: 'Open your most recent project', icon: 'agentos' },
+        display: {
+          title: 'Open Latest Project',
+          subtitle: 'Open your most recent project',
+          icon: 'agentos',
+        },
       };
     case 'open_project':
       return {
@@ -186,6 +223,16 @@ export function proposeIntent(recognised: RecognisedIntent): IntentProposal {
           }`,
           subtitle: 'Open the resolved project in the resolved application',
           icon: 'app',
+        },
+      };
+    case 'open_file_in_application':
+      return {
+        ...base,
+        plan: { kind: 'open-file-in-application' },
+        display: {
+          title: `Open ${slots.fileQuery ?? 'File'} in ${slots.applicationQuery ?? 'Application'}`,
+          subtitle: 'Open the resolved file in the resolved application',
+          icon: 'file',
         },
       };
     case 'open_application':

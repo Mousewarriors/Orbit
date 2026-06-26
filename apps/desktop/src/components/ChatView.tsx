@@ -11,11 +11,7 @@ import {
 import { addMemory, buildContext, renderContextBlock, type ContextItem } from '@orbit/profile';
 import type { McpClient, ToolRecord } from '@orbit/tool-registry';
 import * as native from '../native.js';
-import {
-  AI_SETTING_KEYS,
-  parseFolderConfidence,
-  type ProviderInfo,
-} from '../ai/providerConfig.js';
+import { AI_SETTING_KEYS, parseFolderConfidence, type ProviderInfo } from '../ai/providerConfig.js';
 import { loadProviderInfo } from '../ai/providerLoad.js';
 import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 import { buildToolRegistry, DEMO_MCP_SERVER_ID } from '../ai/toolRegistry.js';
@@ -37,7 +33,9 @@ interface PendingToolConfirm {
 }
 
 function genId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 }
 
 /**
@@ -59,7 +57,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   const [models, setModels] = useState<readonly AiModelInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [personalItems, setPersonalItems] = useState<ContextItem[]>([]);
-  const [memories, setMemories] = useState<Awaited<ReturnType<typeof loadProfileBundle>>['memories']>([]);
+  const [memories, setMemories] = useState<
+    Awaited<ReturnType<typeof loadProfileBundle>>['memories']
+  >([]);
   const [usePersonal, setUsePersonal] = useState(false);
   const [savedNote, setSavedNote] = useState<string | null>(null);
   const [chatTools, setChatTools] = useState<ToolRecord[]>([]);
@@ -94,12 +94,17 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       await refreshChats();
       // Populate the model list + personal context (both best-effort).
       if (built.provider?.listModels) {
-        built.provider.listModels().then(setModels).catch(() => setModels([]));
+        built.provider
+          .listModels()
+          .then(setModels)
+          .catch(() => setModels([]));
       }
       const bundle = await loadProfileBundle();
       setMemories(bundle.memories);
       setPersonalItems(
-        buildContext(bundle.profile, bundle.memories, bundle.memorySettings, { remote: !built.local }),
+        buildContext(bundle.profile, bundle.memories, bundle.memorySettings, {
+          remote: !built.local,
+        }),
       );
       // Build the tool registry: offer the model the connected MCP servers'
       // tools (AgentOS + any others). Native tools stay in the Orbit Agent
@@ -181,7 +186,8 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
       // critical risk always ask again (never persistently approvable, §21).
       if (sessionApprovedRef.current.has(record.id)) return Promise.resolve(true);
       const allowSession =
-        record.approvalScopes.includes('per-mission') || record.approvalScopes.includes('per-project');
+        record.approvalScopes.includes('per-mission') ||
+        record.approvalScopes.includes('per-project');
       return new Promise<boolean>((resolve) => {
         setPendingConfirm({
           record,
@@ -201,12 +207,22 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   const persistAssistant = useCallback(
     async (chatId: string, text: string, model: string | null) => {
       if (tauri) {
-        const saved = await native.chatAddMessage(genId(), chatId, 'assistant', text, model).catch(() => null);
+        const saved = await native
+          .chatAddMessage(genId(), chatId, 'assistant', text, model)
+          .catch(() => null);
         if (saved) setMessages((prev) => [...prev, saved]);
       } else {
         setMessages((prev) => [
           ...prev,
-          { id: genId(), chat_id: chatId, role: 'assistant', content: text, model, seq: prev.length, created_at: Date.now() },
+          {
+            id: genId(),
+            chat_id: chatId,
+            role: 'assistant',
+            content: text,
+            model,
+            seq: prev.length,
+            created_at: Date.now(),
+          },
         ]);
       }
     },
@@ -266,6 +282,8 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                   launchPath: (p) => native.launchPath(p),
                   openProjectInApplication: (applicationId, projectPath) =>
                     native.openProjectInApplication(applicationId, projectPath),
+                  openFileInApplication: (applicationId, filePath) =>
+                    native.openFileInApplication(applicationId, filePath),
                   recordUsage: (id) => native.recordCommandUsage(id),
                   fileSearch: (q) => native.fileSearch(q),
                   findFolders: async (q) =>
@@ -366,7 +384,15 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
     if (tauri) {
       userMsg = await native.chatAddMessage(genId(), chatId, 'user', text, null);
     } else {
-      userMsg = { id: genId(), chat_id: chatId, role: 'user', content: text, model: null, seq: messages.length, created_at: Date.now() };
+      userMsg = {
+        id: genId(),
+        chat_id: chatId,
+        role: 'user',
+        content: text,
+        model: null,
+        seq: messages.length,
+        created_at: Date.now(),
+      };
     }
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
@@ -421,7 +447,12 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
   // Explicit (never silent) save of a message into Memory.
   const saveToMemory = useCallback(
     async (content: string) => {
-      const next = addMemory(memories, { id: genId(), content, source: 'chat', createdAt: Date.now() });
+      const next = addMemory(memories, {
+        id: genId(),
+        content,
+        source: 'chat',
+        createdAt: Date.now(),
+      });
       setMemories(next);
       if (tauri) await saveMemories(next).catch(() => {});
       setSavedNote('Saved to memory');
@@ -474,7 +505,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
         </div>
         <div className="quick-ai-empty">
           <p>No AI provider is configured.</p>
-          <p className="quick-ai-note">Choose Local Ollama (or Mock) in Settings → AI to start chatting.</p>
+          <p className="quick-ai-note">
+            Choose Local Ollama (or Mock) in Settings → AI to start chatting.
+          </p>
           <button className="settings-btn" onClick={() => void native.openSettings()}>
             Open AI Settings
           </button>
@@ -546,7 +579,9 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
               placeholder="New chat"
               disabled={!currentId}
               onChange={(e) =>
-                setChats((prev) => prev.map((c) => (c.id === currentId ? { ...c, title: e.target.value } : c)))
+                setChats((prev) =>
+                  prev.map((c) => (c.id === currentId ? { ...c, title: e.target.value } : c)),
+                )
               }
               onBlur={(e) => void rename(e.target.value)}
             />
@@ -590,7 +625,11 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                 {useTools ? `✓ Tools (${chatTools.length})` : 'Tools'}
               </button>
             )}
-            <button className="chat-head-btn" disabled={history.length === 0} onClick={() => void exportChat()}>
+            <button
+              className="chat-head-btn"
+              disabled={history.length === 0}
+              onClick={() => void exportChat()}
+            >
               Export
             </button>
             <button
@@ -621,10 +660,17 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
               </div>
             )}
             {status === 'streaming' && (
-              <ChatBubble role="assistant" content={streaming} streaming onCopy={() => void copyText(streaming)} />
+              <ChatBubble
+                role="assistant"
+                content={streaming}
+                streaming
+                onCopy={() => void copyText(streaming)}
+              />
             )}
             {messages.length === 0 && status === 'idle' && (
-              <div className="chat-thread-empty">Ask anything. Conversations are saved locally.</div>
+              <div className="chat-thread-empty">
+                Ask anything. Conversations are saved locally.
+              </div>
             )}
           </div>
 
@@ -728,8 +774,8 @@ function ToolConfirmDialog({
         <div className="orbit-confirm-title">Run “{record.title}”?</div>
         <div className="orbit-confirm-body">
           <p>
-            The assistant wants to run <strong>{record.name}</strong> ({record.serverId ?? record.source}
-            ) — risk {RISK_LABEL[record.risk]}.
+            The assistant wants to run <strong>{record.name}</strong> (
+            {record.serverId ?? record.source}) — risk {RISK_LABEL[record.risk]}.
           </p>
           {argText && <pre className="chat-tool-card-args">{argText}</pre>}
         </div>

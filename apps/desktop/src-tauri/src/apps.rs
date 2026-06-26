@@ -42,7 +42,10 @@ fn collect(dir: &Path, ext: &str, depth: usize, out: &mut Vec<PathBuf>) {
         let Ok(meta) = entry.metadata() else { continue };
         if meta.is_dir() {
             collect(&path, ext, depth - 1, out);
-        } else if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case(ext))
+        } else if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case(ext))
             == Some(true)
         {
             out.push(path);
@@ -180,13 +183,46 @@ fn scan_start_apps() -> Vec<AppEntry> {
     if !output.status.success() {
         return Vec::new();
     }
-    parse_start_apps(&String::from_utf8_lossy(&output.stdout))
+    let mut apps = parse_start_apps(&String::from_utf8_lossy(&output.stdout));
+    for app in &mut apps {
+        if let Some(alias) = start_app_execution_alias(&app.name, &app.path) {
+            app.id = make_id(&alias);
+            app.path = alias;
+            app.kind = "app".into();
+        }
+    }
+    apps
 }
 
 /// Parse the JSON emitted by `Get-StartApps … | ConvertTo-Json` into app entries
 /// whose launch path is the Explorer AppsFolder moniker for the app. Pure, so it
 /// is unit-tested without spawning PowerShell. `ConvertTo-Json` emits a bare
 /// object for a single app and an array for many — both are handled.
+#[cfg(target_os = "windows")]
+fn start_app_alias_name(_name: &str, path: &str) -> Option<&'static str> {
+    let is_paint_aumid = path
+        .trim()
+        .to_ascii_lowercase()
+        .starts_with(r"shell:appsfolder\microsoft.paint_");
+    if is_paint_aumid {
+        return Some("mspaint.exe");
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn start_app_execution_alias(name: &str, path: &str) -> Option<String> {
+    let alias = start_app_alias_name(name, path)?;
+    let local = std::env::var_os("LOCALAPPDATA")?;
+    let candidate = std::path::PathBuf::from(local)
+        .join("Microsoft")
+        .join("WindowsApps")
+        .join(alias);
+    candidate
+        .exists()
+        .then(|| candidate.to_string_lossy().to_string())
+}
+
 #[cfg(target_os = "windows")]
 fn parse_start_apps(json: &str) -> Vec<AppEntry> {
     let json = json.trim();
@@ -203,8 +239,16 @@ fn parse_start_apps(json: &str) -> Vec<AppEntry> {
     };
     let mut out = Vec::new();
     for item in items {
-        let name = item.get("Name").and_then(|v| v.as_str()).unwrap_or("").trim();
-        let app_id = item.get("AppID").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let name = item
+            .get("Name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        let app_id = item
+            .get("AppID")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if name.is_empty() || app_id.is_empty() {
             continue;
         }
@@ -260,12 +304,33 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
+    fn store_paint_prefers_the_file_open_execution_alias() {
+        assert_eq!(
+            start_app_alias_name(
+                "Paint",
+                r"shell:AppsFolder\Microsoft.Paint_8wekyb3d8bbwe!App"
+            ),
+            Some("mspaint.exe")
+        );
+        assert_eq!(
+            start_app_alias_name(
+                "Calculator",
+                r"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+            ),
+            None
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
     fn parses_single_object_and_skips_incomplete_rows() {
         // ConvertTo-Json emits a bare object when there is exactly one app.
-        let single = r#"{"Name":"Calculator","AppID":"Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"}"#;
+        let single =
+            r#"{"Name":"Calculator","AppID":"Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"}"#;
         assert_eq!(parse_start_apps(single).len(), 1);
         // Rows missing a name or id are dropped; junk input yields nothing.
-        let mixed = r#"[{"Name":"","AppID":"x"},{"Name":"Ok","AppID":"y"},{"Name":"No id","AppID":""}]"#;
+        let mixed =
+            r#"[{"Name":"","AppID":"x"},{"Name":"Ok","AppID":"y"},{"Name":"No id","AppID":""}]"#;
         let apps = parse_start_apps(mixed);
         assert_eq!(apps.len(), 1);
         assert_eq!(apps[0].name, "Ok");

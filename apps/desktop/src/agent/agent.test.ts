@@ -79,19 +79,27 @@ describe('executeMissionStep', () => {
           : q.toLowerCase().includes('code')
             ? { id: 'vscode', name: 'Visual Studio Code', path: 'code.exe' }
             : null,
-      resolveProject: (q) => (q.toLowerCase().includes('orbit') ? { name: 'Orbit', path: 'C:/p/orbit' } : null),
+      resolveProject: (q) =>
+        q.toLowerCase().includes('orbit') ? { name: 'Orbit', path: 'C:/p/orbit' } : null,
       resolveProjectFromIndex: async (q) =>
         q.toLowerCase().includes('research')
           ? {
               kind: 'match',
-              project: { name: 'Personal Research Assistant', path: 'C:/Personal Research Assistant' },
+              project: {
+                name: 'Personal Research Assistant',
+                path: 'C:/Personal Research Assistant',
+              },
             }
           : { kind: 'none' },
       chooseFolder: async (_q, choices) => choices[0] ?? null,
       launchApp: vi.fn().mockResolvedValue(undefined),
       openProjectInApplication: vi.fn().mockResolvedValue(undefined),
+      openFileInApplication: vi.fn().mockResolvedValue(undefined),
       revealFolder: vi.fn().mockResolvedValue(undefined),
-      fileSearch: () => Promise.resolve([{ name: 'a.txt', parent: 'C:/docs' }]),
+      fileSearch: () =>
+        Promise.resolve([
+          { name: 'a.txt', parent: 'C:/docs', path: 'C:/docs/a.txt', kind: 'file' },
+        ]),
       noteSearch: () => Promise.resolve([{ title: 'Leonard' }]),
       dispatchAgent: () => Promise.resolve({ ok: true, summary: 'Launched Codex', warnings: [] }),
       restartRelay: vi.fn().mockResolvedValue(undefined),
@@ -131,6 +139,65 @@ describe('executeMissionStep', () => {
     expect(openProjectInApplication).toHaveBeenCalledWith('vscode', 'C:/p/orbit');
   });
 
+  it('opens an indexed file in a resolved application', async () => {
+    const openFileInApplication = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openFileInApplication,
+        args: { applicationQuery: 'vs code', fileQuery: 'convention attendant positions map' },
+      },
+      deps({
+        openFileInApplication,
+        fileSearch: () =>
+          Promise.resolve([
+            {
+              name: 'Convention Attendant Positions Map.png',
+              parent: 'C:/docs',
+              path: 'C:/docs/Convention Attendant Positions Map.png',
+              kind: 'file',
+            },
+          ]),
+      }),
+    );
+    expect(out.ok).toBe(true);
+    expect(openFileInApplication).toHaveBeenCalledWith(
+      'vscode',
+      'C:/docs/Convention Attendant Positions Map.png',
+    );
+  });
+
+  it('does not guess when several indexed files match an open-file mission step', async () => {
+    const openFileInApplication = vi.fn().mockResolvedValue(undefined);
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openFileInApplication,
+        args: { applicationQuery: 'vs code', fileQuery: 'accounts instructions' },
+      },
+      deps({
+        openFileInApplication,
+        fileSearch: () =>
+          Promise.resolve([
+            {
+              name: 'KHT Accounts Instructions.pdf',
+              parent: 'C:/docs',
+              path: 'C:/docs/kht.pdf',
+              kind: 'file',
+            },
+            {
+              name: 'ABC Accounts Instructions.pdf',
+              parent: 'C:/docs',
+              path: 'C:/docs/abc.pdf',
+              kind: 'file',
+            },
+          ]),
+      }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.summary).toMatch(/Multiple indexed files match/);
+    expect(out.detail).toContain('C:/docs/kht.pdf');
+    expect(openFileInApplication).not.toHaveBeenCalled();
+  });
+
   it('falls back to an indexed folder when the catalog has no project', async () => {
     const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
     const out = await executeMissionStep(
@@ -149,8 +216,8 @@ describe('executeMissionStep', () => {
 
   it('asks the user to choose among ambiguous indexed folders, then opens the pick', async () => {
     const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
-    const chooseFolder = vi.fn(async (_q: string, choices: readonly { name: string; path: string }[]) =>
-      choices[1] ?? null,
+    const chooseFolder = vi.fn(
+      async (_q: string, choices: readonly { name: string; path: string }[]) => choices[1] ?? null,
     );
     const out = await executeMissionStep(
       {
@@ -200,8 +267,8 @@ describe('executeMissionStep', () => {
 
   it('asks via the picker for a low-confidence single match, then opens the confirmed folder', async () => {
     const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
-    const chooseFolder = vi.fn(async (_q: string, choices: readonly { name: string; path: string }[]) =>
-      choices[0] ?? null,
+    const chooseFolder = vi.fn(
+      async (_q: string, choices: readonly { name: string; path: string }[]) => choices[0] ?? null,
     );
     const out = await executeMissionStep(
       {
@@ -242,7 +309,10 @@ describe('executeMissionStep', () => {
       warnings: ['w'],
     });
     const out = await executeMissionStep(
-      { toolId: NATIVE_TOOL_IDS.dispatchAgent, args: { projectQuery: 'orbit', agentPreference: 'best' } },
+      {
+        toolId: NATIVE_TOOL_IDS.dispatchAgent,
+        args: { projectQuery: 'orbit', agentPreference: 'best' },
+      },
       deps({ dispatchAgent }),
     );
     expect(dispatchAgent).toHaveBeenCalledWith('C:/p/orbit', 'best');
@@ -267,7 +337,10 @@ describe('executeMissionStep', () => {
 
   it('returns a navigation target for a Control Center step', async () => {
     const out = await executeMissionStep(
-      { toolId: NATIVE_TOOL_IDS.openControlCenter, args: { controlCenterTab: 'sessions', sessionStatus: 'failed' } },
+      {
+        toolId: NATIVE_TOOL_IDS.openControlCenter,
+        args: { controlCenterTab: 'sessions', sessionStatus: 'failed' },
+      },
       deps(),
     );
     expect(out.ok).toBe(true);

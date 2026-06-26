@@ -156,6 +156,43 @@ pub fn open_project_in_application(
     }
 }
 
+/// Open an indexed file in an indexed desktop application. Both entities are
+/// re-resolved natively; the renderer/model cannot supply an executable path,
+/// arbitrary command line, or a file outside Orbit's file index.
+#[tauri::command]
+pub fn open_file_in_application(
+    state: State<'_, AppState>,
+    application_id: String,
+    file_path: String,
+) -> Result<(), String> {
+    validate_relay_path("file path", &file_path)?;
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        let rec = orbit_core::files::get(&conn, &file_path)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "file is not in Orbit's index".to_string())?;
+        if rec.kind != "file" {
+            return Err("indexed path is not a file".into());
+        }
+    }
+    let application = {
+        let apps = state.apps.lock().map_err(|e| e.to_string())?;
+        apps.iter()
+            .find(|entry| entry.id == application_id)
+            .cloned()
+            .ok_or_else(|| "application is not in Orbit's index".to_string())?
+    };
+    #[cfg(windows)]
+    {
+        crate::launcher::platform::launch_with_file(&application.path, &file_path)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = application;
+        Err("opening a file in an application is implemented on Windows only".into())
+    }
+}
+
 /// Open an external URL. Only http(s)/mailto schemes are permitted.
 #[tauri::command]
 pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {

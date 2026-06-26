@@ -112,9 +112,7 @@ export function OrbitAgentView({
   const missionRegistry = useMemo(() => {
     if (!registry) return null;
     const executable = new ToolRegistry();
-    executable.register(
-      registry.all().filter((tool) => MISSION_EXECUTABLE_TOOL_IDS.has(tool.id)),
-    );
+    executable.register(registry.all().filter((tool) => MISSION_EXECUTABLE_TOOL_IDS.has(tool.id)));
     return executable;
   }, [registry]);
 
@@ -223,10 +221,18 @@ export function OrbitAgentView({
       launchApp: (path) => native.launchPath(path),
       openProjectInApplication: (applicationId, projectPath) =>
         native.openProjectInApplication(applicationId, projectPath),
+      openFileInApplication: (applicationId, filePath) =>
+        native.openFileInApplication(applicationId, filePath),
       revealFolder: (path) => native.revealPath(path),
       fileSearch: async (q, limit) =>
-        (await native.fileSearch(q, { limit })).map((f) => ({ name: f.name, parent: f.parent })),
-      noteSearch: async (q, limit) => (await native.noteList(q, limit)).map((n) => ({ title: n.title })),
+        (await native.fileSearch(q, { limit })).map((f) => ({
+          name: f.name,
+          parent: f.parent,
+          path: f.path,
+          kind: f.kind,
+        })),
+      noteSearch: async (q, limit) =>
+        (await native.noteList(q, limit)).map((n) => ({ title: n.title })),
       dispatchAgent: (projectPath, pref) =>
         dispatchAgentViaRelay(
           {
@@ -245,9 +251,19 @@ export function OrbitAgentView({
         if (!provider) return '[No AI provider configured]';
         const contexts: QuickAiContext[] =
           useClipboard && clipboard.current.trim()
-            ? [{ kind: 'clipboard', label: 'Clipboard', text: clipboard.current, remote: !(info?.local ?? true) }]
+            ? [
+                {
+                  kind: 'clipboard',
+                  label: 'Clipboard',
+                  text: clipboard.current,
+                  remote: !(info?.local ?? true),
+                },
+              ]
             : [];
-        const r = await provider.complete({ messages: buildMessages(prompt, contexts), temperature: 0.3 });
+        const r = await provider.complete({
+          messages: buildMessages(prompt, contexts),
+          temperature: 0.3,
+        });
         return r.content;
       },
     }),
@@ -349,7 +365,11 @@ export function OrbitAgentView({
         }}
       />
       <div className="agent-actions">
-        <button className="agent-plan-btn" disabled={!goal.trim() || phase === 'planning'} onClick={() => void doPlan()}>
+        <button
+          className="agent-plan-btn"
+          disabled={!goal.trim() || phase === 'planning'}
+          onClick={() => void doPlan()}
+        >
           {phase === 'planning' ? 'Planning…' : 'Plan mission'}
         </button>
         {phase === 'preview' && (
@@ -377,8 +397,8 @@ export function OrbitAgentView({
 
           {hasDispatch && !relayReady && (
             <div className="agent-warn">
-              Relay is {relayState}. Launching an agent needs Relay ready — that step may fail until it
-              is.
+              Relay is {relayState}. Launching an agent needs Relay ready — that step may fail until
+              it is.
             </div>
           )}
 
@@ -399,7 +419,9 @@ export function OrbitAgentView({
                 {outcomes[i] && (
                   <div className={`agent-step-out${outcomes[i]!.ok ? '' : ' is-fail'}`}>
                     {outcomes[i]!.summary}
-                    {outcomes[i]!.detail && <pre className="agent-step-detail">{outcomes[i]!.detail}</pre>}
+                    {outcomes[i]!.detail && (
+                      <pre className="agent-step-detail">{outcomes[i]!.detail}</pre>
+                    )}
                   </div>
                 )}
               </li>
@@ -412,7 +434,10 @@ export function OrbitAgentView({
           </div>
 
           {phase === 'done' && navTarget && (
-            <button className="agent-run-btn" onClick={() => onNavigate(navTarget.viewId, navTarget.arg)}>
+            <button
+              className="agent-run-btn"
+              onClick={() => onNavigate(navTarget.viewId, navTarget.arg)}
+            >
               Open result
             </button>
           )}
@@ -487,7 +512,9 @@ function dispatchHint(
   const pref = args['agentPreference'];
   if (typeof pref === 'string' && pref !== 'best') return null;
   const rec = recommendAgent(goal);
-  return rec ? `Suggested: ${rec.agent.name} (${rec.reason}). Relay/Hermes make the final choice.` : null;
+  return rec
+    ? `Suggested: ${rec.agent.name} (${rec.reason}). Relay/Hermes make the final choice.`
+    : null;
 }
 
 function argSummary(args: Readonly<Record<string, unknown>>): string {

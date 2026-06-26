@@ -41,8 +41,17 @@ export interface ActionDescriptor {
  * extensions, deeplinks, etc.
  */
 export type ActionToken =
-  | { readonly kind: 'builtin'; readonly handler: string; readonly args?: Readonly<Record<string, unknown>> }
-  | { readonly kind: 'extension'; readonly extensionId: string; readonly handler: string; readonly args?: Readonly<Record<string, unknown>> }
+  | {
+      readonly kind: 'builtin';
+      readonly handler: string;
+      readonly args?: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly kind: 'extension';
+      readonly extensionId: string;
+      readonly handler: string;
+      readonly args?: Readonly<Record<string, unknown>>;
+    }
   | { readonly kind: 'deeplink'; readonly url: string }
   | { readonly kind: 'open-url'; readonly url: string }
   | { readonly kind: 'open-path'; readonly path: string }
@@ -50,6 +59,11 @@ export type ActionToken =
       readonly kind: 'open-project-in-application';
       readonly applicationId: string;
       readonly projectPath: string;
+    }
+  | {
+      readonly kind: 'open-file-in-application';
+      readonly applicationId: string;
+      readonly filePath: string;
     }
   | { readonly kind: 'reveal-path'; readonly path: string }
   | { readonly kind: 'copy'; readonly text: string }
@@ -59,5 +73,9 @@ export type ActionToken =
       /** When set, the snippet whose usage should be recorded after pasting. */
       readonly snippetId?: string;
     }
-  | { readonly kind: 'push-view'; readonly viewId: string; readonly args?: Readonly<Record<string, unknown>> }
+  | {
+      readonly kind: 'push-view';
+      readonly viewId: string;
+      readonly args?: Readonly<Record<string, unknown>>;
+    }
   | { readonly kind: 'run-extension'; readonly extId: string; readonly command: string };

@@ -54,15 +54,13 @@ export interface MissionExecutorDeps {
     choices: readonly ResolvedEntity[],
   ) => Promise<ResolvedEntity | null>;
   readonly launchApp: (path: string) => Promise<void>;
-  readonly openProjectInApplication: (
-    applicationId: string,
-    projectPath: string,
-  ) => Promise<void>;
+  readonly openProjectInApplication: (applicationId: string, projectPath: string) => Promise<void>;
+  readonly openFileInApplication: (applicationId: string, filePath: string) => Promise<void>;
   readonly revealFolder: (path: string) => Promise<void>;
   readonly fileSearch: (
     query: string,
     limit: number,
-  ) => Promise<ReadonlyArray<{ name: string; parent: string }>>;
+  ) => Promise<ReadonlyArray<{ name: string; parent: string; path?: string; kind?: string }>>;
   readonly noteSearch: (query: string, limit: number) => Promise<ReadonlyArray<{ title: string }>>;
   readonly dispatchAgent: (
     projectPath: string,
@@ -133,6 +131,31 @@ export async function executeMissionStep(
       };
     }
 
+    case NATIVE_TOOL_IDS.openFileInApplication: {
+      const app = deps.resolveApp(str(args, 'applicationQuery'));
+      const fileQuery = str(args, 'fileQuery');
+      if (!app?.id) return fail(`No installed app matching "${str(args, 'applicationQuery')}"`);
+      const hits = await deps.fileSearch(fileQuery, 10);
+      const files = hits.filter((candidate) => candidate.kind !== 'dir' && candidate.path);
+      const file = files[0];
+      if (!file?.path) return fail(`No indexed file matching "${fileQuery}"`);
+      if (files.length > 1) {
+        return fail(
+          `Multiple indexed files match "${fileQuery}"`,
+          files
+            .slice(0, 5)
+            .map((candidate) => `• ${candidate.name} — ${candidate.path}`)
+            .join('\n'),
+        );
+      }
+      await deps.openFileInApplication(app.id, file.path);
+      return {
+        ok: true,
+        summary: `Opened ${file.name} in ${app.name}`,
+        detail: file.path,
+      };
+    }
+
     case NATIVE_TOOL_IDS.openProjectFolder: {
       const projectQuery = str(args, 'projectQuery');
       const resolved = await resolveStepProject(projectQuery, deps);
@@ -166,7 +189,10 @@ export async function executeMissionStep(
       const q = str(args, 'fileQuery');
       const hits = await deps.fileSearch(q, 20);
       if (hits.length === 0) return { ok: true, summary: `No files match "${q}"` };
-      const top = hits.slice(0, 5).map((f) => `• ${f.name} — ${f.parent}`).join('\n');
+      const top = hits
+        .slice(0, 5)
+        .map((f) => `• ${f.name} — ${f.parent}`)
+        .join('\n');
       return { ok: true, summary: `Found ${hits.length} file(s) for "${q}"`, detail: top };
     }
 
@@ -174,7 +200,10 @@ export async function executeMissionStep(
       const q = str(args, 'noteQuery');
       const hits = await deps.noteSearch(q, 15);
       if (hits.length === 0) return { ok: true, summary: `No notes match "${q}"` };
-      const top = hits.slice(0, 5).map((n) => `• ${n.title || 'Untitled'}`).join('\n');
+      const top = hits
+        .slice(0, 5)
+        .map((n) => `• ${n.title || 'Untitled'}`)
+        .join('\n');
       return { ok: true, summary: `Found ${hits.length} note(s) for "${q}"`, detail: top };
     }
 
@@ -191,7 +220,8 @@ export async function executeMissionStep(
       const prefRaw = str(args, 'agentPreference');
       const pref = prefRaw ? (prefRaw as AgentPreference) : undefined;
       const result = await deps.dispatchAgent(project.path, pref);
-      const detail = result.warnings.length > 0 ? `Warnings:\n${result.warnings.join('\n')}` : result.detail;
+      const detail =
+        result.warnings.length > 0 ? `Warnings:\n${result.warnings.join('\n')}` : result.detail;
       const navigateTo =
         result.ok && result.sessionId
           ? {

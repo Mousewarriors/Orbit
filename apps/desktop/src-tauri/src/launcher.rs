@@ -27,8 +27,13 @@ pub mod platform {
 
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::HWND;
-    use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
-    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CLSCTX_LOCAL_SERVER, COINIT_APARTMENTTHREADED,
+    };
+    use windows::Win32::UI::Shell::{
+        ApplicationActivationManager, IApplicationActivationManager, IShellItem, IShellItemArray,
+        SHCreateItemFromParsingName, SHCreateShellItemArrayFromShellItem, ShellExecuteW,
+    };
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     /// Don't flash a console window when spawning Explorer.
@@ -46,6 +51,14 @@ pub mod platform {
     /// filesystem path? Those are activated via Explorer, not `ShellExecuteW`.
     pub fn is_shell_item(target: &str) -> bool {
         target.len() > "shell:".len() && target[.."shell:".len()].eq_ignore_ascii_case("shell:")
+    }
+
+    fn apps_folder_aumid(target: &str) -> Option<&str> {
+        const PREFIX: &str = r"shell:AppsFolder\";
+        if target.len() <= PREFIX.len() || !target[..PREFIX.len()].eq_ignore_ascii_case(PREFIX) {
+            return None;
+        }
+        Some(&target[PREFIX.len()..])
     }
 
     /// Map a failing `ShellExecute` `HINSTANCE` code to a human-readable reason.
@@ -177,6 +190,82 @@ pub mod platform {
         }
     }
 
+    fn shell_item_array_for_file(path: &str) -> Result<IShellItemArray, String> {
+        let path_wide = wide(path);
+        let item: IShellItem =
+            unsafe { SHCreateItemFromParsingName(PCWSTR(path_wide.as_ptr()), None) }
+                .map_err(|e| format!("launch failed: could not resolve file shell item ({e})"))?;
+        unsafe { SHCreateShellItemArrayFromShellItem(&item) }
+            .map_err(|e| format!("launch failed: could not create file activation item ({e})"))
+    }
+
+    fn activate_app_for_file(aumid: &str, path: &str) -> Result<(), String> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let app_id = wide(aumid);
+        let verb = wide("open");
+        let items = shell_item_array_for_file(path)?;
+        let manager: IApplicationActivationManager = unsafe {
+            CoCreateInstance(&ApplicationActivationManager, None, CLSCTX_LOCAL_SERVER)
+        }
+        .map_err(|e| format!("launch failed: could not create app activation manager ({e})"))?;
+        unsafe {
+            manager
+                .ActivateForFile(PCWSTR(app_id.as_ptr()), &items, PCWSTR(verb.as_ptr()))
+                .map(|_| ())
+        }
+        .map_err(|e| format!("launch failed: app file activation failed ({e})"))
+    }
+
+    /// Launch an indexed desktop application with one filesystem file argument.
+    /// Classic apps receive a single quoted path argument via `ShellExecuteW`;
+    /// Windows Store/AppX AppsFolder entries use `IApplicationActivationManager`
+    /// file activation. Both paths are narrower than arbitrary argv.
+    pub fn launch_with_file(target: &str, path: &str) -> Result<(), String> {
+        let target = target.trim();
+        let path = path.trim();
+        if target.is_empty() || path.is_empty() {
+            return Err("launch target and file path are required".into());
+        }
+        let argument = Path::new(path);
+        if !argument.is_absolute() || !argument.is_file() {
+            return Err("file path must be an existing absolute file".into());
+        }
+        if let Some(aumid) = apps_folder_aumid(target) {
+            return activate_app_for_file(aumid, path);
+        }
+        if is_shell_item(target) {
+            return Err("this shell item type cannot accept a file path".into());
+        }
+        if !Path::new(target).exists() {
+            return Err(format!("launch failed: '{target}' no longer exists"));
+        }
+
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        }
+        let verb = wide("open");
+        let file = wide(target);
+        let parameters = wide(&format!("\"{}\"", regular_windows_path(path)));
+        let hinst = unsafe {
+            ShellExecuteW(
+                HWND::default(),
+                PCWSTR(verb.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR(parameters.as_ptr()),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        let code = hinst.0 as isize;
+        if code > 32 {
+            Ok(())
+        } else {
+            Err(shell_error(code))
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -204,6 +293,20 @@ pub mod platform {
         }
 
         #[test]
+        fn apps_folder_aumid_is_extracted_case_insensitively() {
+            assert_eq!(
+                apps_folder_aumid(r"shell:AppsFolder\Microsoft.Paint_8wekyb3d8bbwe!App"),
+                Some("Microsoft.Paint_8wekyb3d8bbwe!App")
+            );
+            assert_eq!(
+                apps_folder_aumid(r"SHELL:APPSFOLDER\Microsoft.Paint_8wekyb3d8bbwe!App"),
+                Some("Microsoft.Paint_8wekyb3d8bbwe!App")
+            );
+            assert_eq!(apps_folder_aumid("shell:AppsFolder\\"), None);
+            assert_eq!(apps_folder_aumid(r"shell:Other\Thing"), None);
+        }
+
+        #[test]
         fn error_messages_are_descriptive() {
             assert!(shell_error(2).contains("not found"));
             assert!(shell_error(31).contains("no application"));
@@ -212,11 +315,21 @@ pub mod platform {
 
         #[test]
         fn project_launch_rejects_missing_target() {
-            let err = launch_with_path(
+            let err = launch_with_path(r"C:\orbit\definitely\does\not\exist.lnk", r"C:\orbit")
+                .unwrap_err();
+            assert!(err.contains("no longer exists"), "unexpected error: {err}");
+        }
+
+        #[test]
+        fn file_launch_rejects_missing_target() {
+            let path = std::env::temp_dir().join("orbit-launch-test-map.png");
+            std::fs::write(&path, b"not really an image").unwrap();
+            let err = launch_with_file(
                 r"C:\orbit\definitely\does\not\exist.lnk",
-                r"C:\orbit",
+                path.to_str().unwrap(),
             )
             .unwrap_err();
+            let _ = std::fs::remove_file(path);
             assert!(err.contains("no longer exists"), "unexpected error: {err}");
         }
 
@@ -245,6 +358,32 @@ pub mod platform {
             });
             launch(&target).unwrap();
         }
+
+        /// Real file-activation smoke â€” opt-in because it opens Paint/a window.
+        /// Defaults to modern Store Paint and a temporary 1x1 BMP, proving the
+        /// AppsFolder `ActivateForFile` path used by "open this map in Paint".
+        /// Run with:
+        /// `cargo test -p orbit-desktop --lib -- --ignored launches_real_file_target`
+        #[test]
+        #[ignore]
+        fn launches_real_file_target() {
+            let target = std::env::var("ORBIT_FILE_LAUNCH_TEST_APP").unwrap_or_else(|_| {
+                r"shell:AppsFolder\Microsoft.Paint_8wekyb3d8bbwe!App".to_string()
+            });
+            let path = std::env::var("ORBIT_FILE_LAUNCH_TEST_FILE").unwrap_or_else(|_| {
+                let path = std::env::temp_dir().join("orbit-paint-file-activation-smoke.bmp");
+                let bmp_1x1_red: [u8; 58] = [
+                    0x42, 0x4d, 0x3a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00,
+                    0x00, 0x28, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+                    0x01, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x13,
+                    0x0b, 0x00, 0x00, 0x13, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0xff, 0x00,
+                ];
+                std::fs::write(&path, bmp_1x1_red).unwrap();
+                path.to_string_lossy().to_string()
+            });
+            launch_with_file(&target, &path).unwrap();
+        }
     }
 }
 
@@ -261,5 +400,9 @@ pub mod platform {
 
     pub fn launch_with_path(_target: &str, _path: &str) -> Result<(), String> {
         Err("opening a project in an application is implemented on Windows only".into())
+    }
+
+    pub fn launch_with_file(_target: &str, _path: &str) -> Result<(), String> {
+        Err("opening a file in an application is implemented on Windows only".into())
     }
 }

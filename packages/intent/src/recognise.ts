@@ -77,6 +77,48 @@ function cleanProjectQuery(raw: string | undefined): string | undefined {
   return t.length > 0 ? t : undefined;
 }
 
+/** Clean an application reference captured from "in/with/using <app>". */
+function cleanApplicationQuery(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const t = raw
+    .trim()
+    .replace(/^(the|my)\s+/, '')
+    .replace(/\s+(app|application|programme|program)$/, '')
+    .trim();
+  return t.length > 0 ? t : undefined;
+}
+
+const FILE_NOUN_RE =
+  /\b(file|files|document|documents|doc|docs|pdf|spreadsheet|presentation|instructions?|maps?|sheets?|forms?|accounts?|images?|pictures?|photos?|diagrams?|plans?|reports?|letters?|minutes|agendas?|positions?)\b/;
+
+const PROJECT_NOUN_RE = /\b(project|projects|repo|repository|folder|directory)\b/;
+
+/**
+ * Clean a captured file reference while preserving meaningful short tokens
+ * ("KHT", initials, file-ish names). This is deliberately light-touch: the file
+ * index wants the real words the user remembers, not a semantic rewrite.
+ */
+function cleanFileQuery(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  let t = raw
+    .trim()
+    .replace(/^(me\s+)?(the|a|an|my)\s+/, '')
+    .replace(/^(file|files|document|documents|doc|docs)\s+/, '')
+    .replace(/^(about|named|called|containing|with|on|for)\s+/, '')
+    .trim();
+  t = t
+    .split(/\s+/)
+    .filter((word) => !/^(the|a|an|of|to|for|about|called|named)$/.test(word))
+    .join(' ')
+    .trim();
+  return t.length > 0 ? t : undefined;
+}
+
+function looksFileLike(raw: string | undefined): boolean {
+  if (!raw) return false;
+  return FILE_NOUN_RE.test(raw) || /\b[\w -]+\.[a-z0-9]{1,8}\b/.test(raw);
+}
+
 /** Build a RecognisedIntent, omitting empty slots (exactOptionalPropertyTypes). */
 function make(
   intent: IntentName,
@@ -146,8 +188,9 @@ const showActiveSessions: Rule = (t) => {
 };
 
 const showActivity: Rule = (t) =>
-  /\b(recent\s+activity|activity\s+(log|feed|timeline)?|what\s+happened|recent\s+events)\b/.test(t) ||
-  /\b(show|view|see|open)\b.*\bactivity\b/.test(t)
+  /\b(recent\s+activity|activity\s+(log|feed|timeline)?|what\s+happened|recent\s+events)\b/.test(
+    t,
+  ) || /\b(show|view|see|open)\b.*\bactivity\b/.test(t)
     ? make('show_recent_activity', 'show-activity', { confidence: 0.85 })
     : null;
 
@@ -182,7 +225,10 @@ const summariseSelection: Rule = (t) =>
   /\bsummari[sz]e\b\s+(this|that|it|the\s+selection|the\s+selected|my\s+selection|the\s+highlighted|the\s+text|selected\s+text)\b/.test(
     t,
   ) || /\b(tl;?dr|tldr)\b/.test(t)
-    ? make('summarise_selection', 'summarise-selection', { confidence: 0.8, slots: { question: t } })
+    ? make('summarise_selection', 'summarise-selection', {
+        confidence: 0.8,
+        slots: { question: t },
+      })
     : null;
 
 const continueProject: Rule = (t) => {
@@ -253,14 +299,30 @@ const openProjectInApplication: Rule = (t) => {
     );
   if (!match) return null;
   const projectQuery = cleanProjectQuery(match[1]);
-  const applicationQuery = (match[2] ?? '')
-    .replace(/^(the|my)\s+/, '')
-    .replace(/\s+(app|application|programme|program)$/, '')
-    .trim();
+  const applicationQuery = cleanApplicationQuery(match[2]);
   if (!projectQuery || !applicationQuery) return null;
   return make('open_project_in_application', 'open-project-in-application', {
     confidence: 0.92,
     slots: { projectQuery, applicationQuery },
+  });
+};
+
+const openFileInApplication: Rule = (t) => {
+  const match =
+    /^(open|load(?:\s+up)?|show|view|bring(?:\s+up)?)\s+(?:the\s+)?(.+?)\s+(?:in|with|using)\s+(.+)$/.exec(
+      t,
+    );
+  if (!match) return null;
+  const rawFile = (match[2] ?? '').trim();
+  // Project/folder phrasing belongs to the project rule.
+  if (PROJECT_NOUN_RE.test(rawFile)) return null;
+  if (!looksFileLike(rawFile)) return null;
+  const fileQuery = cleanFileQuery(rawFile);
+  const applicationQuery = cleanApplicationQuery(match[3]);
+  if (!fileQuery || !applicationQuery) return null;
+  return make('open_file_in_application', 'open-file-in-application', {
+    confidence: 0.91,
+    slots: { fileQuery, applicationQuery },
   });
 };
 
@@ -295,17 +357,28 @@ const findFile: Rule = (t) => {
     /\b(find|search\s+for|search|locate|where\s+is|look\s+for|open)\b.*?\b(file|files|document|documents|doc|docs|pdf|spreadsheet|presentation|the\s+document|the\s+file)\b(?:\s+(?:that\s+(?:mentioned|mentions|mention|says|say|contains|contained|contain|references|reference)|about|named|called|with|containing|on|for))?\s*(.*)$/.exec(
       t,
     );
-  if (!m) return null;
-  const fileQuery = (m[3] ?? '').trim().replace(/^(about|named|called)\s+/, '');
+  if (m) {
+    const fileQuery = cleanFileQuery(m[3]);
+    const slots: IntentSlots = fileQuery ? { fileQuery } : {};
+    return make('find_file', 'find-file', { confidence: 0.78, slots });
+  }
+  const generic =
+    /^(find|search(?:\s+for)?|locate|look\s+for|show\s+me)\s+(?:me\s+)?(?:the\s+)?(.+)$/.exec(t);
+  const raw = generic?.[2];
+  if (!looksFileLike(raw)) return null;
+  const fileQuery = cleanFileQuery(raw);
   const slots: IntentSlots = fileQuery ? { fileQuery } : {};
-  return make('find_file', 'find-file', { confidence: 0.78, slots });
+  return make('find_file', 'find-file-language', { confidence: 0.76, slots });
 };
 
 const openApplication: Rule = (t) => {
   const m = /^(open|launch|start|run|fire up|boot|switch to)\s+(.+)$/.exec(t);
   if (!m) return null;
   let app = (m[2] ?? '').trim();
-  app = app.replace(/^(the|my)\s+/, '').replace(/\s+(app|application|programme|program)$/, '').trim();
+  app = app
+    .replace(/^(the|my)\s+/, '')
+    .replace(/\s+(app|application|programme|program)$/, '')
+    .trim();
   if (!app) return null;
   const slots: IntentSlots = { applicationQuery: app };
   return make('open_application', 'open-application', { confidence: 0.7, slots });
@@ -339,6 +412,7 @@ const RULES: readonly Rule[] = [
   continueProject,
   launchAgentOnProject,
   openLatestProject,
+  openFileInApplication,
   openProjectInApplication,
   openProjectFolder,
   openProject,

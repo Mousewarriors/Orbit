@@ -16,6 +16,7 @@ import type { ToolInputSchema, ToolRecord, ToolSideEffect } from './types.js';
 export const NATIVE_TOOL_IDS = {
   openApplication: 'native:open_application',
   openProjectInApplication: 'native:open_project_in_application',
+  openFileInApplication: 'native:open_file_in_application',
   openProjectFolder: 'native:open_project_folder',
   openControlCenter: 'native:open_control_center',
   findFiles: 'native:find_files',
@@ -27,7 +28,10 @@ export const NATIVE_TOOL_IDS = {
 
 export type NativeToolId = (typeof NATIVE_TOOL_IDS)[keyof typeof NATIVE_TOOL_IDS];
 
-function obj(properties: ToolInputSchema['properties'], required?: readonly string[]): ToolInputSchema {
+function obj(
+  properties: ToolInputSchema['properties'],
+  required?: readonly string[],
+): ToolInputSchema {
   return { type: 'object', properties, ...(required ? { required } : {}) };
 }
 
@@ -67,7 +71,9 @@ export function nativeToolRecords(): ToolRecord[] {
       NATIVE_TOOL_IDS.openApplication,
       'Open application',
       'Launch an installed application by name.',
-      obj({ applicationQuery: { type: 'string', description: 'App name to open' } }, ['applicationQuery']),
+      obj({ applicationQuery: { type: 'string', description: 'App name to open' } }, [
+        'applicationQuery',
+      ]),
       [],
     ),
     record(
@@ -84,10 +90,25 @@ export function nativeToolRecords(): ToolRecord[] {
       [],
     ),
     record(
+      NATIVE_TOOL_IDS.openFileInApplication,
+      'Open file in application',
+      'Resolve an installed application and an indexed file, then open that file in the application.',
+      obj(
+        {
+          applicationQuery: { type: 'string', description: 'Application name or alias' },
+          fileQuery: { type: 'string', description: 'File to resolve from the local file index' },
+        },
+        ['applicationQuery', 'fileQuery'],
+      ),
+      ['read'],
+    ),
+    record(
       NATIVE_TOOL_IDS.openProjectFolder,
       'Open project folder',
       'Reveal a resolved project folder in the file manager.',
-      obj({ projectQuery: { type: 'string', description: 'Project to resolve' } }, ['projectQuery']),
+      obj({ projectQuery: { type: 'string', description: 'Project to resolve' } }, [
+        'projectQuery',
+      ]),
       ['read'],
     ),
     record(
@@ -148,10 +169,7 @@ export function nativeToolRecords(): ToolRecord[] {
       NATIVE_TOOL_IDS.quickAi,
       'Quick AI',
       'Run a one-shot AI sub-task (summarise, explain, draft) and capture its text.',
-      obj(
-        { prompt: { type: 'string' }, useClipboard: { type: 'boolean' } },
-        ['prompt'],
-      ),
+      obj({ prompt: { type: 'string' }, useClipboard: { type: 'boolean' } }, ['prompt']),
       ['network'],
     ),
   ];

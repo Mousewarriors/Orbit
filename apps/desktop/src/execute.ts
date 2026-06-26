@@ -50,6 +50,9 @@ export async function executeAction(
     case 'open-project-in-application':
       await native.openProjectInApplication(run.applicationId, run.projectPath);
       return { hide: true };
+    case 'open-file-in-application':
+      await native.openFileInApplication(run.applicationId, run.filePath);
+      return { hide: true };
     case 'reveal-path':
       if (native.isTauri()) await native.revealPath(run.path);
       return { hide: true };

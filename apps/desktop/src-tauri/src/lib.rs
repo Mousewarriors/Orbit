@@ -350,6 +350,7 @@ pub fn run() {
             commands::usage_snapshot,
             commands::launch_path,
             commands::open_project_in_application,
+            commands::open_file_in_application,
             commands::open_url,
             commands::manage_window,
             commands::clipboard_list,

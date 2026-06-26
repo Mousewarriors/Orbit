@@ -9,27 +9,23 @@ describe('ToolRegistry', () => {
     const reg = new ToolRegistry();
     reg.register(nativeToolRecords());
     reg.register(
-      mcpToolsToRecords(
-        'fs',
-        [{ name: 'read_file', annotations: { readOnlyHint: true } }],
-        { trustReadOnlyHint: true },
-      ),
+      mcpToolsToRecords('fs', [{ name: 'read_file', annotations: { readOnlyHint: true } }], {
+        trustReadOnlyHint: true,
+      }),
     );
     const before = reg.size;
     // Re-registering the same id replaces, doesn't grow.
     reg.register(
-      mcpToolsToRecords(
-        'fs',
-        [{ name: 'read_file', annotations: { readOnlyHint: true } }],
-        { trustReadOnlyHint: true },
-      ),
+      mcpToolsToRecords('fs', [{ name: 'read_file', annotations: { readOnlyHint: true } }], {
+        trustReadOnlyHint: true,
+      }),
     );
     expect(reg.size).toBe(before);
     expect(reg.get('mcp:fs:read_file')).toBeDefined();
     expect(reg.get(NATIVE_TOOL_IDS.dispatchAgent)?.source).toBe('relay');
   });
 
-  it('removes a server\'s tools on disable', () => {
+  it("removes a server's tools on disable", () => {
     const reg = new ToolRegistry();
     reg.register(mcpToolsToRecords('fs', [{ name: 'a' }, { name: 'b' }]));
     expect(reg.bySource('mcp')).toHaveLength(2);
@@ -39,7 +35,9 @@ describe('ToolRegistry', () => {
 
   it('scopes tools to the active project', () => {
     const reg = new ToolRegistry();
-    reg.register(mcpToolsToRecords('repo', [{ name: 'build' }], { projectScope: ['C:/proj/orbit'] }));
+    reg.register(
+      mcpToolsToRecords('repo', [{ name: 'build' }], { projectScope: ['C:/proj/orbit'] }),
+    );
     reg.register(nativeToolRecords());
     expect(reg.scopedTo('C:/proj/orbit').some((t) => t.id === 'mcp:repo:build')).toBe(true);
     expect(reg.scopedTo('C:/proj/other').some((t) => t.id === 'mcp:repo:build')).toBe(false);
@@ -66,8 +64,31 @@ describe('native dispatch_agent tool', () => {
     const bad = validateArgs(dispatch.inputSchema, { agentPreference: 'wizard' });
     expect(bad.ok).toBe(false);
     expect(bad.errors.join(' ')).toContain('projectQuery');
-    const good = validateArgs(dispatch.inputSchema, { projectQuery: 'orbit', agentPreference: 'best' });
+    const good = validateArgs(dispatch.inputSchema, {
+      projectQuery: 'orbit',
+      agentPreference: 'best',
+    });
     expect(good.ok).toBe(true);
     expect(good.cleaned).toEqual({ projectQuery: 'orbit', agentPreference: 'best' });
+  });
+});
+
+describe('native open_file_in_application tool', () => {
+  it('validates the app and file search arguments', () => {
+    const openFile = nativeToolRecords().find(
+      (t) => t.id === NATIVE_TOOL_IDS.openFileInApplication,
+    )!;
+    const bad = validateArgs(openFile.inputSchema, { applicationQuery: 'paint' });
+    expect(bad.ok).toBe(false);
+    expect(bad.errors.join(' ')).toContain('fileQuery');
+    const good = validateArgs(openFile.inputSchema, {
+      applicationQuery: 'paint',
+      fileQuery: 'convention attendant positions map',
+    });
+    expect(good.ok).toBe(true);
+    expect(good.cleaned).toEqual({
+      applicationQuery: 'paint',
+      fileQuery: 'convention attendant positions map',
+    });
   });
 });

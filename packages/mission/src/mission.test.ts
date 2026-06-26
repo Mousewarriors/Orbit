@@ -39,6 +39,18 @@ describe('planDeterministically', () => {
     expect(plan?.steps[0]?.args['applicationQuery']).toMatch(/calculator/i);
   });
 
+  it('maps "load up the convention attendant positions map in Paint" to open_file_in_application', () => {
+    const plan = planDeterministically(
+      'load up the convention attendant positions map in Paint',
+      reg,
+    );
+    expect(plan?.steps[0]?.toolId).toBe(NATIVE_TOOL_IDS.openFileInApplication);
+    expect(plan?.steps[0]?.args).toEqual({
+      applicationQuery: 'paint',
+      fileQuery: 'convention attendant positions map',
+    });
+  });
+
   it('maps "Show failed sessions" to open_control_center filtered to failed', () => {
     const plan = planDeterministically('Show failed sessions', reg);
     expect(plan?.steps[0]?.toolId).toBe(NATIVE_TOOL_IDS.openControlCenter);
@@ -98,10 +110,15 @@ describe('planMission', () => {
   });
 
   it('falls back to AI when nothing is recognised', async () => {
-    const complete = vi.fn().mockResolvedValue(
-      JSON.stringify({ steps: [{ tool: NATIVE_TOOL_IDS.findFiles, args: { fileQuery: 'a' } }] }),
-    );
-    const result = await planMission('rummage for a file about a', reg, { tools: reg.all(), complete });
+    const complete = vi
+      .fn()
+      .mockResolvedValue(
+        JSON.stringify({ steps: [{ tool: NATIVE_TOOL_IDS.findFiles, args: { fileQuery: 'a' } }] }),
+      );
+    const result = await planMission('rummage for a file about a', reg, {
+      tools: reg.all(),
+      complete,
+    });
     expect(complete).toHaveBeenCalledOnce();
     expect(result.plan?.source).toBe('ai');
   });

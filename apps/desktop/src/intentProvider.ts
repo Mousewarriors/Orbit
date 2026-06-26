@@ -63,7 +63,7 @@ export interface IntentProviderDeps {
   readonly getApps: () => ReadonlyArray<IntentApp>;
   /** Cached recent ∪ favourite projects (resolved synchronously). */
   readonly getProjects: () => ReadonlyArray<IntentProject>;
-  /** Search the local file index (only called for find-file intents). */
+  /** Search the local file index (find-file and open-file-in-application intents). */
   readonly fileSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentFile>>;
   /** Search notes (only called for find-notes intents). */
   readonly noteSearch: (query: string, limit: number) => Promise<ReadonlyArray<IntentNote>>;
@@ -89,7 +89,11 @@ interface BaseFields {
   readonly confidence?: number;
 }
 
-function baseItem(id: string, query: string, fields: BaseFields): Omit<SearchItem, 'primaryAction'> {
+function baseItem(
+  id: string,
+  query: string,
+  fields: BaseFields,
+): Omit<SearchItem, 'primaryAction'> {
   return {
     id,
     title: fields.title,
@@ -186,7 +190,9 @@ async function buildItems(
         ...(slots.agentPreference ? { agentPreference: slots.agentPreference } : {}),
         ...(slots.includeLatestHandoff ? { includeLatestHandoff: true } : {}),
       };
-      const subtitle = project ? `${display.subtitle} · ${project.name ?? project.path}` : display.subtitle;
+      const subtitle = project
+        ? `${display.subtitle} · ${project.name ?? project.path}`
+        : display.subtitle;
       return [
         {
           ...baseItem(`intent.${recognised.intent}`, query, {
@@ -206,7 +212,10 @@ async function buildItems(
     }
 
     case 'open-project-folder': {
-      const project = bestProject(slots.projectQuery, deps.getProjects() as readonly ProjectCandidate[]);
+      const project = bestProject(
+        slots.projectQuery,
+        deps.getProjects() as readonly ProjectCandidate[],
+      );
       if (!project) {
         return [
           {
@@ -297,6 +306,71 @@ async function buildItems(
           },
         },
       ];
+    }
+
+    case 'open-file-in-application': {
+      const term = (slots.fileQuery ?? '').trim();
+      const app = rankApps(slots.applicationQuery ?? '', deps.getApps())[0]?.item ?? null;
+      if (!term) return [];
+      if (!app) {
+        return [
+          {
+            ...baseItem('intent.open-file-in-application.no-app', query, {
+              title: display.title,
+              subtitle: `No installed application matching "${slots.applicationQuery ?? ''}"`,
+              category: 'Files',
+              source: SOURCE,
+              icon: icon('app'),
+              confidence: 0.78,
+            }),
+            primaryAction: {
+              id: 'intent.open-file-in-application.no-app.noop',
+              title: 'No match',
+              run: { kind: 'copy', text: slots.applicationQuery ?? '' },
+            },
+          },
+        ];
+      }
+      const files = (await deps.fileSearch(term, 10)).filter((f) => f.kind !== 'dir');
+      if (files.length === 0) {
+        return [
+          {
+            ...baseItem('intent.open-file-in-application.no-file', query, {
+              title: display.title,
+              subtitle: `No indexed file matching "${term}" — enable or rebuild the file index in Settings → Files`,
+              category: 'Files',
+              source: 'file',
+              icon: icon('file'),
+              confidence: 0.78,
+            }),
+            primaryAction: {
+              id: 'intent.open-file-in-application.no-file.noop',
+              title: 'OK',
+              run: { kind: 'copy', text: term },
+            },
+          },
+        ];
+      }
+      return files.slice(0, 3).map((f, i) => ({
+        ...baseItem(`intent.open-file-in-application.${f.path}`, query, {
+          title: `Open ${f.name} in ${app.name}`,
+          subtitle: `${f.parent} · ${app.name}`,
+          category: 'Files',
+          source: 'file',
+          icon: icon('file'),
+          confidence: Math.max(0.6, 0.97 - i * 0.02),
+        }),
+        primaryAction: {
+          id: `intent.open-file-in-application.${f.path}.open`,
+          title: 'Open File',
+          run: {
+            kind: 'open-file-in-application',
+            applicationId: app.id,
+            filePath: f.path,
+          },
+          requires: ['apps.launch', 'files.read'],
+        },
+      }));
     }
 
     case 'open-application': {

@@ -15,6 +15,7 @@ import * as native from './native.js';
 vi.mock('./native.js', () => ({
   isTauri: () => true,
   launchPath: vi.fn(async () => {}),
+  openFileInApplication: vi.fn(async () => {}),
   revealPath: vi.fn(async () => {}),
   openUrl: vi.fn(async () => {}),
   hideLauncher: vi.fn(async () => {}),
@@ -73,5 +74,20 @@ describe('application launch journey', () => {
       run: { kind: 'open-path', path: 'C:\\gone.lnk' },
     };
     await expect(executeAction(action, ctx)).rejects.toThrow('no longer exists');
+  });
+
+  it('an open-file-in-application action dispatches through the audited native command', async () => {
+    const action: ActionDescriptor = {
+      id: 'x',
+      title: 'Open in Paint',
+      run: {
+        kind: 'open-file-in-application',
+        applicationId: 'paint',
+        filePath: 'C:\\docs\\map.png',
+      },
+    };
+    const outcome = await executeAction(action, ctx);
+    expect(native.openFileInApplication).toHaveBeenCalledWith('paint', 'C:\\docs\\map.png');
+    expect(outcome.hide).toBe(true);
   });
 });

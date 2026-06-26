@@ -68,6 +68,13 @@ export async function openProjectInApplication(
   return invoke('open_project_in_application', { applicationId, projectPath });
 }
 
+export async function openFileInApplication(
+  applicationId: string,
+  filePath: string,
+): Promise<void> {
+  return invoke('open_file_in_application', { applicationId, filePath });
+}
+
 export async function openUrl(url: string): Promise<void> {
   return invoke('open_url', { url });
 }
@@ -573,10 +580,7 @@ export async function projectMetaGet(path: string): Promise<ProjectMeta | null> 
   return invoke<ProjectMeta | null>('project_meta_get', { path });
 }
 
-export async function projectMetaUpsert(
-  path: string,
-  name: string | null,
-): Promise<ProjectMeta> {
+export async function projectMetaUpsert(path: string, name: string | null): Promise<ProjectMeta> {
   return invoke<ProjectMeta>('project_meta_upsert', { path, name });
 }
 
@@ -591,10 +595,7 @@ export async function projectMetaTouch(path: string): Promise<void> {
   return invoke('project_meta_touch', { path });
 }
 
-export async function projectMetaSetFavourite(
-  path: string,
-  favourite: boolean,
-): Promise<void> {
+export async function projectMetaSetFavourite(path: string, favourite: boolean): Promise<void> {
   return invoke('project_meta_set_favourite', { path, favourite });
 }
 

@@ -5,6 +5,7 @@ import { decodeControlCenterArg } from './controlCenterState.js';
 const APPS = [
   { id: 'calc', name: 'Calculator', path: 'C:\\Windows\\calc.exe' },
   { id: 'chrome', name: 'Google Chrome', path: 'C:\\chrome.exe' },
+  { id: 'paint', name: 'Paint', path: 'C:\\Windows\\System32\\mspaint.exe' },
 ];
 
 const PROJECTS = [
@@ -107,10 +108,7 @@ describe('intent provider — control center navigation', () => {
 
   it('"open Orbit in Visual Studio Code" resolves both indexed entities', async () => {
     const deps = makeDeps({
-      getApps: () => [
-        ...APPS,
-        { id: 'vscode', name: 'Visual Studio Code', path: 'C:\\Code.lnk' },
-      ],
+      getApps: () => [...APPS, { id: 'vscode', name: 'Visual Studio Code', path: 'C:\\Code.lnk' }],
     });
     const items = await run('Open Orbit in Visual Studio Code', deps);
     expect(items[0]!.primaryAction.run).toEqual({
@@ -143,6 +141,47 @@ describe('intent provider — direct + find', () => {
     expect(items[0]!.primaryAction.run).toEqual({
       kind: 'open-path',
       path: 'C:\\docs\\leonard.txt',
+    });
+  });
+
+  it('"load up the convention attendant positions map in Paint" opens the indexed file in Paint', async () => {
+    const fileSearch = vi.fn(async () => [
+      {
+        path: 'C:\\docs\\Convention Attendant Positions Map.png',
+        name: 'Convention Attendant Positions Map.png',
+        parent: 'C:\\docs',
+        kind: 'file',
+      },
+    ]);
+    const items = await run(
+      'load up the convention attendant positions map in paint',
+      makeDeps({ fileSearch }),
+    );
+    expect(fileSearch).toHaveBeenCalledWith('convention attendant positions map', 10);
+    expect(items[0]!.primaryAction.run).toEqual({
+      kind: 'open-file-in-application',
+      applicationId: 'paint',
+      filePath: 'C:\\docs\\Convention Attendant Positions Map.png',
+    });
+  });
+
+  it('"find the congregation accounts instructions for KHT" searches files by remembered description', async () => {
+    const fileSearch = vi.fn(async () => [
+      {
+        path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
+        name: 'KHT Congregation Accounts Instructions.pdf',
+        parent: 'C:\\docs',
+        kind: 'file',
+      },
+    ]);
+    const items = await run(
+      'find the congregation accounts instructions for KHT',
+      makeDeps({ fileSearch }),
+    );
+    expect(fileSearch).toHaveBeenCalledWith('congregation accounts instructions kht', 20);
+    expect(items[0]!.primaryAction.run).toEqual({
+      kind: 'open-path',
+      path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
     });
   });
 

@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NATIVE_TOOL_IDS, nativeToolRecords, type ToolRecord } from '@orbit/tool-registry';
-import {
-  executeNativeTool,
-  resolveApplication,
-  type NativeToolDeps,
-} from './nativeToolExecute.js';
+import { executeNativeTool, resolveApplication, type NativeToolDeps } from './nativeToolExecute.js';
 import type { NativeApp } from '../native.js';
 
 const APPS: NativeApp[] = [
@@ -23,6 +19,7 @@ function deps(over: Partial<NativeToolDeps> = {}): NativeToolDeps {
     listProjects: async () => PROJECTS,
     launchPath: async () => {},
     openProjectInApplication: async () => {},
+    openFileInApplication: async () => {},
     recordUsage: async () => {},
     fileSearch: async () => [],
     findFolders: async () => [],
@@ -30,6 +27,69 @@ function deps(over: Partial<NativeToolDeps> = {}): NativeToolDeps {
     ...over,
   };
 }
+
+describe('executeNativeTool · open_file_in_application', () => {
+  it('resolves the app and indexed file, then opens the file in that app', async () => {
+    const openFileInApplication = vi.fn(async () => {});
+    const recordUsage = vi.fn(async () => {});
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openFileInApplication),
+      { applicationQuery: 'notepad', fileQuery: 'congregation accounts instructions kht' },
+      deps({
+        openFileInApplication,
+        recordUsage,
+        fileSearch: async () => [
+          {
+            name: 'KHT Congregation Accounts Instructions.pdf',
+            path: 'C:/docs/KHT Congregation Accounts Instructions.pdf',
+            kind: 'file',
+          },
+        ],
+      }),
+    );
+    expect(out.ok).toBe(true);
+    expect(openFileInApplication).toHaveBeenCalledWith(
+      'notepad',
+      'C:/docs/KHT Congregation Accounts Instructions.pdf',
+    );
+    expect(recordUsage).toHaveBeenCalledWith('notepad');
+    expect(out.content).toContain('Opened KHT Congregation Accounts Instructions.pdf in Notepad');
+  });
+
+  it('does not claim success when opening the file fails', async () => {
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openFileInApplication),
+      { applicationQuery: 'notepad', fileQuery: 'map' },
+      deps({
+        openFileInApplication: async () => {
+          throw new Error('launch failed');
+        },
+        fileSearch: async () => [{ name: 'map.png', path: 'C:/docs/map.png', kind: 'file' }],
+      }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.content).toContain('launch failed');
+  });
+
+  it('asks for a narrower query when several indexed files match', async () => {
+    const openFileInApplication = vi.fn(async () => {});
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openFileInApplication),
+      { applicationQuery: 'notepad', fileQuery: 'accounts instructions' },
+      deps({
+        openFileInApplication,
+        fileSearch: async () => [
+          { name: 'KHT Accounts Instructions.pdf', path: 'C:/docs/kht.pdf', kind: 'file' },
+          { name: 'ABC Accounts Instructions.pdf', path: 'C:/docs/abc.pdf', kind: 'file' },
+        ],
+      }),
+    );
+    expect(out.ok).toBe(false);
+    expect(out.content).toMatch(/Multiple indexed files match/);
+    expect(out.content).toContain('C:/docs/kht.pdf');
+    expect(openFileInApplication).not.toHaveBeenCalled();
+  });
+});
 
 describe('resolveApplication', () => {
   it('matches an exact name (case-insensitive)', () => {

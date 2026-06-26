@@ -103,6 +103,15 @@ describe('recogniseIntent — projects', () => {
     expect(r.slots.applicationQuery).toBe('visual studio code');
   });
 
+  it('open file in an application', () => {
+    const r = expectIntent(
+      'Load up the convention attendant positions map in Paint',
+      'open_file_in_application',
+    );
+    expect(r.slots.fileQuery).toBe('convention attendant positions map');
+    expect(r.slots.applicationQuery).toBe('paint');
+  });
+
   it('open latest project', () => {
     expectIntent('Open the latest project', 'open_latest_project');
     expectIntent('open my most recent project', 'open_latest_project');
@@ -156,6 +165,11 @@ describe('recogniseIntent — find', () => {
     const r = expectIntent('Find the document that mentioned Leonard', 'find_file');
     expect(r.slots.fileQuery).toBe('leonard');
     expectIntent('find file report.pdf', 'find_file');
+  });
+
+  it('finds remembered file descriptions without requiring the word file', () => {
+    const r = expectIntent('find the congregation accounts instructions for KHT', 'find_file');
+    expect(r.slots.fileQuery).toBe('congregation accounts instructions kht');
   });
 
   it('find notes extracts the topic', () => {

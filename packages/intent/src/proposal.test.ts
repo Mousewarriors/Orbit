@@ -51,7 +51,9 @@ describe('proposeIntent — control-center navigation', () => {
   });
 
   it('approvals / activity / handoffs map to their tabs', () => {
-    expect((plan('show approvals').plan as { target: { tab: string } }).target.tab).toBe('approvals');
+    expect((plan('show approvals').plan as { target: { tab: string } }).target.tab).toBe(
+      'approvals',
+    );
     expect((plan('show recent activity').plan as { target: { tab: string } }).target.tab).toBe(
       'activity',
     );
@@ -74,6 +76,13 @@ describe('proposeIntent — direct actions', () => {
     expect(plan('open the Orbit folder').plan).toEqual({ kind: 'open-project-folder' });
   });
 
+  it('open file in application maps to the file/application action plan', () => {
+    const p = plan('load up the convention attendant positions map in paint');
+    expect(p.plan).toEqual({ kind: 'open-file-in-application' });
+    expect(p.display.title).toContain('convention attendant positions map');
+    expect(p.display.title).toContain('paint');
+  });
+
   it('find file / notes → search plans with the term in the title', () => {
     const f = plan('find the document that mentioned Leonard');
     expect(f.plan).toEqual({ kind: 'find-files' });
@@ -87,11 +96,7 @@ describe('proposeIntent — direct actions', () => {
 
 describe('proposeIntent — AI intents are honest', () => {
   it('explain/summarise/ask map to unsupported-ai with a helpful subtitle', () => {
-    for (const q of [
-      'explain this error',
-      'summarise the clipboard',
-      'ask ai what is a monad',
-    ]) {
+    for (const q of ['explain this error', 'summarise the clipboard', 'ask ai what is a monad']) {
       const p = plan(q);
       expect(p.plan).toEqual({ kind: 'unsupported-ai' });
       expect(p.display.subtitle).toMatch(/not available yet/i);

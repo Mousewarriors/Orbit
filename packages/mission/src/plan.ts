@@ -46,14 +46,28 @@ function intentToToolCall(
   const { intent, slots } = recognised;
   switch (intent) {
     case 'open_application':
-      return { toolId: NATIVE_TOOL_IDS.openApplication, args: { applicationQuery: slots.applicationQuery } };
+      return {
+        toolId: NATIVE_TOOL_IDS.openApplication,
+        args: { applicationQuery: slots.applicationQuery },
+      };
     case 'open_project_folder':
-      return { toolId: NATIVE_TOOL_IDS.openProjectFolder, args: { projectQuery: slots.projectQuery } };
+      return {
+        toolId: NATIVE_TOOL_IDS.openProjectFolder,
+        args: { projectQuery: slots.projectQuery },
+      };
     case 'open_project_in_application':
       return {
         toolId: NATIVE_TOOL_IDS.openProjectInApplication,
         args: {
           projectQuery: slots.projectQuery,
+          applicationQuery: slots.applicationQuery,
+        },
+      };
+    case 'open_file_in_application':
+      return {
+        toolId: NATIVE_TOOL_IDS.openFileInApplication,
+        args: {
+          fileQuery: slots.fileQuery,
           applicationQuery: slots.applicationQuery,
         },
       };

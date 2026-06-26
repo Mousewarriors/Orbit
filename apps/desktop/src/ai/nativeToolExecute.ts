@@ -26,6 +26,7 @@ import type { NativeApp } from '../native.js';
 export const CHAT_NATIVE_TOOL_IDS: readonly string[] = [
   NATIVE_TOOL_IDS.openApplication,
   NATIVE_TOOL_IDS.openProjectInApplication,
+  NATIVE_TOOL_IDS.openFileInApplication,
   NATIVE_TOOL_IDS.findFiles,
   NATIVE_TOOL_IDS.findNotes,
 ];
@@ -62,7 +63,8 @@ export function resolveApplication(query: string, apps: readonly NativeApp[]): A
   const prefix = apps.filter((a) => a.name.toLowerCase().startsWith(target));
   if (prefix.length === 1) return { kind: 'match', app: prefix[0]! };
 
-  const pool = prefix.length > 0 ? prefix : apps.filter((a) => a.name.toLowerCase().includes(target));
+  const pool =
+    prefix.length > 0 ? prefix : apps.filter((a) => a.name.toLowerCase().includes(target));
   if (pool.length === 1) return { kind: 'match', app: pool[0]! };
   if (pool.length > 1) return { kind: 'choices', apps: pool.slice(0, 5) };
   return { kind: 'none' };
@@ -73,8 +75,9 @@ export interface NativeToolDeps {
   listProjects(): Promise<readonly ProjectCandidate[]>;
   launchPath(path: string): Promise<void>;
   openProjectInApplication(applicationId: string, projectPath: string): Promise<void>;
+  openFileInApplication(applicationId: string, filePath: string): Promise<void>;
   recordUsage(commandId: string): Promise<void>;
-  fileSearch(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
+  fileSearch(query: string): Promise<ReadonlyArray<{ name: string; path: string; kind?: string }>>;
   /** Search the file index restricted to directories (folders), for project fallback. */
   findFolders(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
   noteList(query: string): Promise<ReadonlyArray<{ title: string }>>;
@@ -153,10 +156,7 @@ export async function executeNativeTool(
       if (!applicationQuery || !projectQuery) {
         return { ok: false, content: 'An application and project name are required.' };
       }
-      const [apps, projects] = await Promise.all([
-        deps.listApplications(),
-        deps.listProjects(),
-      ]);
+      const [apps, projects] = await Promise.all([deps.listApplications(), deps.listProjects()]);
       const app = resolveApplication(applicationQuery, apps);
       if (app.kind === 'none') {
         return {
@@ -220,6 +220,64 @@ export async function executeNativeTool(
       };
     }
 
+    case NATIVE_TOOL_IDS.openFileInApplication: {
+      const applicationQuery = String(args['applicationQuery'] ?? '').trim();
+      const fileQuery = String(args['fileQuery'] ?? '').trim();
+      if (!applicationQuery || !fileQuery) {
+        return { ok: false, content: 'An application and file search query are required.' };
+      }
+      const [apps, rawFiles] = await Promise.all([
+        deps.listApplications(),
+        deps.fileSearch(fileQuery),
+      ]);
+      const app = resolveApplication(applicationQuery, apps);
+      if (app.kind === 'none') {
+        return {
+          ok: false,
+          content: `No installed application matches "${applicationQuery}".`,
+        };
+      }
+      if (app.kind === 'choices') {
+        return {
+          ok: false,
+          content: `Multiple applications match "${applicationQuery}": ${app.apps
+            .map((candidate) => candidate.name)
+            .join(', ')}. Ask the user which one they mean.`,
+        };
+      }
+      const files = rawFiles.filter((candidate) => candidate.kind !== 'dir');
+      const file = files[0];
+      if (!file) {
+        return {
+          ok: false,
+          content: `No indexed file matches "${fileQuery}". Make sure file indexing is enabled and rebuilt in Settings → Files.`,
+        };
+      }
+      if (files.length > 1) {
+        return {
+          ok: false,
+          content: `Multiple indexed files match "${fileQuery}":\n${files
+            .slice(0, 5)
+            .map((candidate) => `• ${candidate.name} — ${candidate.path}`)
+            .join(
+              '\n',
+            )}\nAsk the user which file they mean, then call this tool again with a more exact fileQuery.`,
+        };
+      }
+      try {
+        await deps.openFileInApplication(app.app.id, file.path);
+      } catch (e) {
+        return {
+          ok: false,
+          content: `Failed to open ${file.name} in ${app.app.name}: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        };
+      }
+      await deps.recordUsage(app.app.id).catch(() => {});
+      return { ok: true, content: `Opened ${file.name} in ${app.app.name}.` };
+    }
+
     case NATIVE_TOOL_IDS.findFiles: {
       const query = String(args['fileQuery'] ?? '').trim();
       if (!query) return { ok: false, content: 'No search query was provided.' };
@@ -238,7 +296,13 @@ export async function executeNativeTool(
       const query = String(args['noteQuery'] ?? '').trim();
       const results = await deps.noteList(query);
       if (results.length === 0) return { ok: true, content: `No notes found for "${query}".` };
-      return { ok: true, content: results.slice(0, 10).map((r) => `• ${r.title}`).join('\n') };
+      return {
+        ok: true,
+        content: results
+          .slice(0, 10)
+          .map((r) => `• ${r.title}`)
+          .join('\n'),
+      };
     }
 
     default:
