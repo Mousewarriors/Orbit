@@ -476,6 +476,7 @@ pub fn run() {
             commands::project_meta_list_favourites,
             commands::project_meta_list_catalogued,
             http::http_request,
+            http::http_mcp_request,
             http::http_stream_open,
             http::http_stream_cancel,
             mcp_stdio::mcp_stdio_open,

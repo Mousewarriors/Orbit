@@ -3,8 +3,8 @@
  *
  * A server record is what the user configures in Settings → MCP. It never holds
  * a plaintext secret — only a *reference* into OS secure storage (spec §9.5).
- * Validation is conservative: unknown transports, empty commands and non-
- * http(s) endpoints are rejected before anything is ever spawned/connected.
+ * Validation is conservative: unknown transports, empty commands and non-public
+ * HTTPS endpoints are rejected before anything is ever spawned/connected.
  */
 
 export type McpTransportKind = 'stdio' | 'http';
@@ -60,13 +60,18 @@ export function validateMcpServerConfig(config: Partial<McpServerConfig>): McpCo
     }
   }
   if (config.transport === 'http') {
-    if (!isHttpUrl(config.endpoint)) {
-      errors.push({ field: 'endpoint', message: 'http transport requires an http(s) endpoint' });
+    if (!isPublicHttpsMcpEndpoint(config.endpoint)) {
+      errors.push({
+        field: 'endpoint',
+        message: 'http transport requires a public https endpoint',
+      });
     }
   }
   if (
     config.timeoutMs !== undefined &&
-    (!Number.isFinite(config.timeoutMs) || config.timeoutMs < MIN_TIMEOUT || config.timeoutMs > MAX_TIMEOUT)
+    (!Number.isFinite(config.timeoutMs) ||
+      config.timeoutMs < MIN_TIMEOUT ||
+      config.timeoutMs > MAX_TIMEOUT)
   ) {
     errors.push({ field: 'timeoutMs', message: `timeoutMs must be ${MIN_TIMEOUT}–${MAX_TIMEOUT}` });
   }
@@ -78,6 +83,71 @@ export function isHttpUrl(value: unknown): boolean {
   try {
     const url = new URL(value);
     return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function parseIpv4(host: string): number[] | null {
+  const parts = host.split('.');
+  if (parts.length !== 4) return null;
+  const octets = parts.map((part) => {
+    if (!/^\d{1,3}$/.test(part)) return NaN;
+    return Number(part);
+  });
+  return octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255) ? octets : null;
+}
+
+function isForbiddenIpv4(host: string): boolean {
+  const octets = parseIpv4(host);
+  if (!octets) return false;
+  const a = octets[0]!;
+  const b = octets[1]!;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 192 && b === 0 && (octets[2] === 0 || octets[2] === 2)) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 203 && b === 0 && octets[2] === 113)
+  );
+}
+
+function isForbiddenIpv6(host: string): boolean {
+  const h = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
+  if (!h.includes(':')) return false;
+  if (h === '::' || h === '::1' || h.startsWith('::ffff:127.') || h.startsWith('::ffff:10.')) {
+    return true;
+  }
+  const first = h.split(':').find(Boolean) ?? '';
+  const firstValue = Number.parseInt(first, 16);
+  if (!Number.isFinite(firstValue)) return false;
+  return (
+    (firstValue & 0xfe00) === 0xfc00 ||
+    (firstValue & 0xffc0) === 0xfe80 ||
+    firstValue === 0xff00 ||
+    h.startsWith('2001:db8:')
+  );
+}
+
+/** Static HTTP-MCP endpoint policy; native Rust repeats this and adds DNS checks. */
+export function isPublicHttpsMcpEndpoint(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    if (url.protocol !== 'https:') return false;
+    if (url.username || url.password) return false;
+    if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) {
+      return false;
+    }
+    if (isForbiddenIpv4(host) || isForbiddenIpv6(host)) return false;
+    return true;
   } catch {
     return false;
   }

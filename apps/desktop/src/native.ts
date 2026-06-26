@@ -816,6 +816,16 @@ export async function httpRequest(
   return invoke<HttpResponse>('http_request', { method, url, headers, body: body ?? null });
 }
 
+/** One-shot HTTP request for HTTP MCP servers with native SSRF/redirect controls. */
+export async function httpMcpRequest(
+  method: string,
+  url: string,
+  headers: Record<string, string>,
+  body?: string | null,
+): Promise<HttpResponse> {
+  return invoke<HttpResponse>('http_mcp_request', { method, url, headers, body: body ?? null });
+}
+
 /** Begin a streamed HTTP request; body chunks arrive on the `http-stream` event. */
 export async function httpStreamOpen(
   id: string,

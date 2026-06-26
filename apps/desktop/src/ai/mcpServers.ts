@@ -12,7 +12,7 @@
  * The kind is discriminated by which fields are present (`command` ⇒ stdio),
  * so existing http entries round-trip unchanged. No secret is ever stored here.
  */
-import { isHttpUrl } from '@orbit/tool-registry';
+import { isPublicHttpsMcpEndpoint } from '@orbit/tool-registry';
 
 export const MCP_SERVERS_SETTING_KEY = 'mcp.servers';
 
@@ -69,7 +69,7 @@ export function parseMcpServers(raw: string | null | undefined): StoredMcpServer
     } else {
       // http server
       const endpoint = typeof o['endpoint'] === 'string' ? o['endpoint'] : '';
-      if (!isHttpUrl(endpoint)) continue;
+      if (!isPublicHttpsMcpEndpoint(endpoint)) continue;
       out.push({ id, name, endpoint, enabled });
       seen.add(id);
     }
@@ -102,7 +102,9 @@ export function validateServer(
   if (candidate.command && candidate.command.trim()) {
     return null; // stdio: a non-empty command is enough (args/cwd are optional)
   }
-  if (!isHttpUrl(candidate.endpoint ?? '')) return 'Endpoint must be an http(s) URL';
+  if (!isPublicHttpsMcpEndpoint(candidate.endpoint ?? '')) {
+    return 'Endpoint must be a public https URL';
+  }
   return null;
 }
 

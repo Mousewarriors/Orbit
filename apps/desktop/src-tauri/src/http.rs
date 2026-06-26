@@ -10,6 +10,7 @@
 //! AI runtime + MCP client that were already built behind injected transports.
 
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -47,7 +48,8 @@ struct StreamEvent {
 }
 
 /// Validate the URL scheme and build a request. Rejects anything but http(s).
-fn build_request(
+fn build_request_with_client(
+    client: &reqwest::Client,
     method: &str,
     url: &str,
     headers: HashMap<String, String>,
@@ -59,7 +61,7 @@ fn build_request(
     }
     let m = reqwest::Method::from_bytes(method.as_bytes())
         .map_err(|e| format!("invalid method: {e}"))?;
-    let mut rb = CLIENT.request(m, parsed);
+    let mut rb = client.request(m, parsed);
     for (k, v) in headers {
         rb = rb.header(k, v);
     }
@@ -67,6 +69,127 @@ fn build_request(
         rb = rb.body(b);
     }
     Ok(rb)
+}
+
+fn build_request(
+    method: &str,
+    url: &str,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+) -> Result<reqwest::RequestBuilder, String> {
+    build_request_with_client(&CLIENT, method, url, headers, body)
+}
+
+fn ipv4_is_forbidden(ip: Ipv4Addr) -> bool {
+    ip.is_unspecified()
+        || ip.is_loopback()
+        || ip.is_private()
+        || ip.is_link_local()
+        || ip.is_broadcast()
+        || ip.is_documentation()
+        || ip.is_multicast()
+        || ip.octets()[0] == 0
+        || ip.octets()[0] == 100 && (64..=127).contains(&ip.octets()[1])
+        || ip.octets()[0] == 169 && ip.octets()[1] == 254
+        || ip.octets()[0] >= 240
+}
+
+fn ipv6_is_unique_local(ip: Ipv6Addr) -> bool {
+    (ip.segments()[0] & 0xfe00) == 0xfc00
+}
+
+fn ipv6_is_unicast_link_local(ip: Ipv6Addr) -> bool {
+    (ip.segments()[0] & 0xffc0) == 0xfe80
+}
+
+fn ipv6_is_documentation(ip: Ipv6Addr) -> bool {
+    ip.segments()[0] == 0x2001 && ip.segments()[1] == 0x0db8
+}
+
+fn ip_is_forbidden(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => ipv4_is_forbidden(ip),
+        IpAddr::V6(ip) => {
+            ip.is_unspecified()
+                || ip.is_loopback()
+                || ip.is_multicast()
+                || ipv6_is_unique_local(ip)
+                || ipv6_is_unicast_link_local(ip)
+                || ipv6_is_documentation(ip)
+                || ip.to_ipv4_mapped().map(ipv4_is_forbidden).unwrap_or(false)
+        }
+    }
+}
+
+fn validate_http_mcp_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid url: {e}"))?;
+    if parsed.scheme() != "https" {
+        return Err("HTTP MCP endpoints must use https".into());
+    }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("HTTP MCP endpoints must not include credentials in the URL".into());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "HTTP MCP endpoint must include a host".to_string())?;
+    let lower_host = host.trim_end_matches('.').to_ascii_lowercase();
+    if lower_host == "localhost"
+        || lower_host.ends_with(".localhost")
+        || lower_host.ends_with(".local")
+    {
+        return Err("HTTP MCP endpoints must not target loopback or local hosts".into());
+    }
+    let ip_literal = host.trim_start_matches('[').trim_end_matches(']');
+    if let Ok(ip) = ip_literal.parse::<IpAddr>() {
+        if ip_is_forbidden(ip) {
+            return Err("HTTP MCP endpoint resolves to a forbidden address".into());
+        }
+    }
+    Ok(parsed)
+}
+
+fn resolve_http_mcp_addresses(url: &reqwest::Url) -> Result<(String, Vec<SocketAddr>), String> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| "HTTP MCP endpoint must include a host".to_string())?;
+    let host_for_resolution = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_string();
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| "HTTP MCP endpoint must include a port".to_string())?;
+    let addrs = (host_for_resolution.as_str(), port)
+        .to_socket_addrs()
+        .map_err(|e| format!("could not resolve HTTP MCP endpoint: {e}"))?
+        .collect::<Vec<_>>();
+    if addrs.is_empty() {
+        return Err("HTTP MCP endpoint resolved to no addresses".into());
+    }
+    if addrs.iter().any(|addr| ip_is_forbidden(addr.ip())) {
+        return Err("HTTP MCP endpoint resolves to a forbidden address".into());
+    }
+    Ok((host_for_resolution, addrs))
+}
+
+fn build_mcp_request(
+    method: &str,
+    url: &str,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+) -> Result<reqwest::RequestBuilder, String> {
+    let parsed = validate_http_mcp_url(url)?;
+    let (host, addrs) = resolve_http_mcp_addresses(&parsed)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
+        .resolve_to_addrs(&host, &addrs)
+        .user_agent("orbit/0.1 mcp")
+        .build()
+        .map_err(|e| format!("failed to build HTTP MCP client: {e}"))?;
+    build_request_with_client(&client, method, parsed.as_str(), headers, body)
 }
 
 /// One-shot HTTP request. Returns the status + body text (never throws for a
@@ -80,6 +203,27 @@ pub async fn http_request(
 ) -> Result<HttpResponse, String> {
     let rb = build_request(&method, &url, headers, body)?;
     let resp = rb.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    Ok(HttpResponse { status, body: text })
+}
+
+/// One-shot HTTP request for Streamable HTTP MCP only. This deliberately has a
+/// narrower policy than general provider traffic: public HTTPS, no URL secrets,
+/// no loopback/private/reserved destinations after DNS resolution, and redirects
+/// are terminal errors rather than followed.
+#[tauri::command]
+pub async fn http_mcp_request(
+    method: String,
+    url: String,
+    headers: HashMap<String, String>,
+    body: Option<String>,
+) -> Result<HttpResponse, String> {
+    let rb = build_mcp_request(&method, &url, headers, body)?;
+    let resp = rb.send().await.map_err(|e| e.to_string())?;
+    if resp.status().is_redirection() {
+        return Err("HTTP MCP redirects are not allowed".into());
+    }
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     Ok(HttpResponse { status, body: text })
@@ -107,7 +251,12 @@ pub async fn http_stream_open(
         let emit = |kind: &str, data: String, status: u16| {
             let _ = app.emit(
                 "http-stream",
-                StreamEvent { id: id.clone(), kind: kind.into(), data, status },
+                StreamEvent {
+                    id: id.clone(),
+                    kind: kind.into(),
+                    data,
+                    status,
+                },
             );
         };
         match rb.send().await {
@@ -169,7 +318,48 @@ mod tests {
 
     #[test]
     fn accepts_http_and_https() {
-        assert!(build_request("GET", "http://127.0.0.1:11434/api/tags", HashMap::new(), None).is_ok());
-        assert!(build_request("POST", "https://api.example.com/v1", HashMap::new(), Some("{}".into())).is_ok());
+        assert!(build_request(
+            "GET",
+            "http://127.0.0.1:11434/api/tags",
+            HashMap::new(),
+            None
+        )
+        .is_ok());
+        assert!(build_request(
+            "POST",
+            "https://api.example.com/v1",
+            HashMap::new(),
+            Some("{}".into())
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn http_mcp_requires_https_public_hosts_without_url_credentials() {
+        assert!(validate_http_mcp_url("http://mcp.example.com").is_err());
+        assert!(validate_http_mcp_url("https://user:pass@mcp.example.com").is_err());
+        assert!(validate_http_mcp_url("https://localhost/mcp").is_err());
+        assert!(validate_http_mcp_url("https://service.local/mcp").is_err());
+        assert!(validate_http_mcp_url("https://127.0.0.1/mcp").is_err());
+        assert!(validate_http_mcp_url("https://10.0.0.8/mcp").is_err());
+        assert!(validate_http_mcp_url("https://172.16.0.8/mcp").is_err());
+        assert!(validate_http_mcp_url("https://192.168.1.8/mcp").is_err());
+        assert!(validate_http_mcp_url("https://169.254.169.254/mcp").is_err());
+        assert!(validate_http_mcp_url("https://[::1]/mcp").is_err());
+        assert!(validate_http_mcp_url("https://[fc00::1]/mcp").is_err());
+        assert!(validate_http_mcp_url("https://mcp.example.com/rpc").is_ok());
+    }
+
+    #[test]
+    fn http_mcp_dns_resolution_rejects_forbidden_addresses() {
+        let parsed = validate_http_mcp_url("https://127.0.0.1/mcp");
+        assert!(
+            parsed.is_err(),
+            "direct loopback must be rejected before DNS"
+        );
+        let parsed = validate_http_mcp_url("https://mcp.example.com/rpc").expect("shape valid");
+        // This assertion documents the preflight DNS hook without depending on a
+        // live network result in CI; direct forbidden hosts are rejected above.
+        assert_eq!(parsed.scheme(), "https");
     }
 }

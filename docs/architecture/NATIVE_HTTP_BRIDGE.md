@@ -1,70 +1,69 @@
 # Native HTTP bridge (AI providers + HTTP MCP)
 
-Status: **landed (session 12).** This is the activation step that makes the
-already-built AI runtime and MCP client talk to real servers. Local **Ollama**
-and **HTTP MCP servers** now work; cloud providers (credentials) and **stdio**
-MCP (process spawn) remain.
+Status: **landed + V1 hardening.** The native HTTP bridge lets the already-built
+AI runtime and MCP client talk to real servers without giving the renderer an
+unbounded socket capability. Local **Ollama** uses the general provider bridge.
+HTTP MCP uses a separate hardened native command. Stdio MCP uses the native
+process host.
 
 ## Why it exists
 
 The webview runs under the app CSP and has no way to open raw sockets, so it
-cannot reach `http://127.0.0.1:11434` (Ollama) or an arbitrary MCP endpoint.
-Rust is not CSP-bound. So Orbit exposes a **narrow, validated** HTTP capability
-through three IPC commands and routes the AI/MCP traffic through it. The pure
-adapters (`OllamaProvider`, `McpClient`) are unchanged — they were always built
-behind an injected transport for exactly this.
+cannot reach `http://127.0.0.1:11434` (Ollama) or arbitrary MCP endpoints
+directly. Rust is not CSP-bound. Orbit therefore exposes narrow, validated HTTP
+capabilities through IPC and keeps the pure adapters (`OllamaProvider`,
+`McpClient`) behind injected transports.
 
 ## Rust (`apps/desktop/src-tauri/src/http.rs`)
 
-A shared `reqwest` client (rustls TLS, 120 s timeout) behind three commands:
+Two native clients exist:
 
-- `http_request(method, url, headers, body) -> { status, body }` — one-shot;
-  used for Ollama `/api/tags`, non-streaming `/api/chat`, and HTTP MCP JSON-RPC.
-- `http_stream_open(id, method, url, headers, body)` — spawns a task that streams
-  the response body and emits base64 chunks on the `http-stream` event
-  (`{ id, kind: 'chunk'|'end'|'error', data, status }`); used for Ollama token
-  streaming.
-- `http_stream_cancel(id)` — flips a per-stream cancel flag the task checks.
+- `http_request(method, url, headers, body) -> { status, body }` is the general
+  one-shot provider bridge. It accepts only `http`/`https` URLs and is used for
+  Ollama `/api/tags`, non-streaming `/api/chat`, and provider adapters.
+- `http_mcp_request(method, url, headers, body) -> { status, body }` is the
+  dedicated HTTP MCP JSON-RPC bridge. It requires public HTTPS, rejects URL
+  credentials, rejects loopback/private/link-local/reserved/direct-local
+  destinations before sending, performs DNS preflight, rejects forbidden resolved
+  addresses, pins the request to the preflight-approved address set, bypasses
+  proxies for MCP, and never follows redirects.
+- `http_stream_open(id, method, url, headers, body)` streams response body bytes
+  as base64 chunks on the `http-stream` event (`{ id, kind, data, status }`) for
+  Ollama token streaming.
+- `http_stream_cancel(id)` flips a per-stream cancellation flag that the stream
+  task checks.
 
-**Only `http`/`https` URLs are accepted** (validated before any connection);
-non-http schemes are rejected (unit-tested).
+The provider bridge remains compatible with local Ollama. HTTP MCP is
+deliberately narrower so a configured MCP server cannot turn JSON-RPC tool data
+into SSRF traffic.
 
 ## Renderer
 
-- `native.ts` — typed wrappers (`httpRequest`, `httpStreamOpen`,
-  `httpStreamCancel`, `onHttpStream`).
-- `ai/nativeFetch.ts` — a `FetchLike` over an injectable `HttpBridge`. Non-
-  streaming calls go through `http_request`; streaming calls build an
-  **event-fed `ReadableStream<Uint8Array>`** (subscribe-before-open; base64 →
-  bytes), so the `OllamaProvider`'s streaming `TextDecoder` handles multi-byte
-  boundaries correctly. The bridge is injected, so the streaming assembly is
-  unit-tested with no Tauri.
-- `ai/nativeMcpTransport.ts` — `NativeHttpMcpTransport` POSTs JSON-RPC through
-  `http_request` and parses a plain-JSON **or** SSE `data:` response.
-- `ai/mcpServers.ts` — MCP server configs persisted in the settings KV
-  (`mcp.servers`), http(s)-only + validated; the **MCP & Tools** view adds an
-  add/enable/remove panel, and `buildToolRegistry` connects enabled servers and
-  registers their tools (an unreachable server is skipped, never fatal).
-
-## Wiring
-
-`createProvider(settings, createNativeFetch())` at the Quick AI and Orbit Agent
-call sites — so selecting **Ollama** in Settings → AI (endpoint + model) makes
-Quick AI, AI Commands and mission AI-planning stream real, on-device tokens.
+- `native.ts` exposes typed wrappers: `httpRequest`, `httpMcpRequest`,
+  `httpStreamOpen`, `httpStreamCancel`, and `onHttpStream`.
+- `ai/nativeFetch.ts` implements a `FetchLike` over the provider bridge.
+  Streaming calls build an event-fed `ReadableStream<Uint8Array>`.
+- `ai/nativeMcpTransport.ts` posts JSON-RPC through `http_mcp_request` and parses
+  either plain JSON or an SSE `data:` response.
+- `ai/mcpServers.ts` stores MCP server configs in `mcp.servers`; HTTP MCP
+  registration accepts public HTTPS endpoints only. `buildToolRegistry` skips an
+  unreachable MCP server without breaking native tools.
 
 ## Security
 
-- http(s) only, validated in Rust before connecting.
-- No secrets pass through here; cloud-provider credentials will live in OS secure
-  storage (next slice) and only a reference is held.
-- Streamed output stays untrusted data; MCP/AI text never gains authority over
-  Orbit's actions (the Tool Registry + mission validation still gate everything).
+- Provider bridge: http(s) only, validated in Rust before connecting.
+- HTTP MCP bridge: public HTTPS only, no URL credentials, no redirects, and
+  direct/DNS-resolved loopback, private, link-local, documentation/reserved or
+  multicast addresses are rejected before tool data is sent to any forbidden
+  destination. The request is pinned to the approved DNS results to avoid a
+  preflight/re-resolve gap.
+- Secrets do not live in these configs; provider/MCP credentials are referenced
+  from OS secure storage only.
+- Streamed output and MCP responses remain untrusted data; the Tool Registry and
+  confirmation flow still gate actions.
 
 ## Remaining
 
-- **Cloud providers** (OpenAI-compatible / Anthropic / Gemini) — adapters +
-  secure credential storage.
-- **stdio MCP** — needs a process host (like the extension runtime) to spawn and
-  pipe a local MCP server; only HTTP MCP is live today.
-- **AbortSignal for non-streaming** `http_request` is best-effort (the Rust call
-  runs to completion); streaming requests cancel promptly via `http_stream_cancel`.
+- Non-streaming `http_request` cancellation is best-effort: once invoked, the
+  Rust request runs to completion. Streaming requests cancel promptly via
+  `http_stream_cancel`.

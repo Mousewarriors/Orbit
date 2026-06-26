@@ -47,7 +47,7 @@ export class NativeHttpMcpTransport implements McpTransport {
   ) {}
 
   async send(request: JsonRpcRequest): Promise<JsonRpcResponse> {
-    const res = await native.httpRequest(
+    const res = await native.httpMcpRequest(
       'POST',
       this.endpoint,
       { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },

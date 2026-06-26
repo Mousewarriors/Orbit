@@ -14,7 +14,7 @@ describe('parseMcpServers', () => {
       { id: 'a', name: 'A', endpoint: 'https://a/mcp', enabled: true },
       { id: 'b', name: 'B', endpoint: 'ftp://b' }, // bad scheme
       { id: '', name: 'C', endpoint: 'http://c' }, // no id
-      { id: 'a', name: 'dup', endpoint: 'http://a2' }, // dup id
+      { id: 'a', name: 'dup', endpoint: 'https://a2/mcp' }, // dup id
     ]);
     const list = parseMcpServers(raw);
     expect(list.map((s) => s.id)).toEqual(['a']);
@@ -28,7 +28,9 @@ describe('parseMcpServers', () => {
   });
 
   it('round-trips through serialize', () => {
-    const list: StoredMcpServer[] = [{ id: 'x', name: 'X', endpoint: 'http://x/mcp', enabled: false }];
+    const list: StoredMcpServer[] = [
+      { id: 'x', name: 'X', endpoint: 'https://x.example/mcp', enabled: false },
+    ];
     expect(parseMcpServers(serializeMcpServers(list))).toEqual(list);
   });
 
@@ -57,17 +59,30 @@ describe('parseMcpServers', () => {
 });
 
 describe('validateServer', () => {
-  const existing: StoredMcpServer[] = [{ id: 'a', name: 'A', endpoint: 'http://a', enabled: true }];
+  const existing: StoredMcpServer[] = [
+    { id: 'a', name: 'A', endpoint: 'https://a.example/mcp', enabled: true },
+  ];
 
   it('accepts a valid server', () => {
-    expect(validateServer({ id: 'fs', name: 'FS', endpoint: 'http://localhost:9/mcp' }, existing)).toBeNull();
+    expect(
+      validateServer({ id: 'fs', name: 'FS', endpoint: 'https://mcp.example.com/rpc' }, existing),
+    ).toBeNull();
   });
 
-  it('rejects bad id, duplicate id, missing name, non-http endpoint', () => {
-    expect(validateServer({ id: 'bad id', name: 'n', endpoint: 'http://x' }, existing)).toMatch(/Id/);
-    expect(validateServer({ id: 'a', name: 'n', endpoint: 'http://x' }, existing)).toMatch(/exists/);
-    expect(validateServer({ id: 'ok', name: '', endpoint: 'http://x' }, existing)).toMatch(/Name/);
-    expect(validateServer({ id: 'ok', name: 'n', endpoint: 'ws://x' }, existing)).toMatch(/http/);
+  it('rejects bad id, duplicate id, missing name, non-public endpoint', () => {
+    expect(
+      validateServer({ id: 'bad id', name: 'n', endpoint: 'https://mcp.example.com' }, existing),
+    ).toMatch(/Id/);
+    expect(
+      validateServer({ id: 'a', name: 'n', endpoint: 'https://mcp.example.com' }, existing),
+    ).toMatch(/exists/);
+    expect(
+      validateServer({ id: 'ok', name: '', endpoint: 'https://mcp.example.com' }, existing),
+    ).toMatch(/Name/);
+    expect(validateServer({ id: 'ok', name: 'n', endpoint: 'ws://x' }, existing)).toMatch(/https/);
+    expect(
+      validateServer({ id: 'ok', name: 'n', endpoint: 'http://localhost:9/mcp' }, existing),
+    ).toMatch(/https/);
   });
 
   it('accepts a stdio server with just a command (no endpoint needed)', () => {
@@ -78,8 +93,13 @@ describe('validateServer', () => {
 describe('upsert/remove', () => {
   it('replaces by id and removes', () => {
     let list: StoredMcpServer[] = [];
-    list = upsertServer(list, { id: 'a', name: 'A', endpoint: 'http://a', enabled: true });
-    list = upsertServer(list, { id: 'a', name: 'A2', endpoint: 'http://a', enabled: false });
+    list = upsertServer(list, { id: 'a', name: 'A', endpoint: 'https://a.example', enabled: true });
+    list = upsertServer(list, {
+      id: 'a',
+      name: 'A2',
+      endpoint: 'https://a.example',
+      enabled: false,
+    });
     expect(list).toHaveLength(1);
     expect(list[0]?.name).toBe('A2');
     expect(removeServer(list, 'a')).toEqual([]);

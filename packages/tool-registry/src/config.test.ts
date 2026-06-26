@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { defaultMcpServerConfig, isHttpUrl, redactConfig, validateMcpServerConfig } from './config.js';
+import {
+  defaultMcpServerConfig,
+  isHttpUrl,
+  isPublicHttpsMcpEndpoint,
+  redactConfig,
+  validateMcpServerConfig,
+} from './config.js';
 
 describe('validateMcpServerConfig', () => {
   it('accepts a valid stdio server', () => {
@@ -17,12 +23,12 @@ describe('validateMcpServerConfig', () => {
     ).toEqual([]);
   });
 
-  it('rejects an http server without an http(s) endpoint', () => {
+  it('rejects an http server without a public https endpoint', () => {
     const errors = validateMcpServerConfig({
       id: 'x',
       name: 'X',
       transport: 'http',
-      endpoint: 'ftp://example.com',
+      endpoint: 'http://127.0.0.1/mcp',
     });
     expect(errors.some((e) => e.field === 'endpoint')).toBe(true);
   });
@@ -50,6 +56,23 @@ describe('isHttpUrl', () => {
     expect(isHttpUrl('https://x')).toBe(true);
     expect(isHttpUrl('file:///x')).toBe(false);
     expect(isHttpUrl('not a url')).toBe(false);
+  });
+});
+
+describe('isPublicHttpsMcpEndpoint', () => {
+  it('allows only public-looking https endpoints', () => {
+    expect(isPublicHttpsMcpEndpoint('https://mcp.example.com/rpc')).toBe(true);
+    expect(isPublicHttpsMcpEndpoint('http://mcp.example.com/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://user:pass@mcp.example.com/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://localhost/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://service.local/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://127.0.0.1/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://10.0.0.2/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://172.16.0.2/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://192.168.1.2/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://169.254.169.254/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://[::1]/rpc')).toBe(false);
+    expect(isPublicHttpsMcpEndpoint('https://[fc00::1]/rpc')).toBe(false);
   });
 });
 
