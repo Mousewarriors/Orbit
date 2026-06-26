@@ -12,6 +12,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::apps::{scan_applications, AppEntry};
+use crate::orbit_command::OrbitCommandPayload;
 use crate::snippet_watcher;
 use crate::window_mgmt::platform as winmgmt;
 
@@ -39,6 +40,9 @@ pub struct AppState {
     pub ext_host: crate::extension_host::ExtensionHost,
     /// Certified Orbit Relay sidecar supervisor.
     pub relay: crate::relay_supervisor::RelaySupervisor,
+    /// Natural-language commands received from PowerShell / OS launches before
+    /// the renderer was ready to consume them.
+    pub pending_orbit_commands: Mutex<Vec<OrbitCommandPayload>>,
 }
 
 fn now_ms() -> i64 {
@@ -92,6 +96,20 @@ pub fn record_command_usage(state: State<'_, AppState>, command_id: String) -> R
 pub fn usage_snapshot(state: State<'_, AppState>) -> Result<Vec<(String, i64, i64)>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     orbit_core::usage_snapshot(&conn).map_err(|e| e.to_string())
+}
+
+/// Drain natural-language commands supplied by a new process launch
+/// (`--orbit-query "..."` or an `orbit://...` invocation). Commands are queued
+/// natively so startup and single-instance event races cannot lose them.
+#[tauri::command]
+pub fn take_pending_orbit_commands(
+    state: State<'_, AppState>,
+) -> Result<Vec<OrbitCommandPayload>, String> {
+    let mut pending = state
+        .pending_orbit_commands
+        .lock()
+        .map_err(|e| e.to_string())?;
+    Ok(std::mem::take(&mut *pending))
 }
 
 /// Launch an application or open a file/folder. `path` must come from Orbit's own

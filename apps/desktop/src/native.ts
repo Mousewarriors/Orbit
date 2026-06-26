@@ -14,6 +14,12 @@ export interface NativeApp {
   kind: string;
 }
 
+export interface OrbitCommandPayload {
+  query: string;
+  source: string;
+  receivedAtMs: number;
+}
+
 /** True when running inside the Tauri shell (vs. a plain browser/dev preview). */
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -55,6 +61,16 @@ export async function recordCommandUsage(commandId: string): Promise<void> {
 
 export async function usageSnapshot(): Promise<Array<[string, number, number]>> {
   return invoke<Array<[string, number, number]>>('usage_snapshot');
+}
+
+export async function takePendingOrbitCommands(): Promise<OrbitCommandPayload[]> {
+  return invoke<OrbitCommandPayload[]>('take_pending_orbit_commands');
+}
+
+export async function onOrbitCommandAvailable(
+  handler: (payload: OrbitCommandPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<OrbitCommandPayload>('orbit-command-available', (event) => handler(event.payload));
 }
 
 export async function launchPath(path: string): Promise<void> {

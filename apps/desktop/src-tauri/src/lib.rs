@@ -17,6 +17,7 @@ mod file_index;
 mod http;
 mod mcp_stdio;
 mod oauth;
+mod orbit_command;
 mod secrets;
 mod launcher;
 mod relay_manifest;
@@ -27,10 +28,11 @@ mod window_mgmt;
 
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use commands::{AppState, DEFAULT_HOTKEY};
+use orbit_command::{parse_orbit_command_args, OrbitCommandPayload};
 
 const LAUNCHER_LABEL: &str = "launcher";
 const SETTINGS_LABEL: &str = "settings";
@@ -64,6 +66,34 @@ fn focus_launcher(app: &AppHandle) {
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
+    }
+}
+
+fn enqueue_orbit_command(app: &AppHandle, payload: OrbitCommandPayload, notify_renderer: bool) {
+    let event_payload = payload.clone();
+    if let Some(state) = app.try_state::<AppState>() {
+        let queued = if let Ok(mut pending) = state.pending_orbit_commands.lock() {
+            pending.push(payload);
+            true
+        } else {
+            false
+        };
+        if queued && notify_renderer {
+            let _ = app.emit("orbit-command-available", event_payload);
+        }
+    }
+}
+
+fn enqueue_orbit_command_args(
+    app: &AppHandle,
+    argv: &[String],
+    notify_renderer: bool,
+) -> bool {
+    if let Some(parsed) = parse_orbit_command_args(argv) {
+        enqueue_orbit_command(app, parsed.into(), notify_renderer);
+        true
+    } else {
+        false
     }
 }
 
@@ -143,8 +173,9 @@ pub fn run() {
         // Single-instance MUST be the first plugin: if Orbit is already running, a
         // second launch fires this callback in the existing instance (instead of
         // starting a new one) and we simply surface the launcher.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             focus_launcher(app);
+            enqueue_orbit_command_args(app, &argv, true);
         }))
         // Launch-at-login support; toggled from Settings → General via the
         // get_autostart/set_autostart commands (the manager API, so no extra
@@ -220,7 +251,16 @@ pub fn run() {
                 index: file_index::IndexState::default(),
                 ext_host: extension_host::ExtensionHost::default(),
                 relay: relay_supervisor::RelaySupervisor::default(),
+                pending_orbit_commands: Mutex::new(Vec::new()),
             });
+
+            // If Orbit was cold-started from PowerShell / an OS command, retain
+            // the natural-language request until the renderer subscribes and
+            // drains it. Do not emit yet: the webview may not have loaded.
+            let startup_args = std::env::args().collect::<Vec<_>>();
+            if enqueue_orbit_command_args(&handle, &startup_args, false) {
+                focus_launcher(&handle);
+            }
 
             // First run only: install the bundled sample extensions (Developer
             // Utilities, AgentOS Controller) so they're discoverable without a
@@ -348,6 +388,7 @@ pub fn run() {
             commands::set_setting,
             commands::record_command_usage,
             commands::usage_snapshot,
+            commands::take_pending_orbit_commands,
             commands::launch_path,
             commands::open_project_in_application,
             commands::open_file_in_application,
@@ -475,6 +516,7 @@ mod tests {
             index: file_index::IndexState::default(),
             ext_host: extension_host::ExtensionHost::default(),
             relay: relay_supervisor::RelaySupervisor::default(),
+            pending_orbit_commands: Mutex::new(Vec::new()),
         }
     }
 
@@ -552,6 +594,7 @@ mod tests {
             index: file_index::IndexState::default(),
             ext_host: extension_host::ExtensionHost::default(),
             relay: relay_supervisor::RelaySupervisor::default(),
+            pending_orbit_commands: Mutex::new(Vec::new()),
         };
 
         // Phase 3: write flag via state (mirrors post-manage() code path)

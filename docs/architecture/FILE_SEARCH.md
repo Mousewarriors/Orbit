@@ -39,6 +39,30 @@ For open-with-app:
 - Chat/Mission native-tool execution refuses to guess when multiple indexed
   files match; it returns a shortlist and asks for a narrower file query.
 
+## PowerShell / OS natural-language entry
+
+Orbit can receive a natural-language command from a second desktop process and
+route it through the same Root Search providers/actions as typed input:
+
+```powershell
+Orbit.exe --orbit-query "load up the convention attendant positions map in paint"
+Orbit.exe --orbit-query "find the congregation accounts instructions for kht"
+```
+
+Implementation notes:
+
+- Native startup and the single-instance callback parse only narrow Orbit query
+  flags (`--orbit-query`, `--orbit-command`, `--orbit-do`) or an `orbit://...`
+  command-shaped argument. They extract a bounded plain-language query; no
+  executable path or arbitrary argv is accepted from the external caller.
+- Commands are queued in native state until the renderer drains them, so a cold
+  launch cannot lose the request before React has subscribed.
+- The renderer refreshes the app/project catalogues, searches with the normal
+  provider list, and executes only the top resolved action through
+  `executeAction`. Consequential actions still use the normal confirmation gate.
+- The exact examples above are covered by `apps/desktop/src/orbitCommand.test.ts`
+  as external-command proof tests.
+
 ## Privacy & safety
 
 - **Off by default.** Nothing is scanned until the user enables indexing in

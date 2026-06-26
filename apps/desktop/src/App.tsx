@@ -5,7 +5,7 @@ import type {
   RankingSignals,
   SearchProvider,
 } from '@orbit/shared-types';
-import { runSearch } from '@orbit/search-engine';
+import { runSearch, type SearchUpdate } from '@orbit/search-engine';
 import { createCommandProvider } from '@orbit/command-model';
 import { BRANDING } from '@orbit/branding';
 import * as native from './native.js';
@@ -22,7 +22,7 @@ import {
 } from './providers.js';
 import { createIntentProvider } from './intentProvider.js';
 import { createAiCommandProvider } from './ai/aiCommands.js';
-import { executeAction, type EffectResult } from './execute.js';
+import { executeAction, type EffectResult, type ExecuteOutcome } from './execute.js';
 import { initAppearance } from './appearance.js';
 import { ResultRow } from './components/ResultRow.js';
 import { ActionMenu } from './components/ActionMenu.js';
@@ -44,6 +44,7 @@ import { NotificationToast, useNotifications } from './components/NotificationTo
 import { ConfirmDialog } from './components/ConfirmDialog.js';
 import { describeConfirmation, needsConfirmation } from './confirm.js';
 import { decodeControlCenterArg } from './controlCenterState.js';
+import { runExternalOrbitCommand, startOrbitCommandBridge } from './orbitCommand.js';
 
 type View =
   | 'root'
@@ -98,6 +99,8 @@ export function App(): JSX.Element {
   const signalsRef = useRef<RankingSignals>(buildSignals([]));
   const searchAbort = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryRef = useRef(query);
+  const skipNextQuerySearch = useRef(false);
 
   const { registry, effects } = useMemo(() => createBuiltinRegistry(), []);
 
@@ -114,8 +117,7 @@ export function App(): JSX.Element {
       createIntentProvider({
         getApps: () => appsRef.current,
         getProjects: () => projectsRef.current,
-        fileSearch: async (q, limit) =>
-          native.isTauri() ? native.fileSearch(q, { limit }) : [],
+        fileSearch: async (q, limit) => (native.isTauri() ? native.fileSearch(q, { limit }) : []),
         noteSearch: async (q, limit) => (native.isTauri() ? native.noteList(q, limit) : []),
       }),
       createAiCommandProvider(),
@@ -125,6 +127,10 @@ export function App(): JSX.Element {
     ],
     [registry],
   );
+
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
 
   // Keep a cached project catalogue for natural-language project resolution.
   // Favourites/recents lead, followed by every Relay-scanned named project.
@@ -258,6 +264,22 @@ export function App(): JSX.Element {
     });
   }, [effects, pollFileIndex]);
 
+  const applySearchUpdate = useCallback((update: SearchUpdate) => {
+    setResults([...update.results]);
+    setSelected((prev) => (prev >= update.results.length ? 0 : prev));
+    if (update.done) {
+      if (update.errors.size > 0) {
+        // Structured logging for diagnostics, plus a visible hint.
+        for (const [id, msg] of update.errors) {
+          console.warn(`[orbit] search provider "${id}" failed: ${msg}`);
+        }
+        setDegraded([...update.errors.keys()]);
+      } else {
+        setDegraded([]);
+      }
+    }
+  }, []);
+
   const doSearch = useCallback(
     (q: string) => {
       searchAbort.current?.abort();
@@ -267,28 +289,18 @@ export function App(): JSX.Element {
         q,
         providers,
         { signals: signalsRef.current, limit: 50 },
-        (update) => {
-          setResults([...update.results]);
-          setSelected((prev) => (prev >= update.results.length ? 0 : prev));
-          if (update.done) {
-            if (update.errors.size > 0) {
-              // Structured logging for diagnostics, plus a visible hint.
-              for (const [id, msg] of update.errors) {
-                console.warn(`[orbit] search provider "${id}" failed: ${msg}`);
-              }
-              setDegraded([...update.errors.keys()]);
-            } else {
-              setDegraded([]);
-            }
-          }
-        },
+        applySearchUpdate,
         controller.signal,
       );
     },
-    [providers],
+    [providers, applySearchUpdate],
   );
 
   useEffect(() => {
+    if (skipNextQuerySearch.current) {
+      skipNextQuerySearch.current = false;
+      return;
+    }
     setError(null); // a fresh query clears any stale action error
     void doSearch(query);
   }, [query, doSearch]);
@@ -320,10 +332,15 @@ export function App(): JSX.Element {
 
   // Run an already-resolved action (past any confirmation gate).
   const executeResolved = useCallback(
-    async (itemId: string, action: ActionDescriptor) => {
+    async (
+      itemId: string,
+      action: ActionDescriptor,
+      actionQuery = queryRef.current,
+      rethrow = false,
+    ): Promise<ExecuteOutcome | void> => {
       try {
         setError(null);
-        const outcome = await executeAction(action, { query, effects });
+        const outcome = await executeAction(action, { query: actionQuery, effects });
         // Learn from usage for ranking (keyed by item id). Only reached when the
         // action resolved successfully — a failed launch throws and is caught
         // below, so we never record usage for something that didn't happen.
@@ -348,11 +365,13 @@ export function App(): JSX.Element {
           setQuery('');
           if (native.isTauri()) void native.hideLauncher().catch(() => {});
         }
+        return outcome;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
+        if (rethrow) throw e;
       }
     },
-    [query, effects],
+    [effects],
   );
 
   const runItem = useCallback(
@@ -375,6 +394,98 @@ export function App(): JSX.Element {
     },
     [executeResolved],
   );
+
+  const runExternalCommand = useCallback(
+    async (payload: native.OrbitCommandPayload) => {
+      const externalQuery = payload.query.trim();
+      if (!externalQuery) return;
+
+      searchAbort.current?.abort();
+      const controller = new AbortController();
+      searchAbort.current = controller;
+
+      setView('root');
+      setViewArg(null);
+      setPendingConfirm(null);
+      setActionMenuOpen(false);
+      setError(null);
+      setStatus(
+        `Running from ${payload.source === 'protocol' ? 'OS link' : 'PowerShell'}: ${externalQuery}`,
+      );
+      skipNextQuerySearch.current = true;
+      setQuery(externalQuery);
+
+      try {
+        if (native.isTauri()) {
+          // Store/UWP apps such as Paint arrive from the slower Windows scan;
+          // refresh before resolving an external command so PowerShell launches
+          // behave like an already-warm launcher.
+          await native.reindexApplications().catch(() => undefined);
+          await refreshApps();
+          await refreshProjects();
+        }
+
+        const result = await runExternalOrbitCommand(payload, {
+          providers,
+          signals: signalsRef.current,
+          signal: controller.signal,
+          onUpdate: applySearchUpdate,
+          execute: async (ranked, q) => {
+            setSelected(0);
+            return (
+              (await executeResolved(ranked.item.id, ranked.item.primaryAction, q, true)) ?? {
+                hide: false,
+              }
+            );
+          },
+          requestConfirmation: (ranked) => {
+            setSelected(0);
+            setPendingConfirm({ itemId: ranked.item.id, action: ranked.item.primaryAction });
+            setStatus('This external Orbit command needs confirmation before it runs.');
+          },
+        });
+
+        if (controller.signal.aborted) return;
+        if (result.status === 'no-results') {
+          setStatus(`No Orbit result for: ${externalQuery}`);
+        } else if (result.status === 'executed') {
+          setStatus(null);
+        }
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      }
+    },
+    [applySearchUpdate, executeResolved, providers, refreshApps, refreshProjects],
+  );
+
+  useEffect(() => {
+    if (!native.isTauri()) return;
+    let stopped = false;
+    let unlisten: (() => void) | null = null;
+
+    void startOrbitCommandBridge(
+      {
+        isTauri: native.isTauri,
+        takePendingOrbitCommands: native.takePendingOrbitCommands,
+        onOrbitCommandAvailable: native.onOrbitCommandAvailable,
+      },
+      runExternalCommand,
+    )
+      .then((stop) => {
+        if (stopped) stop();
+        else unlisten = stop;
+      })
+      .catch((e) => {
+        if (!stopped) setError(e instanceof Error ? e.message : String(e));
+      });
+
+    return () => {
+      stopped = true;
+      unlisten?.();
+    };
+  }, [runExternalCommand]);
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -460,24 +571,42 @@ export function App(): JSX.Element {
     [closeToRoot],
   );
 
-  const toast = (
-    <NotificationToast notifications={notifications} onDismiss={dismissNotification} />
-  );
+  const toast = <NotificationToast notifications={notifications} onDismiss={dismissNotification} />;
 
   if (view === 'clipboard') {
-    return <><ClipboardView onPop={() => setView('root')} onCopied={closeToRoot} />{toast}</>;
+    return (
+      <>
+        <ClipboardView onPop={() => setView('root')} onCopied={closeToRoot} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'snippets') {
-    return <><SnippetsView onPop={() => setView('root')} onPasted={closeToRoot} />{toast}</>;
+    return (
+      <>
+        <SnippetsView onPop={() => setView('root')} onPasted={closeToRoot} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'quicklinks') {
-    return <><QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />{toast}</>;
+    return (
+      <>
+        <QuicklinksView onPop={() => setView('root')} onOpened={closeToRoot} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'notes') {
-    return <><NotesView initialNoteId={viewArg} onPop={() => setView('root')} />{toast}</>;
+    return (
+      <>
+        <NotesView initialNoteId={viewArg} onPop={() => setView('root')} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'extension-list') {
@@ -527,15 +656,30 @@ export function App(): JSX.Element {
   }
 
   if (view === 'quick-ai') {
-    return <><QuickAiView initialArg={viewArg ?? undefined} onPop={() => setView('root')} />{toast}</>;
+    return (
+      <>
+        <QuickAiView initialArg={viewArg ?? undefined} onPop={() => setView('root')} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'mcp-tools') {
-    return <><ToolsView onPop={() => setView('root')} />{toast}</>;
+    return (
+      <>
+        <ToolsView onPop={() => setView('root')} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'chat') {
-    return <><ChatView onPop={() => setView('root')} />{toast}</>;
+    return (
+      <>
+        <ChatView onPop={() => setView('root')} />
+        {toast}
+      </>
+    );
   }
 
   if (view === 'orbit-agent') {
