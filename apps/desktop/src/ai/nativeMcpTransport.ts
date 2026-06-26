@@ -10,6 +10,8 @@
 import type { JsonRpcRequest, JsonRpcResponse, McpTransport } from '@orbit/tool-registry';
 import * as native from '../native.js';
 
+let requestCounter = 0;
+
 /** Parse an MCP HTTP response body (plain JSON or an SSE `data:` frame). */
 export function parseJsonRpcBody(body: string): JsonRpcResponse | null {
   const text = body.trim();
@@ -46,13 +48,23 @@ export class NativeHttpMcpTransport implements McpTransport {
     private readonly endpoint: string,
   ) {}
 
-  async send(request: JsonRpcRequest): Promise<JsonRpcResponse> {
-    const res = await native.httpMcpRequest(
-      'POST',
-      this.endpoint,
-      { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-      JSON.stringify(request),
-    );
+  async send(request: JsonRpcRequest, signal?: AbortSignal): Promise<JsonRpcResponse> {
+    if (signal?.aborted) throw new Error('aborted');
+    const requestId = `mcp-http-${++requestCounter}-${Date.now()}`;
+    const cancel = () => void native.httpMcpCancel(requestId);
+    signal?.addEventListener('abort', cancel, { once: true });
+    let res: Awaited<ReturnType<typeof native.httpMcpRequest>>;
+    try {
+      res = await native.httpMcpRequest(
+        'POST',
+        this.endpoint,
+        { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        JSON.stringify(request),
+        requestId,
+      );
+    } finally {
+      signal?.removeEventListener('abort', cancel);
+    }
     if (res.status < 200 || res.status >= 300) {
       return {
         jsonrpc: '2.0',

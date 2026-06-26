@@ -26,7 +26,11 @@ Two native clients exist:
   credentials, rejects loopback/private/link-local/reserved/direct-local
   destinations before sending, performs DNS preflight, rejects forbidden resolved
   addresses, pins the request to the preflight-approved address set, bypasses
-  proxies for MCP, and never follows redirects.
+  proxies for MCP, and never follows redirects. Renderer-supplied request ids
+  make the request cancellable.
+- `http_mcp_cancel(id)` marks an in-flight HTTP MCP request cancelled. The Rust
+  command races the reqwest future against this flag and drops the request
+  future when cancellation wins.
 - `http_stream_open(id, method, url, headers, body)` streams response body bytes
   as base64 chunks on the `http-stream` event (`{ id, kind, data, status }`) for
   Ollama token streaming.
@@ -40,11 +44,12 @@ into SSRF traffic.
 ## Renderer
 
 - `native.ts` exposes typed wrappers: `httpRequest`, `httpMcpRequest`,
-  `httpStreamOpen`, `httpStreamCancel`, and `onHttpStream`.
+  `httpMcpCancel`, `httpStreamOpen`, `httpStreamCancel`, and `onHttpStream`.
 - `ai/nativeFetch.ts` implements a `FetchLike` over the provider bridge.
   Streaming calls build an event-fed `ReadableStream<Uint8Array>`.
 - `ai/nativeMcpTransport.ts` posts JSON-RPC through `http_mcp_request` and parses
-  either plain JSON or an SSE `data:` response.
+  either plain JSON or an SSE `data:` response. It supplies a unique native
+  request id and wires `AbortSignal` to `http_mcp_cancel`.
 - `ai/mcpServers.ts` stores MCP server configs in `mcp.servers`; HTTP MCP
   registration accepts public HTTPS endpoints only. `buildToolRegistry` skips an
   unreachable MCP server without breaking native tools.
@@ -66,4 +71,4 @@ into SSRF traffic.
 
 - Non-streaming `http_request` cancellation is best-effort: once invoked, the
   Rust request runs to completion. Streaming requests cancel promptly via
-  `http_stream_cancel`.
+  `http_stream_cancel`. HTTP MCP requests cancel through `http_mcp_cancel`.

@@ -822,8 +822,20 @@ export async function httpMcpRequest(
   url: string,
   headers: Record<string, string>,
   body?: string | null,
+  requestId?: string | null,
 ): Promise<HttpResponse> {
-  return invoke<HttpResponse>('http_mcp_request', { method, url, headers, body: body ?? null });
+  return invoke<HttpResponse>('http_mcp_request', {
+    method,
+    url,
+    headers,
+    body: body ?? null,
+    requestId: requestId ?? null,
+  });
+}
+
+/** Cancel an in-flight HTTP MCP request. */
+export async function httpMcpCancel(id: string): Promise<void> {
+  return invoke('http_mcp_cancel', { id });
 }
 
 /** Begin a streamed HTTP request; body chunks arrive on the `http-stream` event. */

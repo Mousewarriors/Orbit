@@ -32,6 +32,10 @@ static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 static CANCELS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// In-flight HTTP MCP cancellation flags, keyed by the renderer-supplied id.
+static MCP_CANCELS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 #[derive(Serialize)]
 pub struct HttpResponse {
     pub status: u16,
@@ -228,15 +232,51 @@ pub async fn http_mcp_request(
     url: String,
     headers: HashMap<String, String>,
     body: Option<String>,
+    request_id: Option<String>,
 ) -> Result<HttpResponse, String> {
     let rb = build_mcp_request(&method, &url, headers, body)?;
-    let resp = rb.send().await.map_err(|e| e.to_string())?;
+    let flag = request_id.as_ref().map(|id| {
+        let flag = Arc::new(AtomicBool::new(false));
+        MCP_CANCELS.lock().unwrap().insert(id.clone(), flag.clone());
+        flag
+    });
+    let result = match flag {
+        Some(flag) => {
+            tokio::select! {
+                _ = wait_for_cancel(flag) => Err("HTTP MCP request cancelled".to_string()),
+                result = send_mcp_request(rb) => result,
+            }
+        }
+        None => send_mcp_request(rb).await,
+    };
+    if let Some(id) = request_id {
+        MCP_CANCELS.lock().unwrap().remove(&id);
+    }
+    let resp = result?;
     if resp.status().is_redirection() {
         return Err("HTTP MCP redirects are not allowed".into());
     }
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     Ok(HttpResponse { status, body: text })
+}
+
+async fn send_mcp_request(rb: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
+    rb.send().await.map_err(|e| e.to_string())
+}
+
+async fn wait_for_cancel(flag: Arc<AtomicBool>) {
+    while !flag.load(Ordering::Relaxed) {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+/// Signal an in-flight HTTP MCP request to stop.
+#[tauri::command]
+pub fn http_mcp_cancel(id: String) {
+    if let Some(flag) = MCP_CANCELS.lock().unwrap().get(&id) {
+        flag.store(true, Ordering::Relaxed);
+    }
 }
 
 /// Start a streamed request. Body bytes are emitted as base64 on the
@@ -387,5 +427,15 @@ mod tests {
         // This assertion documents the preflight DNS hook without depending on a
         // live network result in CI; direct forbidden hosts are rejected above.
         assert_eq!(parsed.scheme(), "https");
+    }
+
+    #[test]
+    fn http_mcp_cancel_sets_inflight_flag() {
+        let id = "unit-cancel".to_string();
+        let flag = Arc::new(AtomicBool::new(false));
+        MCP_CANCELS.lock().unwrap().insert(id.clone(), flag.clone());
+        http_mcp_cancel(id.clone());
+        assert!(flag.load(Ordering::Relaxed));
+        MCP_CANCELS.lock().unwrap().remove(&id);
     }
 }
