@@ -108,21 +108,53 @@ pub fn content_count(conn: &Connection) -> Result<i64, DbError> {
 
 /// Search the optional content index, returning the matching files' metadata
 /// (joined back to `files`). Empty when content indexing is off / has no rows.
-pub fn search_content(conn: &Connection, query: &str, limit: i64) -> Result<Vec<FileRecord>, DbError> {
+fn filter_clauses(filters: &FileFilters) -> (Vec<String>, Vec<Box<dyn rusqlite::ToSql>>) {
+    let mut clauses: Vec<String> = Vec::new();
+    let mut binds: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+    if let Some(kind) = filters.kind.as_ref().filter(|k| !k.is_empty()) {
+        clauses.push("f.kind = ?".into());
+        binds.push(Box::new(kind.clone()));
+    }
+    if let Some(ext) = filters.ext.as_ref().filter(|e| !e.is_empty()) {
+        clauses.push("f.ext = ?".into());
+        binds.push(Box::new(ext.to_lowercase()));
+    }
+    if let Some(after) = filters.modified_after {
+        clauses.push("f.modified_at >= ?".into());
+        binds.push(Box::new(after));
+    }
+    (clauses, binds)
+}
+
+pub fn search_content(
+    conn: &Connection,
+    query: &str,
+    filters: &FileFilters,
+    limit: i64,
+) -> Result<Vec<FileRecord>, DbError> {
     let Some(expr) = fts_query(query) else {
         return Ok(Vec::new());
     };
+    let (clauses, binds) = filter_clauses(filters);
     let select = COLS
         .split(',')
         .map(|c| format!("f.{}", c.trim()))
         .collect::<Vec<_>>()
         .join(", ");
+    let mut where_parts = vec!["files_content_fts MATCH ?".to_string()];
+    where_parts.extend(clauses);
     let sql = format!(
         "SELECT {select} FROM files_content_fts c JOIN files f ON f.path = c.path
-         WHERE files_content_fts MATCH ?1 ORDER BY rank LIMIT ?2"
+         WHERE {} ORDER BY rank LIMIT ?",
+        where_parts.join(" AND ")
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(params![expr, limit], row_to_record)?;
+    let mut params_vec: Vec<&dyn rusqlite::ToSql> = vec![&expr];
+    for b in &binds {
+        params_vec.push(b.as_ref());
+    }
+    params_vec.push(&limit);
+    let rows = stmt.query_map(params_vec.as_slice(), row_to_record)?;
     let mut out = Vec::new();
     for r in rows {
         out.push(r?);
@@ -211,21 +243,8 @@ pub fn search(
     filters: &FileFilters,
     limit: i64,
 ) -> Result<Vec<FileRecord>, DbError> {
-    // Build the optional filter clause + bound parameters shared by both paths.
-    let mut clauses: Vec<String> = Vec::new();
-    let mut binds: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-    if let Some(kind) = filters.kind.as_ref().filter(|k| !k.is_empty()) {
-        clauses.push("f.kind = ?".into());
-        binds.push(Box::new(kind.clone()));
-    }
-    if let Some(ext) = filters.ext.as_ref().filter(|e| !e.is_empty()) {
-        clauses.push("f.ext = ?".into());
-        binds.push(Box::new(ext.to_lowercase()));
-    }
-    if let Some(after) = filters.modified_after {
-        clauses.push("f.modified_at >= ?".into());
-        binds.push(Box::new(after));
-    }
+    // Build the optional filter clause + bound parameters.
+    let (clauses, binds) = filter_clauses(filters);
 
     let select = COLS
         .split(',')
@@ -302,7 +321,12 @@ mod tests {
     #[test]
     fn insert_and_get() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/a.txt", "a.txt", Some("txt"), "file", 100), 1).unwrap();
+        insert(
+            &conn,
+            &f("/root/a.txt", "a.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
         let rec = get(&conn, "/root/a.txt").unwrap().unwrap();
         assert_eq!(rec.name, "a.txt");
         assert_eq!(rec.ext.as_deref(), Some("txt"));
@@ -312,8 +336,18 @@ mod tests {
     #[test]
     fn reinsert_same_path_replaces_without_duplicating() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/a.txt", "a.txt", Some("txt"), "file", 100), 1).unwrap();
-        insert(&conn, &f("/root/a.txt", "a.txt", Some("txt"), "file", 200), 2).unwrap();
+        insert(
+            &conn,
+            &f("/root/a.txt", "a.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
+        insert(
+            &conn,
+            &f("/root/a.txt", "a.txt", Some("txt"), "file", 200),
+            2,
+        )
+        .unwrap();
         assert_eq!(count(&conn).unwrap(), 1);
         assert_eq!(get(&conn, "/root/a.txt").unwrap().unwrap().modified_at, 200);
         // FTS still matches exactly once.
@@ -324,11 +358,31 @@ mod tests {
     #[test]
     fn search_matches_name_and_path_prefix() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/report.pdf", "report.pdf", Some("pdf"), "file", 100), 1).unwrap();
-        insert(&conn, &f("/root/notes.md", "notes.md", Some("md"), "file", 200), 1).unwrap();
-        assert_eq!(search(&conn, "rep", &FileFilters::default(), 50).unwrap().len(), 1);
+        insert(
+            &conn,
+            &f("/root/report.pdf", "report.pdf", Some("pdf"), "file", 100),
+            1,
+        )
+        .unwrap();
+        insert(
+            &conn,
+            &f("/root/notes.md", "notes.md", Some("md"), "file", 200),
+            1,
+        )
+        .unwrap();
+        assert_eq!(
+            search(&conn, "rep", &FileFilters::default(), 50)
+                .unwrap()
+                .len(),
+            1
+        );
         // Path fragment also matches via the indexed path column.
-        assert_eq!(search(&conn, "root", &FileFilters::default(), 50).unwrap().len(), 2);
+        assert_eq!(
+            search(&conn, "root", &FileFilters::default(), 50)
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
@@ -343,7 +397,12 @@ mod tests {
     #[test]
     fn filters_by_ext_and_kind() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/a.txt", "a.txt", Some("txt"), "file", 100), 1).unwrap();
+        insert(
+            &conn,
+            &f("/root/a.txt", "a.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
         insert(&conn, &f("/root/a.md", "a.md", Some("md"), "file", 100), 1).unwrap();
         insert(&conn, &f("/root/sub", "sub", None, "dir", 100), 1).unwrap();
         let only_md = FileFilters {
@@ -366,16 +425,28 @@ mod tests {
     #[test]
     fn clear_empties_index_and_fts() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/a.txt", "a.txt", Some("txt"), "file", 100), 1).unwrap();
+        insert(
+            &conn,
+            &f("/root/a.txt", "a.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
         clear(&conn).unwrap();
         assert_eq!(count(&conn).unwrap(), 0);
-        assert!(search(&conn, "a", &FileFilters::default(), 50).unwrap().is_empty());
+        assert!(search(&conn, "a", &FileFilters::default(), 50)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn search_query_is_quote_safe() {
         let conn = open_in_memory().unwrap();
-        insert(&conn, &f("/root/wei\"rd.txt", "wei\"rd.txt", Some("txt"), "file", 100), 1).unwrap();
+        insert(
+            &conn,
+            &f("/root/wei\"rd.txt", "wei\"rd.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
         // Must not error on FTS metacharacters.
         let _ = search(&conn, "wei\"rd", &FileFilters::default(), 50).unwrap();
     }
@@ -384,20 +455,74 @@ mod tests {
     fn content_search_finds_by_body_and_clear_wipes_it() {
         let conn = open_in_memory().unwrap();
         // The file metadata row must exist for the content search to join back.
-        insert(&conn, &f("/root/notes.md", "notes.md", Some("md"), "file", 100), 1).unwrap();
-        set_content(&conn, "/root/notes.md", "the quick brown fox jumps over orbit").unwrap();
+        insert(
+            &conn,
+            &f("/root/notes.md", "notes.md", Some("md"), "file", 100),
+            1,
+        )
+        .unwrap();
+        set_content(
+            &conn,
+            "/root/notes.md",
+            "the quick brown fox jumps over orbit",
+        )
+        .unwrap();
         assert_eq!(content_count(&conn).unwrap(), 1);
 
         // A word that appears only in the body (not the name/path) is found.
-        let hits = search_content(&conn, "brown", 50).unwrap();
+        let hits = search_content(&conn, "brown", &FileFilters::default(), 50).unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].name, "notes.md");
         // A non-matching word returns nothing; an empty query is a no-op.
-        assert!(search_content(&conn, "zzz", 50).unwrap().is_empty());
-        assert!(search_content(&conn, "", 50).unwrap().is_empty());
+        assert!(search_content(&conn, "zzz", &FileFilters::default(), 50)
+            .unwrap()
+            .is_empty());
+        assert!(search_content(&conn, "", &FileFilters::default(), 50)
+            .unwrap()
+            .is_empty());
 
         clear(&conn).unwrap();
         assert_eq!(content_count(&conn).unwrap(), 0);
-        assert!(search_content(&conn, "brown", 50).unwrap().is_empty());
+        assert!(search_content(&conn, "brown", &FileFilters::default(), 50)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn content_search_respects_kind_and_extension_filters() {
+        let conn = open_in_memory().unwrap();
+        insert(
+            &conn,
+            &f("/root/notes.md", "notes.md", Some("md"), "file", 100),
+            1,
+        )
+        .unwrap();
+        insert(
+            &conn,
+            &f("/root/notes.txt", "notes.txt", Some("txt"), "file", 100),
+            1,
+        )
+        .unwrap();
+        set_content(
+            &conn,
+            "/root/notes.md",
+            "congregation accounts instructions",
+        )
+        .unwrap();
+        set_content(
+            &conn,
+            "/root/notes.txt",
+            "congregation accounts instructions",
+        )
+        .unwrap();
+
+        let only_md = FileFilters {
+            ext: Some("md".into()),
+            kind: Some("file".into()),
+            ..Default::default()
+        };
+        let hits = search_content(&conn, "congregation", &only_md, 50).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "notes.md");
     }
 }

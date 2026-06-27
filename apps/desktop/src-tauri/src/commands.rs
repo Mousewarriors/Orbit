@@ -780,7 +780,7 @@ pub fn file_search(
     // content-only matches.
     if !query.trim().is_empty() && (results.len() as i64) < limit {
         let seen: std::collections::HashSet<String> = results.iter().map(|r| r.path.clone()).collect();
-        let content = orbit_core::files::search_content(&conn, &query, limit).map_err(|e| e.to_string())?;
+        let content = orbit_core::files::search_content(&conn, &query, &filters, limit).map_err(|e| e.to_string())?;
         for rec in content {
             if (results.len() as i64) >= limit {
                 break;
