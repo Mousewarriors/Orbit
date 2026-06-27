@@ -858,11 +858,10 @@ pub fn file_index_rebuild(
 /// come from Orbit's own index; it is passed as a separate argument, never via a
 /// shell, so there is no injection surface.
 #[tauri::command]
-pub fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
+pub fn reveal_path(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<(), String> {
     let _ = &app; // used on non-Windows; referenced here so Windows has no warning
-    if path.trim().is_empty() {
-        return Err("empty path".into());
-    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    ensure_indexed_reveal_path(&conn, &path)?;
     #[cfg(windows)]
     {
         // explorer.exe /select,<path> highlights the item in its folder.
@@ -883,6 +882,14 @@ pub fn reveal_path(app: AppHandle, path: String) -> Result<(), String> {
             .open_path(parent, None::<&str>)
             .map_err(|e| e.to_string())
     }
+}
+
+fn ensure_indexed_reveal_path(conn: &rusqlite::Connection, path: &str) -> Result<(), String> {
+    validate_relay_path("path", path)?;
+    orbit_core::files::get(conn, path)
+        .map_err(|e| e.to_string())?
+        .map(|_| ())
+        .ok_or_else(|| "path is not in Orbit's file index".to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -1249,6 +1256,40 @@ fn relay_request(
         .relay
         .request(method, params)
         .map_err(|error| error.display_message())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn indexed(path: &str, name: &str, kind: &str) -> orbit_core::FileInput {
+        orbit_core::FileInput {
+            path: path.to_string(),
+            name: name.to_string(),
+            parent: r"C:\docs".to_string(),
+            ext: None,
+            kind: kind.to_string(),
+            size: 1,
+            created_at: Some(1),
+            modified_at: 1,
+        }
+    }
+
+    #[test]
+    fn reveal_path_requires_an_indexed_file_or_folder() {
+        let conn = orbit_core::open_in_memory().expect("in-memory db");
+        orbit_core::files::insert(&conn, &indexed(r"C:\docs\map.png", "map.png", "file"), 1)
+            .unwrap();
+        orbit_core::files::insert(&conn, &indexed(r"C:\docs\folder", "folder", "dir"), 1)
+            .unwrap();
+
+        assert!(ensure_indexed_reveal_path(&conn, r"C:\docs\map.png").is_ok());
+        assert!(ensure_indexed_reveal_path(&conn, r"C:\docs\folder").is_ok());
+        assert!(ensure_indexed_reveal_path(&conn, r"C:\docs\missing.pdf")
+            .unwrap_err()
+            .contains("not in Orbit's file index"));
+        assert!(ensure_indexed_reveal_path(&conn, "").is_err());
+    }
 }
 
 #[tauri::command]
