@@ -455,6 +455,8 @@ export function App(): JSX.Element {
         if (controller.signal.aborted) return;
         if (result.status === 'no-results') {
           setStatus(`No Orbit result for: ${externalQuery}`);
+        } else if (result.status === 'not-actionable') {
+          setStatus(`Orbit could not complete from PowerShell: ${externalQuery}`);
         } else if (result.status === 'executed') {
           setStatus(null);
         }

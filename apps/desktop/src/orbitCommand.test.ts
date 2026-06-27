@@ -150,6 +150,117 @@ describe('external Orbit command runner', () => {
     expect(result.status).toBe('no-results');
   });
 
+  it('does not execute unavailable or disabled results from external commands', async () => {
+    const execute = vi.fn(async () => ({ hide: true }));
+    const result = await runExternalOrbitCommand(payload('open missing thing'), {
+      providers: [
+        provider([
+          {
+            ...item(
+              {
+                id: 'noop',
+                title: 'No match',
+                disabledReason: 'No matching item.',
+                run: { kind: 'copy', text: 'missing' },
+              },
+              ['open missing thing'],
+            ),
+            availability: 'unavailable',
+          },
+        ]),
+      ],
+      signals: signals(),
+      execute,
+      requestConfirmation: vi.fn(),
+    });
+
+    expect(result.status).toBe('not-actionable');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('does not report PowerShell unknown app fallbacks as successful execution', async () => {
+    const execute = vi.fn(async () => ({ hide: true }));
+    const result = await runExternalOrbitCommand(payload('open Photoshop'), {
+      providers: [
+        createIntentProvider({
+          getApps: () => [],
+          getProjects: () => [],
+          fileSearch: async () => [],
+          noteSearch: async () => [],
+        }),
+      ],
+      signals: signals(),
+      execute,
+      requestConfirmation: vi.fn(),
+    });
+
+    expect(result.status).toBe('not-actionable');
+    expect(result.itemId).toBe('intent.open-application.none');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('does not execute a missing file-in-app fallback from PowerShell', async () => {
+    const execute = vi.fn(async () => ({ hide: true }));
+    const result = await runExternalOrbitCommand(
+      payload('load up the convention attendant positions map in paint'),
+      {
+        providers: [
+          createIntentProvider({
+            getApps: () => [
+              {
+                id: 'paint',
+                name: 'Paint',
+                path: 'C:\\Windows\\System32\\mspaint.exe',
+                kind: 'app',
+              },
+            ],
+            getProjects: () => [],
+            fileSearch: async () => [],
+            noteSearch: async () => [],
+          }),
+        ],
+        signals: signals(),
+        execute,
+        requestConfirmation: vi.fn(),
+      },
+    );
+
+    expect(result.status).toBe('not-actionable');
+    expect(result.itemId).toBe('intent.open-file-in-application.no-file');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('does not execute unresolved project/app fallbacks from PowerShell', async () => {
+    const execute = vi.fn(async () => ({ hide: true }));
+    const result = await runExternalOrbitCommand(
+      payload('open MissingProject in Visual Studio Code'),
+      {
+        providers: [
+          createIntentProvider({
+            getApps: () => [
+              {
+                id: 'vscode',
+                name: 'Visual Studio Code',
+                path: 'C:\\apps\\code.exe',
+                kind: 'app',
+              },
+            ],
+            getProjects: () => [],
+            fileSearch: async () => [],
+            noteSearch: async () => [],
+          }),
+        ],
+        signals: signals(),
+        execute,
+        requestConfirmation: vi.fn(),
+      },
+    );
+
+    expect(result.status).toBe('not-actionable');
+    expect(result.itemId).toBe('intent.open-project-in-application.unresolved');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('proves a PowerShell sentence can open the convention positions map in Paint', async () => {
     const executed: RankedItem[] = [];
     const execute = vi.fn(async (ranked: RankedItem) => {

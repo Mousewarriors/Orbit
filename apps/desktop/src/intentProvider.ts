@@ -211,6 +211,7 @@ async function buildItems(
                 icon: icon('agentos'),
                 confidence: 0.8,
               }),
+              availability: 'unavailable',
               primaryAction: {
                 id: `intent.${recognised.intent}.scan`,
                 title: 'Open Projects',
@@ -265,6 +266,7 @@ async function buildItems(
               icon: icon('folder'),
               confidence: 0.8,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.open-project-folder.scan',
               title: 'Open Projects',
@@ -315,6 +317,7 @@ async function buildItems(
               icon: icon('app'),
               confidence: 0.8,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.open-project-in-application.scan',
               title: 'Open Projects',
@@ -361,10 +364,12 @@ async function buildItems(
               icon: icon('app'),
               confidence: 0.78,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.open-file-in-application.no-app.noop',
               title: 'No match',
               run: { kind: 'copy', text: slots.applicationQuery ?? '' },
+              disabledReason: 'No matching application is indexed.',
             },
           },
         ];
@@ -382,10 +387,12 @@ async function buildItems(
               icon: icon('file'),
               confidence: 0.78,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.open-file-in-application.no-file.noop',
               title: 'OK',
               run: { kind: 'copy', text: term },
+              disabledReason: 'No matching indexed file was found.',
             },
           },
         ];
@@ -428,10 +435,12 @@ async function buildItems(
               icon: icon('app'),
               confidence: 0.75,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.open-application.none.noop',
               title: 'No match',
               run: { kind: 'copy', text: q },
+              disabledReason: 'No matching application is indexed.',
             },
           },
         ];
@@ -473,10 +482,12 @@ async function buildItems(
               icon: icon('file'),
               confidence: 0.8,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.find-files.none.noop',
               title: 'OK',
               run: { kind: 'copy', text: term },
+              disabledReason: 'No matching indexed file was found.',
             },
           },
         ];
@@ -519,10 +530,12 @@ async function buildItems(
               icon: icon('file-text'),
               confidence: 0.8,
             }),
+            availability: 'unavailable',
             primaryAction: {
               id: 'intent.find-notes.none.noop',
               title: 'OK',
               run: { kind: 'copy', text: term },
+              disabledReason: 'No matching note was found.',
             },
           },
         ];

@@ -13,7 +13,7 @@ export interface OrbitCommandBridgeDeps {
 }
 
 export interface ExternalOrbitCommandResult {
-  status: 'ignored' | 'no-results' | 'needs-confirmation' | 'executed';
+  status: 'ignored' | 'no-results' | 'not-actionable' | 'needs-confirmation' | 'executed';
   query: string;
   itemId?: string;
   outcome?: ExecuteOutcome;
@@ -103,6 +103,9 @@ export async function runExternalOrbitCommand(
   if (!top) return { status: 'no-results', query };
 
   const action = top.item.primaryAction;
+  if (top.item.availability === 'unavailable' || action.disabledReason) {
+    return { status: 'not-actionable', query, itemId: top.item.id };
+  }
   if (needsConfirmation(action)) {
     deps.requestConfirmation(top);
     return { status: 'needs-confirmation', query, itemId: top.item.id };
