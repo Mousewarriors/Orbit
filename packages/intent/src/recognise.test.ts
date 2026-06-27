@@ -180,6 +180,12 @@ describe('recogniseIntent — find', () => {
   it('finds remembered file descriptions without requiring the word file', () => {
     const r = expectIntent('find the congregation accounts instructions for KHT', 'find_file');
     expect(r.slots.fileQuery).toBe('congregation accounts instructions kht');
+
+    const friendly = expectIntent(
+      'find me the congregation accounts instructions for KHT',
+      'find_file',
+    );
+    expect(friendly.slots.fileQuery).toBe('congregation accounts instructions kht');
   });
 
   it('find notes extracts the topic', () => {

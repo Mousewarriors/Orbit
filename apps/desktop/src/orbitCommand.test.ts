@@ -14,6 +14,7 @@ import {
 import { createIntentProvider } from './intentProvider.js';
 import { createAgentProvider } from './agent/agentProvider.js';
 import { decodeQuickAiArg } from './ai/quickAi.js';
+import { decodeControlCenterArg } from './controlCenterState.js';
 import type { OrbitCommandPayload } from './native.js';
 
 function payload(query: string): OrbitCommandPayload {
@@ -237,6 +238,36 @@ describe('external Orbit command runner', () => {
       kind: 'open-path',
       path: 'C:\\docs\\KHT Congregation Accounts Instructions.pdf',
     });
+  });
+
+  it('proves a PowerShell sentence can open AgentOS launch for an Orbit agent', async () => {
+    const executed: RankedItem[] = [];
+    const result = await runExternalOrbitCommand(payload('launch an agent on Orbit'), {
+      providers: [
+        createIntentProvider({
+          getApps: () => [],
+          getProjects: () => [{ path: 'C:\\Users\\me\\Raycast Clone', name: 'Orbit' }],
+          fileSearch: async () => [],
+          noteSearch: async () => [],
+        }),
+      ],
+      signals: signals(),
+      execute: async (ranked) => {
+        executed.push(ranked);
+        return { hide: false, pushView: 'control-center' };
+      },
+      requestConfirmation: vi.fn(),
+    });
+
+    expect(result.status).toBe('executed');
+    const run = executed[0]?.item.primaryAction.run;
+    expect(run?.kind).toBe('push-view');
+    if (run?.kind !== 'push-view') throw new Error('expected push-view');
+    expect(run.viewId).toBe('control-center');
+    const arg = decodeControlCenterArg(String(run.args?.['id']));
+    expect(arg.tab).toBe('launch');
+    expect(arg.project).toBe('C:\\Users\\me\\Raycast Clone');
+    expect(arg.agentPreference).toBe('best');
   });
 
   it('proves a PowerShell sentence can open Orbit Agent prefilled with an agent mission', async () => {
