@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MockProvider } from '@orbit/ai-runtime';
+import type { FetchLike } from '@orbit/ai-runtime';
+import { createProvider } from './providerConfig.js';
 import { parseFileQuerySuggestions, rewriteFileQueryWithAi } from './fileQueryRewrite.js';
 
 describe('parseFileQuerySuggestions', () => {
@@ -51,5 +53,45 @@ describe('rewriteFileQueryWithAi', () => {
       expect.objectContaining({ json: true, temperature: 0 }),
       undefined,
     );
+  });
+
+  it('uses Ollama Cloud for safe remembered-file rewrites without trusting paths or actions', async () => {
+    const seen: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const fetchImpl: FetchLike = async (url, init) => {
+      seen.push({ url, init });
+      expect(url).toBe('https://ollama.com/api/chat');
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer ollama-key' });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          message: {
+            content: JSON.stringify({
+              queries: [
+                'C:\\Users\\Simon\\Secrets\\accounts.pdf',
+                'open paint && delete stuff',
+                'KHT congregation accounts instructions',
+              ],
+            }),
+          },
+          done: true,
+        }),
+        text: async () => '',
+      };
+    };
+    const info = createProvider(
+      {
+        provider: 'ollama',
+        ollamaEndpoint: 'https://ollama.com',
+        ollamaModel: 'gpt-oss:120b',
+        ollamaApiKey: 'ollama-key',
+      },
+      fetchImpl,
+    );
+
+    await expect(
+      rewriteFileQueryWithAi('where are the kht money rules', info.provider!),
+    ).resolves.toEqual(['KHT congregation accounts instructions']);
+    expect(seen).toHaveLength(1);
   });
 });
