@@ -23,10 +23,45 @@ const MAX_CHUNK: usize = 1000;
 /// number is the chunk count. The NUL prefix can't occur in a real token/key.
 const CHUNK_MARKER: &str = "\u{0}orbit-chunked:";
 
-fn entry(key: &str) -> Result<keyring::Entry, String> {
+fn validate_secret_key(key: &str) -> Result<(), String> {
     if key.is_empty() || key.len() > 220 {
         return Err("invalid secret key".into());
     }
+    if !key
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b':'))
+    {
+        return Err("secret key contains unsupported characters".into());
+    }
+    if matches!(
+        key,
+        "ai.cloud.apikey"
+            | "ai.ollama.apikey"
+            | "ai.anthropic.apikey"
+            | "ai.oauth.openai-codex"
+            | "ai.oauth.anthropic-claude"
+    ) || is_valid_mcp_secret_key(key)
+    {
+        return Ok(());
+    }
+    Err("secret key is not an approved Orbit credential".into())
+}
+
+fn is_valid_mcp_secret_key(key: &str) -> bool {
+    let Some(rest) = key.strip_prefix("mcp.server:") else {
+        return false;
+    };
+    let Some((server_id, kind)) = rest.rsplit_once('.') else {
+        return false;
+    };
+    matches!(kind, "token" | "apikey" | "oauth")
+        && (3..=80).contains(&server_id.len())
+        && server_id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b':'))
+}
+
+fn entry(key: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new(SERVICE, key).map_err(|e| e.to_string())
 }
 
@@ -44,7 +79,9 @@ fn split_chunks(value: &str) -> Vec<String> {
 fn clear_chunks(key: &str) {
     let mut i = 0usize;
     loop {
-        let Ok(e) = entry(&format!("{key}#{i}")) else { break };
+        let Ok(e) = entry(&format!("{key}#{i}")) else {
+            break;
+        };
         match e.delete_credential() {
             Ok(()) => i += 1,
             Err(_) => break, // NoEntry or any error → stop scanning
@@ -54,6 +91,7 @@ fn clear_chunks(key: &str) {
 
 #[tauri::command]
 pub fn secret_set(key: String, value: String) -> Result<(), String> {
+    validate_secret_key(&key)?;
     // Always clear any prior chunks first so a shrinking value can't leave stragglers.
     clear_chunks(&key);
 
@@ -74,10 +112,13 @@ pub fn secret_set(key: String, value: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn secret_get(key: String) -> Result<Option<String>, String> {
+    validate_secret_key(&key)?;
     match entry(&key)?.get_password() {
         Ok(p) => {
             if let Some(count) = p.strip_prefix(CHUNK_MARKER) {
-                let n: usize = count.parse().map_err(|_| "corrupt chunked secret".to_string())?;
+                let n: usize = count
+                    .parse()
+                    .map_err(|_| "corrupt chunked secret".to_string())?;
                 let mut out = String::new();
                 for i in 0..n {
                     let part = entry(&format!("{key}#{i}"))?
@@ -97,6 +138,7 @@ pub fn secret_get(key: String) -> Result<Option<String>, String> {
 
 #[tauri::command]
 pub fn secret_delete(key: String) -> Result<(), String> {
+    validate_secret_key(&key)?;
     clear_chunks(&key);
     match entry(&key)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
@@ -106,6 +148,7 @@ pub fn secret_delete(key: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn secret_has(key: String) -> Result<bool, String> {
+    validate_secret_key(&key)?;
     Ok(secret_get(key)?.is_some())
 }
 
@@ -131,9 +174,40 @@ mod tests {
     #[test]
     fn splits_on_char_boundaries() {
         // Multi-byte chars must never be cut mid-character.
-        let value = "é".repeat(MAX_CHUNK + 10);
+        let value = "\u{00e9}".repeat(MAX_CHUNK + 10);
         let chunks = split_chunks(&value);
         assert_eq!(chunks.concat(), value);
         assert!(chunks.iter().all(|c| c.chars().count() <= MAX_CHUNK));
+    }
+
+    #[test]
+    fn validates_only_approved_secret_namespaces() {
+        for key in [
+            "ai.cloud.apikey",
+            "ai.ollama.apikey",
+            "ai.anthropic.apikey",
+            "ai.oauth.openai-codex",
+            "ai.oauth.anthropic-claude",
+            "mcp.server:agentos.token",
+            "mcp.server:team-vault.apikey",
+            "mcp.server:corp:gateway.oauth",
+        ] {
+            validate_secret_key(key).expect(key);
+        }
+        for key in [
+            "",
+            "github.token",
+            "password",
+            "ai.bad/key",
+            "ai.anything",
+            "ai.oauth.fake",
+            "mcp.attacker.token",
+            "mcp.server:x.token",
+            "mcp.server:agentos.password",
+            "mcp.server:bad/slash.token",
+            "mcp.bad#0",
+        ] {
+            assert!(validate_secret_key(key).is_err(), "{key} must be rejected");
+        }
     }
 }

@@ -21,8 +21,13 @@ vectors → mitigations (implemented = ✅, planned = ⬜).
 
 ## C. Exfiltrate secrets
 
-- **Secrets in logs / renderer.** Mitigation: secret vault in OS secure storage,
-  redacted logs, secrets never in renderer state ⬜.
+- **Secrets in persistent storage / logs.** Mitigation: provider/OAuth
+  credentials are kept in OS secure storage under exact approved key names and
+  are not written to settings or diagnostics ✅; MCP configs carry credential
+  references only, with native storage constrained to
+  `mcp.server:<id>.(token|apikey|oauth)` for future MCP credential material ✅;
+  expanded redaction coverage for future export/logging surfaces remains
+  tracked ⬜.
 - **Clipboard secrets to AI.** Mitigation: never send clipboard to AI
   automatically; sensitive-content flag + excluded apps ⬜ (schema ✅).
 
