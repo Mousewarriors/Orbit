@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   defaultMcpServerConfig,
   isHttpUrl,
+  isAllowedStdioMcpCommand,
   isPublicHttpsMcpEndpoint,
   redactConfig,
   validateMcpServerConfig,
@@ -14,7 +15,9 @@ describe('validateMcpServerConfig', () => {
         id: 'fs',
         name: 'Filesystem',
         transport: 'stdio',
-        command: 'mcp-fs',
+        command: 'node',
+        args: ['C:/AgentOS/server/mcp/server.js'],
+        cwd: 'C:/AgentOS',
         enabled: true,
         startupPolicy: 'on-demand',
         timeoutMs: 15_000,
@@ -43,10 +46,66 @@ describe('validateMcpServerConfig', () => {
       id: 'fs',
       name: 'fs',
       transport: 'stdio',
-      command: 'c',
+      command: 'node',
+      args: ['C:/AgentOS/server/mcp/server.js'],
+      cwd: 'C:/AgentOS',
       timeoutMs: 10,
     });
     expect(errors.some((e) => e.field === 'timeoutMs')).toBe(true);
+  });
+
+  it('rejects arbitrary stdio executables and inline node scripts', () => {
+    expect(
+      validateMcpServerConfig({
+        id: 'bad',
+        name: 'Bad',
+        transport: 'stdio',
+        command: 'powershell.exe',
+        args: ['-Command', 'whoami'],
+      }).some((e) => e.field === 'command'),
+    ).toBe(true);
+    expect(
+      validateMcpServerConfig({
+        id: 'inline',
+        name: 'Inline',
+        transport: 'stdio',
+        command: 'node',
+        args: ['-e', 'process.exit(0)'],
+      }).some((e) => e.field === 'command'),
+    ).toBe(true);
+  });
+});
+
+describe('isAllowedStdioMcpCommand', () => {
+  it('allows bounded node module MCP servers inside their cwd', () => {
+    expect(
+      isAllowedStdioMcpCommand('node', ['C:/AgentOS/server/mcp/server.js'], 'C:/AgentOS'),
+    ).toBe(true);
+  });
+
+  it('rejects missing cwd, relative scripts, traversal, scripts outside cwd and non-module targets', () => {
+    expect(isAllowedStdioMcpCommand('node', ['C:/AgentOS/server/mcp/server.js'])).toBe(false);
+    expect(isAllowedStdioMcpCommand('node', ['server.js'], 'C:/AgentOS')).toBe(false);
+    expect(isAllowedStdioMcpCommand('node', ['C:/AgentOS/../Other/evil.js'], 'C:/AgentOS')).toBe(
+      false,
+    );
+    expect(
+      isAllowedStdioMcpCommand('node', ['C:/AgentOS/server/mcp/server.js'], 'C:/AgentOS/..'),
+    ).toBe(false);
+    expect(
+      isAllowedStdioMcpCommand('node', ['C:/Other/server/mcp/server.js'], 'C:/AgentOS'),
+    ).toBe(false);
+    expect(isAllowedStdioMcpCommand('node', ['C:/AgentOS/server/mcp/server.txt'])).toBe(false);
+  });
+
+  it('rejects custom node executable paths instead of trusting the basename', () => {
+    expect(
+      isAllowedStdioMcpCommand(
+        'C:/Temp/node.exe',
+        ['C:/AgentOS/server/mcp/server.js'],
+        'C:/AgentOS',
+      ),
+    ).toBe(false);
   });
 });
 

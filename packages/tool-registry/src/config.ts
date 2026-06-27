@@ -17,6 +17,7 @@ export interface McpServerConfig {
   /** For `stdio`: the executable to launch. */
   readonly command?: string;
   readonly args?: readonly string[];
+  readonly cwd?: string;
   /** For `http`: the base endpoint (http/https only). */
   readonly endpoint?: string;
   /** Reference into OS secure storage; never the secret itself. */
@@ -41,6 +42,8 @@ export interface McpConfigError {
 
 const MAX_TIMEOUT = 120_000;
 const MIN_TIMEOUT = 500;
+const MAX_STDIO_ARGS = 32;
+const MAX_STDIO_ARG_LENGTH = 4096;
 
 /** Validate a server config. Returns [] when valid. Never throws. */
 export function validateMcpServerConfig(config: Partial<McpServerConfig>): McpConfigError[] {
@@ -57,6 +60,12 @@ export function validateMcpServerConfig(config: Partial<McpServerConfig>): McpCo
   if (config.transport === 'stdio') {
     if (!config.command || config.command.trim().length === 0) {
       errors.push({ field: 'command', message: 'stdio transport requires a command' });
+    } else if (!isAllowedStdioMcpCommand(config.command, config.args, config.cwd)) {
+      errors.push({
+        field: 'command',
+        message:
+          'stdio transport only supports node <absolute .js/.mjs/.cjs script> inside its working directory',
+      });
     }
   }
   if (config.transport === 'http') {
@@ -76,6 +85,59 @@ export function validateMcpServerConfig(config: Partial<McpServerConfig>): McpCo
     errors.push({ field: 'timeoutMs', message: `timeoutMs must be ${MIN_TIMEOUT}–${MAX_TIMEOUT}` });
   }
   return errors;
+}
+
+function normalisePathForPolicy(path: string): string {
+  return path.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function hasTraversalSegmentForPolicy(path: string): boolean {
+  return normalisePathForPolicy(path)
+    .split('/')
+    .some((segment) => segment === '.' || segment === '..');
+}
+
+function isAbsolutePathForPolicy(path: string): boolean {
+  return /^[a-z]:\//i.test(path) || path.startsWith('/');
+}
+
+function isPathWithinForPolicy(path: string, parent: string): boolean {
+  const child = normalisePathForPolicy(path).toLowerCase();
+  const base = normalisePathForPolicy(parent).toLowerCase();
+  return child === base || child.startsWith(`${base}/`);
+}
+
+/**
+ * Static stdio allow-list mirrored by the native host's stricter runtime checks.
+ * The renderer may persist only Node-launched MCP server modules with bounded
+ * argv. Native still verifies the script exists and is inside cwd before spawn.
+ */
+export function isAllowedStdioMcpCommand(
+  command: unknown,
+  args: unknown = [],
+  cwd?: unknown,
+): boolean {
+  if (typeof command !== 'string') return false;
+  const commandText = command.trim();
+  // Do not accept user-supplied absolute/relative executable paths here. Native
+  // still resolves the actual executable at spawn time, but persisted stdio MCP
+  // config is restricted to the platform's normal `node` command name.
+  if (commandText.includes('/') || commandText.includes('\\')) return false;
+  const exe = commandText.toLowerCase();
+  if (exe !== 'node' && exe !== 'node.exe') return false;
+  if (!Array.isArray(args) || args.length === 0 || args.length > MAX_STDIO_ARGS) return false;
+  if (!args.every((arg): arg is string => typeof arg === 'string')) return false;
+  if (args.some((arg) => arg.length === 0 || arg.length > MAX_STDIO_ARG_LENGTH || arg.includes('\0'))) {
+    return false;
+  }
+  const script = normalisePathForPolicy(args[0]!);
+  if (script.startsWith('-') || !isAbsolutePathForPolicy(script)) return false;
+  if (hasTraversalSegmentForPolicy(script)) return false;
+  if (!/\.(?:cjs|mjs|js)$/i.test(script)) return false;
+  if (typeof cwd !== 'string' || !cwd.trim()) return false;
+  const base = normalisePathForPolicy(cwd);
+  if (hasTraversalSegmentForPolicy(base)) return false;
+  return isAbsolutePathForPolicy(base) && isPathWithinForPolicy(script, base);
 }
 
 export function isHttpUrl(value: unknown): boolean {

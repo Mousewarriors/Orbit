@@ -52,9 +52,59 @@ describe('parseMcpServers', () => {
   it('drops a stdio entry with no command and a bad endpoint, but keeps a valid stdio one', () => {
     const raw = JSON.stringify([
       { id: 'bad', name: 'Bad', enabled: true }, // neither command nor endpoint
-      { id: 'os', name: 'OS', command: 'node', args: ['x.js'], enabled: true },
+      {
+        id: 'os',
+        name: 'OS',
+        command: 'node',
+        args: ['C:/AgentOS/server/mcp/server.js'],
+        cwd: 'C:/AgentOS',
+        enabled: true,
+      },
     ]);
     expect(parseMcpServers(raw).map((s) => s.id)).toEqual(['os']);
+  });
+
+  it('drops arbitrary stdio commands before they can reach the native host', () => {
+    const raw = JSON.stringify([
+      {
+        id: 'shell',
+        name: 'Shell',
+        command: 'powershell.exe',
+        args: ['-Command', 'whoami'],
+        enabled: true,
+      },
+      {
+        id: 'inline',
+        name: 'Inline',
+        command: 'node',
+        args: ['-e', 'process.exit(0)'],
+        enabled: true,
+      },
+      {
+        id: 'relative',
+        name: 'Relative',
+        command: 'node',
+        args: ['server/mcp/server.js'],
+        enabled: true,
+      },
+      {
+        id: 'traversal',
+        name: 'Traversal',
+        command: 'node',
+        args: ['C:/AgentOS/../Other/evil.js'],
+        cwd: 'C:/AgentOS',
+        enabled: true,
+      },
+      {
+        id: 'fake-node',
+        name: 'Fake Node',
+        command: 'C:/Temp/node.exe',
+        args: ['C:/AgentOS/server/mcp/server.js'],
+        cwd: 'C:/AgentOS',
+        enabled: true,
+      },
+    ]);
+    expect(parseMcpServers(raw)).toEqual([]);
   });
 });
 
@@ -86,7 +136,30 @@ describe('validateServer', () => {
   });
 
   it('accepts a stdio server with just a command (no endpoint needed)', () => {
-    expect(validateServer({ id: 'os', name: 'AgentOS', command: 'node' }, existing)).toBeNull();
+    expect(
+      validateServer(
+        {
+          id: 'os',
+          name: 'AgentOS',
+          command: 'node',
+          args: ['C:/AgentOS/server/mcp/server.js'],
+          cwd: 'C:/AgentOS',
+        },
+        existing,
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects generic stdio servers without an allowed script shape', () => {
+    expect(validateServer({ id: 'os', name: 'AgentOS', command: 'node' }, existing)).toMatch(
+      /Stdio MCP/,
+    );
+    expect(
+      validateServer(
+        { id: 'bad', name: 'Bad', command: 'cmd.exe', args: ['/c', 'whoami'] },
+        existing,
+      ),
+    ).toMatch(/Stdio MCP/);
   });
 });
 

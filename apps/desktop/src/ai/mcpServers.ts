@@ -12,7 +12,7 @@
  * The kind is discriminated by which fields are present (`command` ⇒ stdio),
  * so existing http entries round-trip unchanged. No secret is ever stored here.
  */
-import { isPublicHttpsMcpEndpoint } from '@orbit/tool-registry';
+import { isAllowedStdioMcpCommand, isPublicHttpsMcpEndpoint } from '@orbit/tool-registry';
 
 export const MCP_SERVERS_SETTING_KEY = 'mcp.servers';
 
@@ -58,11 +58,12 @@ export function parseMcpServers(raw: string | null | undefined): StoredMcpServer
     const command = typeof o['command'] === 'string' ? o['command'].trim() : '';
 
     if (command) {
-      // stdio server
       const args = Array.isArray(o['args'])
         ? o['args'].filter((a): a is string => typeof a === 'string')
         : [];
       const cwd = typeof o['cwd'] === 'string' && o['cwd'].trim() ? o['cwd'] : undefined;
+      if (!isAllowedStdioMcpCommand(command, args, cwd)) continue;
+      // stdio server
       const base = { id, name, command, args, enabled };
       out.push(cwd ? { ...base, cwd } : base);
       seen.add(id);
@@ -87,6 +88,8 @@ export interface McpServerCandidate {
   readonly name: string;
   readonly endpoint?: string;
   readonly command?: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
 }
 
 /** Validate a candidate server, returning an error message or null. */
@@ -100,7 +103,9 @@ export function validateServer(
   if (existing.some((s) => s.id === candidate.id)) return 'A server with that id already exists';
   if (!candidate.name.trim()) return 'Name is required';
   if (candidate.command && candidate.command.trim()) {
-    return null; // stdio: a non-empty command is enough (args/cwd are optional)
+    return isAllowedStdioMcpCommand(candidate.command, candidate.args ?? [], candidate.cwd)
+      ? null
+      : 'Stdio MCP must use node with an absolute .js/.mjs/.cjs server script inside its working directory';
   }
   if (!isPublicHttpsMcpEndpoint(candidate.endpoint ?? '')) {
     return 'Endpoint must be a public https URL';
