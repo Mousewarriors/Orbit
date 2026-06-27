@@ -83,6 +83,22 @@ export function ControlCenterView({
   const mountedRef = useRef(true);
   const eventPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // External Orbit commands can deep-link into Control Center while the view is
+  // already mounted. `useState(initial*)` only applies on first mount, so keep
+  // the mutable selection in sync when App updates the decoded deep-link args.
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+    if (initialProject !== undefined) setSelectedProject(initialProject);
+    if (initialSessionId !== undefined) setLaunchedSession(initialSessionId);
+    if (initialTab === 'launch') {
+      setContinuationProject(initialProject ?? null);
+      setPlan(null);
+      setConfirmed(false);
+    } else if (initialProject !== undefined) {
+      setContinuationProject(null);
+    }
+  }, [initialProject, initialSessionId, initialTab]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -1231,6 +1247,10 @@ function SessionsPanel({
   readonly selectedSessionId: string | null;
 }): JSX.Element {
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? '');
+
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter ?? '');
+  }, [initialStatusFilter]);
 
   const filtered = useMemo(() => {
     const f = statusFilter.trim().toLowerCase();
