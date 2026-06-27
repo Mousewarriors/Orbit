@@ -12,6 +12,7 @@ import {
 import type { AiMessage } from '@orbit/ai-runtime';
 import * as native from '../native.js';
 import { AI_SETTING_KEYS, parseFolderConfidence, type ProviderInfo } from '../ai/providerConfig.js';
+import { rewriteFileQueryWithAi } from '../ai/fileQueryRewrite.js';
 import { loadProviderInfo } from '../ai/providerLoad.js';
 import { buildMessages, decodeQuickAiArg, type QuickAiContext } from '../ai/quickAi.js';
 import { buildToolRegistry } from '../ai/toolRegistry.js';
@@ -231,6 +232,11 @@ export function OrbitAgentView({
           path: f.path,
           kind: f.kind,
         })),
+      ...(info?.provider
+        ? {
+            rewriteFileQuery: (q: string) => rewriteFileQueryWithAi(q, info.provider!),
+          }
+        : {}),
       noteSearch: async (q, limit) =>
         (await native.noteList(q, limit)).map((n) => ({ title: n.title })),
       dispatchAgent: (projectPath, pref) =>

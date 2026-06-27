@@ -89,6 +89,57 @@ describe('executeNativeTool · open_file_in_application', () => {
     expect(out.content).toContain('C:/docs/kht.pdf');
     expect(openFileInApplication).not.toHaveBeenCalled();
   });
+
+  it('uses AI search phrase rewrites after a direct indexed miss, then opens only indexed paths', async () => {
+    const openFileInApplication = vi.fn(async () => {});
+    const rewriteFileQuery = vi.fn(async () => ['kht congregation accounts instructions']);
+    const fileSearch = vi.fn(async (query: string) =>
+      query === 'kht congregation accounts instructions'
+        ? [
+            {
+              name: 'KHT Congregation Accounts Instructions.pdf',
+              path: 'C:/docs/KHT Congregation Accounts Instructions.pdf',
+              kind: 'file',
+            },
+          ]
+        : [],
+    );
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openFileInApplication),
+      { applicationQuery: 'notepad', fileQuery: 'where are the kht money rules' },
+      deps({ openFileInApplication, fileSearch, rewriteFileQuery }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(fileSearch).toHaveBeenNthCalledWith(1, 'where are the kht money rules');
+    expect(rewriteFileQuery).toHaveBeenCalledWith('where are the kht money rules');
+    expect(openFileInApplication).toHaveBeenCalledWith(
+      'notepad',
+      'C:/docs/KHT Congregation Accounts Instructions.pdf',
+    );
+    expect(out.content).toContain('AI search phrase: "kht congregation accounts instructions"');
+  });
+
+  it('does not ask AI for file rewrites when the direct indexed search already matches', async () => {
+    const rewriteFileQuery = vi.fn(async () => ['unused']);
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.openFileInApplication),
+      { applicationQuery: 'notepad', fileQuery: 'convention attendant positions map' },
+      deps({
+        rewriteFileQuery,
+        fileSearch: async () => [
+          {
+            name: 'Convention Attendant Positions Map.png',
+            path: 'C:/docs/Convention Attendant Positions Map.png',
+            kind: 'file',
+          },
+        ],
+      }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(rewriteFileQuery).not.toHaveBeenCalled();
+  });
 });
 
 describe('resolveApplication', () => {
@@ -286,6 +337,30 @@ describe('executeNativeTool · search', () => {
     );
     expect(out.ok).toBe(true);
     expect(out.content).toMatch(/No files found/);
+  });
+
+  it('uses AI search phrase rewrites for natural-language find-files misses', async () => {
+    const rewriteFileQuery = vi.fn(async () => ['kht congregation accounts instructions']);
+    const fileSearch = vi.fn(async (query: string) =>
+      query === 'kht congregation accounts instructions'
+        ? [
+            {
+              name: 'KHT Congregation Accounts Instructions.pdf',
+              path: 'C:/docs/KHT Congregation Accounts Instructions.pdf',
+            },
+          ]
+        : [],
+    );
+    const out = await executeNativeTool(
+      rec(NATIVE_TOOL_IDS.findFiles),
+      { fileQuery: 'find the congregation account rules for kht' },
+      deps({ fileSearch, rewriteFileQuery }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(rewriteFileQuery).toHaveBeenCalledWith('find the congregation account rules for kht');
+    expect(out.content).toContain('AI search phrase: "kht congregation accounts instructions"');
+    expect(out.content).toContain('KHT Congregation Accounts Instructions.pdf');
   });
 
   it('formats note results', async () => {

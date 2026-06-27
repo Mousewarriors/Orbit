@@ -25,6 +25,13 @@ export interface ResolvedEntity {
   readonly path: string;
 }
 
+type MissionFileHit = {
+  readonly name: string;
+  readonly parent: string;
+  readonly path?: string;
+  readonly kind?: string;
+};
+
 /**
  * Resolving a project name against the indexed file system yields a confident
  * single folder, an ambiguous shortlist (several folders of the same name), or
@@ -60,7 +67,12 @@ export interface MissionExecutorDeps {
   readonly fileSearch: (
     query: string,
     limit: number,
-  ) => Promise<ReadonlyArray<{ name: string; parent: string; path?: string; kind?: string }>>;
+  ) => Promise<ReadonlyArray<MissionFileHit>>;
+  /**
+   * Optional AI assist for natural-language file requests. It may suggest search
+   * phrases only; actual paths still come exclusively from Orbit's local index.
+   */
+  readonly rewriteFileQuery?: (query: string) => Promise<ReadonlyArray<string>>;
   readonly noteSearch: (query: string, limit: number) => Promise<ReadonlyArray<{ title: string }>>;
   readonly dispatchAgent: (
     projectPath: string,
@@ -76,6 +88,37 @@ function str(args: Readonly<Record<string, unknown>>, key: string): string {
 
 function fail(summary: string, detail?: string): MissionStepOutcome {
   return detail ? { ok: false, summary, detail } : { ok: false, summary };
+}
+
+async function searchFilesWithRewrite(
+  deps: MissionExecutorDeps,
+  query: string,
+  limit: number,
+  accept: (hit: MissionFileHit) => boolean = () => true,
+): Promise<{
+  readonly hits: readonly MissionFileHit[];
+  readonly matchedQuery: string;
+  readonly usedRewrite: boolean;
+}> {
+  const direct = (await deps.fileSearch(query, limit)).filter(accept);
+  if (direct.length > 0 || !deps.rewriteFileQuery) {
+    return { hits: direct, matchedQuery: query, usedRewrite: false };
+  }
+
+  const seen = new Set([query.trim().toLowerCase()]);
+  const suggestions = await deps.rewriteFileQuery(query).catch(() => []);
+  for (const suggestion of suggestions) {
+    const candidate = suggestion.trim();
+    const key = candidate.toLowerCase();
+    if (!candidate || seen.has(key)) continue;
+    seen.add(key);
+    const hits = (await deps.fileSearch(candidate, limit)).filter(accept);
+    if (hits.length > 0) {
+      return { hits, matchedQuery: candidate, usedRewrite: true };
+    }
+  }
+
+  return { hits: [], matchedQuery: query, usedRewrite: false };
 }
 
 /** Catalog match → indexed match → ask-the-user on ambiguity → none/cancelled. */
@@ -135,8 +178,13 @@ export async function executeMissionStep(
       const app = deps.resolveApp(str(args, 'applicationQuery'));
       const fileQuery = str(args, 'fileQuery');
       if (!app?.id) return fail(`No installed app matching "${str(args, 'applicationQuery')}"`);
-      const hits = await deps.fileSearch(fileQuery, 10);
-      const files = hits.filter((candidate) => candidate.kind !== 'dir' && candidate.path);
+      const search = await searchFilesWithRewrite(
+        deps,
+        fileQuery,
+        10,
+        (candidate) => candidate.kind !== 'dir' && !!candidate.path,
+      );
+      const files = search.hits;
       const file = files[0];
       if (!file?.path) return fail(`No indexed file matching "${fileQuery}"`);
       if (files.length > 1) {
@@ -151,7 +199,9 @@ export async function executeMissionStep(
       await deps.openFileInApplication(app.id, file.path);
       return {
         ok: true,
-        summary: `Opened ${file.name} in ${app.name}`,
+        summary: `Opened ${file.name} in ${app.name}${
+          search.usedRewrite ? ` using AI search phrase "${search.matchedQuery}"` : ''
+        }`,
         detail: file.path,
       };
     }
@@ -187,13 +237,20 @@ export async function executeMissionStep(
 
     case NATIVE_TOOL_IDS.findFiles: {
       const q = str(args, 'fileQuery');
-      const hits = await deps.fileSearch(q, 20);
+      const search = await searchFilesWithRewrite(deps, q, 20);
+      const hits = search.hits;
       if (hits.length === 0) return { ok: true, summary: `No files match "${q}"` };
       const top = hits
         .slice(0, 5)
         .map((f) => `• ${f.name} — ${f.parent}`)
         .join('\n');
-      return { ok: true, summary: `Found ${hits.length} file(s) for "${q}"`, detail: top };
+      return {
+        ok: true,
+        summary: `Found ${hits.length} file(s) for "${
+          search.usedRewrite ? search.matchedQuery : q
+        }"`,
+        detail: search.usedRewrite ? `AI search phrase for "${q}".\n${top}` : top,
+      };
     }
 
     case NATIVE_TOOL_IDS.findNotes: {

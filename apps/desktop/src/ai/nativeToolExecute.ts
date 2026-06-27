@@ -22,6 +22,8 @@ import {
 } from '@orbit/intent';
 import type { NativeApp } from '../native.js';
 
+type FileSearchHit = { readonly name: string; readonly path: string; readonly kind?: string };
+
 /** Native tools AI Chat is allowed to call in this slice. */
 export const CHAT_NATIVE_TOOL_IDS: readonly string[] = [
   NATIVE_TOOL_IDS.openApplication,
@@ -77,7 +79,12 @@ export interface NativeToolDeps {
   openProjectInApplication(applicationId: string, projectPath: string): Promise<void>;
   openFileInApplication(applicationId: string, filePath: string): Promise<void>;
   recordUsage(commandId: string): Promise<void>;
-  fileSearch(query: string): Promise<ReadonlyArray<{ name: string; path: string; kind?: string }>>;
+  fileSearch(query: string): Promise<ReadonlyArray<FileSearchHit>>;
+  /**
+   * Optional AI assist for natural-language file requests. It may suggest search
+   * phrases only; actual paths still come exclusively from Orbit's local index.
+   */
+  rewriteFileQuery?(query: string): Promise<ReadonlyArray<string>>;
   /** Search the file index restricted to directories (folders), for project fallback. */
   findFolders(query: string): Promise<ReadonlyArray<{ name: string; path: string }>>;
   noteList(query: string): Promise<ReadonlyArray<{ title: string }>>;
@@ -87,6 +94,36 @@ export interface NativeToolDeps {
    * to confirm rather than opening it. Omitted → the library default.
    */
   folderConfidence?: number;
+}
+
+async function searchFilesWithRewrite(
+  deps: NativeToolDeps,
+  query: string,
+  accept: (hit: FileSearchHit) => boolean = () => true,
+): Promise<{
+  readonly files: readonly FileSearchHit[];
+  readonly matchedQuery: string;
+  readonly usedRewrite: boolean;
+}> {
+  const direct = (await deps.fileSearch(query)).filter(accept);
+  if (direct.length > 0 || !deps.rewriteFileQuery) {
+    return { files: direct, matchedQuery: query, usedRewrite: false };
+  }
+
+  const seen = new Set([query.trim().toLowerCase()]);
+  const suggestions = await deps.rewriteFileQuery(query).catch(() => []);
+  for (const suggestion of suggestions) {
+    const candidate = suggestion.trim();
+    const key = candidate.toLowerCase();
+    if (!candidate || seen.has(key)) continue;
+    seen.add(key);
+    const files = (await deps.fileSearch(candidate)).filter(accept);
+    if (files.length > 0) {
+      return { files, matchedQuery: candidate, usedRewrite: true };
+    }
+  }
+
+  return { files: [], matchedQuery: query, usedRewrite: false };
 }
 
 /**
@@ -226,9 +263,9 @@ export async function executeNativeTool(
       if (!applicationQuery || !fileQuery) {
         return { ok: false, content: 'An application and file search query are required.' };
       }
-      const [apps, rawFiles] = await Promise.all([
+      const [apps, search] = await Promise.all([
         deps.listApplications(),
-        deps.fileSearch(fileQuery),
+        searchFilesWithRewrite(deps, fileQuery, (candidate) => candidate.kind !== 'dir'),
       ]);
       const app = resolveApplication(applicationQuery, apps);
       if (app.kind === 'none') {
@@ -245,7 +282,7 @@ export async function executeNativeTool(
             .join(', ')}. Ask the user which one they mean.`,
         };
       }
-      const files = rawFiles.filter((candidate) => candidate.kind !== 'dir');
+      const files = search.files;
       const file = files[0];
       if (!file) {
         return {
@@ -275,20 +312,26 @@ export async function executeNativeTool(
         };
       }
       await deps.recordUsage(app.app.id).catch(() => {});
-      return { ok: true, content: `Opened ${file.name} in ${app.app.name}.` };
+      return {
+        ok: true,
+        content: `Opened ${file.name} in ${app.app.name}.${
+          search.usedRewrite ? ` AI search phrase: "${search.matchedQuery}".` : ''
+        }`,
+      };
     }
 
     case NATIVE_TOOL_IDS.findFiles: {
       const query = String(args['fileQuery'] ?? '').trim();
       if (!query) return { ok: false, content: 'No search query was provided.' };
-      const results = await deps.fileSearch(query);
+      const search = await searchFilesWithRewrite(deps, query);
+      const results = search.files;
       if (results.length === 0) return { ok: true, content: `No files found for "${query}".` };
       return {
         ok: true,
-        content: results
+        content: `${search.usedRewrite ? `AI search phrase: "${search.matchedQuery}".\n` : ''}${results
           .slice(0, 10)
           .map((r) => `${r.name} — ${r.path}`)
-          .join('\n'),
+          .join('\n')}`,
       };
     }
 

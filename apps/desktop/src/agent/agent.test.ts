@@ -198,6 +198,81 @@ describe('executeMissionStep', () => {
     expect(openFileInApplication).not.toHaveBeenCalled();
   });
 
+  it('uses AI search phrase rewrites after a direct indexed miss in open-file missions', async () => {
+    const openFileInApplication = vi.fn().mockResolvedValue(undefined);
+    const rewriteFileQuery = vi.fn(async () => ['convention attendant positions map']);
+    const fileSearch = vi.fn((query: string) =>
+      Promise.resolve(
+        query === 'convention attendant positions map'
+          ? [
+              {
+                name: 'Convention Attendant Positions Map.png',
+                parent: 'C:/docs',
+                path: 'C:/docs/Convention Attendant Positions Map.png',
+                kind: 'file',
+              },
+            ]
+          : [],
+      ),
+    );
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openFileInApplication,
+        args: { applicationQuery: 'vs code', fileQuery: 'load up the attendant map thing' },
+      },
+      deps({ openFileInApplication, fileSearch, rewriteFileQuery }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(fileSearch).toHaveBeenNthCalledWith(1, 'load up the attendant map thing', 10);
+    expect(rewriteFileQuery).toHaveBeenCalledWith('load up the attendant map thing');
+    expect(openFileInApplication).toHaveBeenCalledWith(
+      'vscode',
+      'C:/docs/Convention Attendant Positions Map.png',
+    );
+    expect(out.summary).toContain('using AI search phrase');
+  });
+
+  it('treats folder-only direct hits as open-file misses before trying AI rewrites', async () => {
+    const openFileInApplication = vi.fn().mockResolvedValue(undefined);
+    const rewriteFileQuery = vi.fn(async () => ['convention attendant positions map']);
+    const fileSearch = vi.fn((query: string) =>
+      Promise.resolve(
+        query === 'convention attendant positions map'
+          ? [
+              {
+                name: 'Convention Attendant Positions Map.png',
+                parent: 'C:/docs',
+                path: 'C:/docs/Convention Attendant Positions Map.png',
+                kind: 'file',
+              },
+            ]
+          : [
+              {
+                name: 'Convention',
+                parent: 'C:/docs',
+                path: 'C:/docs/Convention',
+                kind: 'dir',
+              },
+            ],
+      ),
+    );
+    const out = await executeMissionStep(
+      {
+        toolId: NATIVE_TOOL_IDS.openFileInApplication,
+        args: { applicationQuery: 'vs code', fileQuery: 'load up the attendant map thing' },
+      },
+      deps({ openFileInApplication, fileSearch, rewriteFileQuery }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(rewriteFileQuery).toHaveBeenCalledWith('load up the attendant map thing');
+    expect(openFileInApplication).toHaveBeenCalledWith(
+      'vscode',
+      'C:/docs/Convention Attendant Positions Map.png',
+    );
+  });
+
   it('falls back to an indexed folder when the catalog has no project', async () => {
     const openProjectInApplication = vi.fn().mockResolvedValue(undefined);
     const out = await executeMissionStep(
@@ -353,6 +428,34 @@ describe('executeMissionStep', () => {
       deps(),
     );
     expect(out.summary).toContain('Found 1 file');
+  });
+
+  it('uses AI search phrase rewrites for natural-language file-search missions', async () => {
+    const rewriteFileQuery = vi.fn(async () => ['kht congregation accounts instructions']);
+    const fileSearch = vi.fn((query: string) =>
+      Promise.resolve(
+        query === 'kht congregation accounts instructions'
+          ? [
+              {
+                name: 'KHT Congregation Accounts Instructions.pdf',
+                parent: 'C:/docs',
+                path: 'C:/docs/KHT Congregation Accounts Instructions.pdf',
+                kind: 'file',
+              },
+            ]
+          : [],
+      ),
+    );
+    const out = await executeMissionStep(
+      { toolId: NATIVE_TOOL_IDS.findFiles, args: { fileQuery: 'where are the kht money rules' } },
+      deps({ fileSearch, rewriteFileQuery }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(rewriteFileQuery).toHaveBeenCalledWith('where are the kht money rules');
+    expect(out.summary).toContain('kht congregation accounts instructions');
+    expect(out.detail).toContain('AI search phrase');
+    expect(out.detail).toContain('KHT Congregation Accounts Instructions.pdf');
   });
 
   it('runs a quick-ai sub-task and captures the text', async () => {

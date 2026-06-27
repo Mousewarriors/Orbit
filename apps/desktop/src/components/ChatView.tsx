@@ -13,6 +13,7 @@ import type { McpClient, ToolRecord } from '@orbit/tool-registry';
 import * as native from '../native.js';
 import { AI_SETTING_KEYS, parseFolderConfidence, type ProviderInfo } from '../ai/providerConfig.js';
 import { loadProviderInfo } from '../ai/providerLoad.js';
+import { rewriteFileQueryWithAi } from '../ai/fileQueryRewrite.js';
 import { loadProfileBundle, saveMemories } from '../ai/profileStore.js';
 import { buildToolRegistry, DEMO_MCP_SERVER_ID } from '../ai/toolRegistry.js';
 import { runToolLoop, type ToolCallCard } from '../ai/toolLoop.js';
@@ -286,6 +287,7 @@ export function ChatView({ onPop }: { onPop: () => void }): JSX.Element {
                     native.openFileInApplication(applicationId, filePath),
                   recordUsage: (id) => native.recordCommandUsage(id),
                   fileSearch: (q) => native.fileSearch(q),
+                  rewriteFileQuery: (q) => rewriteFileQueryWithAi(q, provider, controller.signal),
                   findFolders: async (q) =>
                     (await native.fileSearch(q, { kind: 'dir' })).map((r) => ({
                       name: r.name,
