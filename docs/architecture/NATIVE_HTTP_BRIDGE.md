@@ -26,8 +26,9 @@ Two native clients exist:
   credentials, rejects loopback/private/link-local/reserved/direct-local
   destinations before sending, performs DNS preflight, rejects forbidden resolved
   addresses, pins the request to the preflight-approved address set, bypasses
-  proxies for MCP, and never follows redirects. Renderer-supplied request ids
-  make the request cancellable.
+  proxies for MCP, never follows redirects, and rejects responses above
+  1,048,576 bytes while streaming the body in Rust. Renderer-supplied request
+  ids make the request cancellable.
 - `http_mcp_cancel(id)` marks an in-flight HTTP MCP request cancelled. The Rust
   command races the reqwest future against this flag and drops the request
   future when cancellation wins.
@@ -61,7 +62,8 @@ into SSRF traffic.
   direct/DNS-resolved loopback, private, link-local, documentation/reserved or
   multicast addresses are rejected before tool data is sent to any forbidden
   destination. The request is pinned to the approved DNS results to avoid a
-  preflight/re-resolve gap.
+  preflight/re-resolve gap. Response bodies are read through a native byte cap so
+  oversized MCP output is rejected before it can inflate in the renderer.
 - Secrets do not live in these configs; provider/MCP credentials are referenced
   from OS secure storage only.
 - Streamed output and MCP responses remain untrusted data; the Tool Registry and

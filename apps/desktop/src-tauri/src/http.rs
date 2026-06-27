@@ -36,6 +36,8 @@ static CANCELS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
 static MCP_CANCELS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+const MAX_HTTP_MCP_RESPONSE_BYTES: usize = 1_048_576;
+
 #[derive(Serialize)]
 pub struct HttpResponse {
     pub status: u16,
@@ -257,12 +259,48 @@ pub async fn http_mcp_request(
         return Err("HTTP MCP redirects are not allowed".into());
     }
     let status = resp.status().as_u16();
-    let text = resp.text().await.map_err(|e| e.to_string())?;
+    let text = read_bounded_mcp_response_text(resp).await?;
     Ok(HttpResponse { status, body: text })
 }
 
 async fn send_mcp_request(rb: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
     rb.send().await.map_err(|e| e.to_string())
+}
+
+fn append_bounded_mcp_response_chunk(
+    body: &mut Vec<u8>,
+    chunk: &[u8],
+    max_bytes: usize,
+) -> Result<(), String> {
+    bounded_mcp_response_next_len(body.len(), chunk.len(), max_bytes)?;
+    body.extend_from_slice(chunk);
+    Ok(())
+}
+
+fn bounded_mcp_response_next_len(
+    current_len: usize,
+    chunk_len: usize,
+    max_bytes: usize,
+) -> Result<usize, String> {
+    let next_len = current_len
+        .checked_add(chunk_len)
+        .ok_or_else(|| "HTTP MCP response exceeded byte limit".to_string())?;
+    if next_len > max_bytes {
+        return Err(format!("HTTP MCP response exceeded {max_bytes} byte limit"));
+    }
+    Ok(next_len)
+}
+
+async fn read_bounded_mcp_response_text(resp: reqwest::Response) -> Result<String, String> {
+    use futures_util::StreamExt;
+
+    let mut body = Vec::new();
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        append_bounded_mcp_response_chunk(&mut body, &chunk, MAX_HTTP_MCP_RESPONSE_BYTES)?;
+    }
+    String::from_utf8(body).map_err(|_| "HTTP MCP response was not valid UTF-8".to_string())
 }
 
 async fn wait_for_cancel(flag: Arc<AtomicBool>) {
@@ -420,7 +458,10 @@ mod tests {
             "198.19.255.255",
             "203.0.113.1",
         ] {
-            assert!(ip_is_forbidden(ip.parse::<IpAddr>().expect(ip)), "{ip} must be forbidden");
+            assert!(
+                ip_is_forbidden(ip.parse::<IpAddr>().expect(ip)),
+                "{ip} must be forbidden"
+            );
         }
         assert!(!ip_is_forbidden("8.8.8.8".parse::<IpAddr>().unwrap()));
         let parsed = validate_http_mcp_url("https://mcp.example.com/rpc").expect("shape valid");
@@ -437,5 +478,27 @@ mod tests {
         http_mcp_cancel(id.clone());
         assert!(flag.load(Ordering::Relaxed));
         MCP_CANCELS.lock().unwrap().remove(&id);
+    }
+
+    #[test]
+    fn http_mcp_response_limit_accepts_exact_limit() {
+        let mut body = Vec::new();
+        append_bounded_mcp_response_chunk(&mut body, b"abcd", 4).unwrap();
+        assert_eq!(body, b"abcd");
+    }
+
+    #[test]
+    fn http_mcp_response_limit_rejects_oversized_body() {
+        let mut body = Vec::new();
+        append_bounded_mcp_response_chunk(&mut body, b"abcd", 4).unwrap();
+        let err = append_bounded_mcp_response_chunk(&mut body, b"e", 4).unwrap_err();
+        assert!(err.contains("exceeded 4 byte limit"));
+        assert_eq!(body, b"abcd");
+    }
+
+    #[test]
+    fn http_mcp_response_limit_handles_length_overflow() {
+        let err = bounded_mcp_response_next_len(usize::MAX, 1, usize::MAX).unwrap_err();
+        assert!(err.contains("exceeded byte limit"));
     }
 }

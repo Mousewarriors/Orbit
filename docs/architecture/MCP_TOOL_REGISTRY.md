@@ -56,8 +56,9 @@ file/note search, Relay dispatch/restart, and Quick AI.
   Native connection preflight rejects URL credentials, loopback/local/private/
   link-local/reserved destinations, forbidden DNS results, proxies, and
   redirects. The native request pins the approved DNS results for the actual
-  JSON-RPC request. `AbortSignal` cancellation flows to `http_mcp_cancel`, which
-  stops the native reqwest future.
+  JSON-RPC request. Response bodies are streamed through a 1,048,576-byte native
+  cap before being handed to the renderer. `AbortSignal` cancellation flows to
+  `http_mcp_cancel`, which stops the native reqwest future.
 
 ## Renderer surface
 
