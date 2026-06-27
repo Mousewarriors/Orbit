@@ -101,7 +101,7 @@ fn parse_orbit_uri(raw: &str) -> Option<String> {
     if matches!(first, "run" | "command" | "query") {
         let joined = segments.collect::<Vec<_>>().join(" ");
         if !joined.is_empty() {
-            return clean_query(&percent_decode(&joined, false));
+            return clean_query(&percent_decode(&joined, true));
         }
     }
 
@@ -194,6 +194,16 @@ mod tests {
         let parsed = parse_orbit_command_args(&args(&["orbit://run/load%20up%20map%20in%20paint"]))
             .expect("parsed");
         assert_eq!(parsed.query, "load up map in paint");
+    }
+
+    #[test]
+    fn parses_protocol_path_form_with_plus_spaces_for_agent_launch() {
+        let parsed = parse_orbit_command_args(&args(&[
+            "orbit://run/agent%3A+launch+an+agent+on+Orbit",
+        ]))
+        .expect("parsed");
+        assert_eq!(parsed.query, "agent: launch an agent on Orbit");
+        assert_eq!(parsed.source, "protocol");
     }
 
     #[test]
