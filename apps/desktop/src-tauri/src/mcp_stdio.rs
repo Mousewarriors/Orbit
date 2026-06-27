@@ -190,6 +190,7 @@ pub fn mcp_stdio_open(
     std::thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().map_while(Result::ok) {
+            let line = crate::redaction::redact_secrets(&line);
             let mut r = ring_w.lock().unwrap();
             if r.len() == STDERR_RING {
                 r.pop_front();
@@ -279,7 +280,13 @@ pub fn mcp_stdio_request(
 pub fn mcp_stdio_logs(id: String) -> Result<Vec<String>, String> {
     let conn = CONNS.lock().unwrap().get(&id).cloned();
     match conn {
-        Some(c) => Ok(c.stderr.lock().unwrap().iter().cloned().collect()),
+        Some(c) => Ok(c
+            .stderr
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| crate::redaction::redact_secrets(line))
+            .collect()),
         None => Ok(vec![]),
     }
 }

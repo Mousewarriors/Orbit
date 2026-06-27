@@ -45,6 +45,7 @@ cross-extension data access; AI tool misuse.
 | Crash-loop protection auto-disables a repeatedly failing/hanging extension; invocations time out and the child is killed | `orbit-extensions::crash` + `extension_host` |
 | Extension manifests are validated host-side (bounded fields, safe ids, no traversal in `main`, known permissions/modes) | `orbit-extensions::manifest` (tested) |
 | Provider/OAuth credentials live in OS secure storage only; native secret access accepts only known provider/OAuth key names plus a narrow `mcp.server:<id>.(token\|apikey\|oauth)` pattern for schema-referenced MCP credentials, and chunks large token sets without writing them to settings | `secrets.rs` + provider settings/loaders (tested) |
+| Relay, MCP stdio and extension diagnostic tails are redacted before renderer exposure, status events or copied diagnostics can include common bearer/API-token/private-key shapes | `redaction.rs`, `relay_supervisor.rs`, `mcp_stdio.rs`, `extension_host.rs` (tested) |
 
 Defence-in-depth: validation exists in TS **and** the native layer re-checks
 (e.g. `open_url` independently rejects non-http(s)/mailto schemes).
@@ -63,8 +64,8 @@ secrets API are tracked as future work (see
 
 ## Planned controls
 
-- Broaden secret redaction coverage in every future export/logging surface as
-  new diagnostics are added.
+- Keep extending diagnostic redaction patterns as new provider/token formats are
+  added.
 - **Permission broker** in Rust enforcing manifest-declared permissions per
   extension; graceful permission-denied states.
 - **Extension isolation**: child-process execution, memory/time limits, crash

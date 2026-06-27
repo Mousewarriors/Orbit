@@ -26,8 +26,9 @@ vectors → mitigations (implemented = ✅, planned = ⬜).
   are not written to settings or diagnostics ✅; MCP configs carry credential
   references only, with native storage constrained to
   `mcp.server:<id>.(token|apikey|oauth)` for future MCP credential material ✅;
-  expanded redaction coverage for future export/logging surfaces remains
-  tracked ⬜.
+  Relay, MCP stdio and extension diagnostic tails redact common bearer/API-token
+  and private-key shapes before renderer exposure ✅; pattern expansion for new
+  token formats remains tracked ⬜.
 - **Clipboard secrets to AI.** Mitigation: never send clipboard to AI
   automatically; sensitive-content flag + excluded apps ⬜ (schema ✅).
 

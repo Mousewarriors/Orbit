@@ -18,6 +18,7 @@ mod http;
 mod mcp_stdio;
 mod oauth;
 mod orbit_command;
+mod redaction;
 mod secrets;
 mod launcher;
 mod relay_manifest;

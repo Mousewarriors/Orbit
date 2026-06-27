@@ -517,8 +517,9 @@ impl ExtensionHost {
                 self.handle_response(app, state, ext_id, &permissions, response)
             }
             Err(e) => {
-                self.record(ext_id, false, Some(e.clone()), logs);
-                Err(e)
+                let safe = crate::redaction::redact_secrets(&e);
+                self.record(ext_id, false, Some(safe.clone()), logs);
+                Err(safe)
             }
         }
     }
@@ -531,13 +532,14 @@ impl ExtensionHost {
                     ext.last_error = None;
                 } else {
                     ext.crash.record_failure(now_ms());
-                    ext.last_error = last_error;
+                    ext.last_error =
+                        last_error.map(|error| crate::redaction::redact_secrets(&error));
                 }
                 // Always refresh the captured logs (even on success) so the most
                 // recent diagnostics are shown; keep the old capture if this run
                 // wrote nothing to stderr.
                 if logs.is_some() {
-                    ext.recent_logs = logs;
+                    ext.recent_logs = logs.map(|log| crate::redaction::redact_secrets(&log));
                 }
             }
         }
@@ -552,7 +554,7 @@ impl ExtensionHost {
         response: InvokeResponse,
     ) -> Result<RunResult, String> {
         match response {
-            InvokeResponse::Error { message, .. } => Err(message),
+            InvokeResponse::Error { message, .. } => Err(crate::redaction::redact_secrets(&message)),
             InvokeResponse::Result { items, effects, storage_writes, toast, .. } => {
                 // Broker top-level effects and perform the allowed ones.
                 for effect in allowed_effects(effects, permissions) {
@@ -686,7 +688,10 @@ fn invoke_child(
             let _ = child.kill();
             // Surface whatever the child managed to log before we killed it.
             let logs = err_rx.recv_timeout(Duration::from_millis(200)).ok();
-            return (Err("extension timed out".into()), logs.and_then(|s| bound_logs(&s)));
+            return (
+                Err("extension timed out".into()),
+                logs.and_then(|s| bound_logs(&crate::redaction::redact_secrets(&s))),
+            );
         }
     };
     let _ = child.wait();
@@ -696,7 +701,7 @@ fn invoke_child(
     let logs = err_rx
         .recv_timeout(Duration::from_millis(200))
         .ok()
-        .and_then(|s| bound_logs(&s));
+        .and_then(|s| bound_logs(&crate::redaction::redact_secrets(&s)));
 
     if output.trim().is_empty() {
         return (Err("extension produced no output".into()), logs);

@@ -123,9 +123,9 @@ impl RelayClientError {
             _ => self.message.clone(),
         };
         if let Some(data) = self.data.as_ref() {
-            format!("{base} ({data})")
+            crate::redaction::redact_secrets(&format!("{base} ({data})"))
         } else {
-            base
+            crate::redaction::redact_secrets(&base)
         }
     }
 }
@@ -919,8 +919,9 @@ impl RelaySupervisor {
                 Err(_) => return,
             };
             inner.state = state;
-            inner.user_message = user_message.into();
-            inner.technical_detail = technical_detail;
+            inner.user_message = crate::redaction::redact_secrets(&user_message.into());
+            inner.technical_detail =
+                technical_detail.map(|detail| crate::redaction::redact_secrets(&detail));
             inner.last_state_change_ms = now_ms();
         }
         self.emit_status(app);
@@ -955,6 +956,7 @@ impl RelaySupervisor {
     }
 
     fn push_diagnostic(&self, line: String, app: Option<&RelayAppHandle>) {
+        let line = crate::redaction::redact_secrets(&line);
         {
             let mut inner = match self.inner.lock() {
                 Ok(inner) => inner,
@@ -1096,6 +1098,19 @@ mod tests {
             status.diagnostics.first().map(String::as_str),
             Some("line 50")
         );
+    }
+
+    #[test]
+    fn diagnostics_are_redacted_before_status_exposure() {
+        let supervisor = RelaySupervisor::default();
+        supervisor.push_diagnostic(
+            "provider failed with Authorization: Bearer secret-token-123".into(),
+            None,
+        );
+        let status = supervisor.status();
+        let line = status.diagnostics.join("\n");
+        assert!(!line.contains("secret-token-123"));
+        assert!(line.contains("[redacted]"));
     }
 
     #[test]
